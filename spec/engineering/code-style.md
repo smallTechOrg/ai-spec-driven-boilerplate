@@ -38,3 +38,43 @@ These apply regardless of language or framework:
 ## What NOT to Do
 
 <!-- FILL IN: Anti-patterns specific to this tech stack. Filled in by tech-designer. -->
+
+---
+
+## Integration Test Patterns
+
+### Replacing an async init function in tests
+
+When your runner calls an async `init_db()` or similar startup function, monkeypatch it with an async noop — not a sync lambda:
+
+```python
+# CORRECT
+async def _noop(): pass
+monkeypatch.setattr("mypackage.agent.runner.init_db", _noop)
+
+# WRONG — breaks await
+monkeypatch.setattr("mypackage.agent.runner.init_db", lambda: None)
+```
+
+### Replacing the DB session factory in integration tests
+
+```python
+@pytest.fixture(autouse=True)
+async def _use_test_db(monkeypatch, tmp_path):
+    db_url = f"sqlite+aiosqlite:///{tmp_path}/test.db"
+    engine = create_async_engine(db_url)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    import mypackage.db.session as s
+    monkeypatch.setattr(s, "AsyncSessionLocal", factory)
+    monkeypatch.setattr(s, "engine", engine)
+
+    async def _noop(): pass
+    monkeypatch.setattr("mypackage.agent.runner.init_db", _noop)
+    yield
+    await engine.dispose()
+```
+
+Use `tmp_path` (not `:memory:`) for integration tests — it avoids shared-state issues across tests.

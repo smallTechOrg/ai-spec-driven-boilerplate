@@ -59,6 +59,41 @@ These apply to all projects. No exceptions.
 
 ---
 
+## Framework Gotchas (keep up to date — known footguns)
+
+### Starlette ≥ 1.0 `TemplateResponse` signature
+
+Starlette 1.0 and FastAPI 0.115+ require the **new** `TemplateResponse` call signature:
+
+```python
+# CORRECT (Starlette ≥ 1.0)
+return templates.TemplateResponse(request, "page.html", {"foo": bar})
+
+# WRONG (pre-1.0 form) — fails with TypeError: unhashable type: 'dict'
+return templates.TemplateResponse("page.html", {"request": request, "foo": bar})
+```
+
+A small helper in the routes module keeps call sites tidy:
+
+```python
+def render(request: Request, name: str, **ctx):
+    return templates.TemplateResponse(request, name, ctx)
+```
+
+### LLM provider selection and stubs
+
+Any project with an LLM dependency must follow these patterns:
+
+1. **`provider=auto` by default.** Resolve to the real provider when the API key env var is set, otherwise to the stub. Setting the key is the only step the user should need. Add a `resolved_llm_provider` property on `Settings` that encapsulates this.
+
+2. **Stub outputs branch on explicit node tags, not prose keywords.** Each pipeline node injects a unique tag (`<node:plan>`, `<node:draft>`, `<node:title>`, ...) into its prompt, and the stub matches those tags. Matching on words that also appear in the prompt body cross-contaminates — a draft prompt that contains "expand this outline" must never trigger the stub's "outline" branch.
+
+3. **Stub "draft"-class outputs are article-shaped.** Multiple paragraphs and/or headings — not a bare bullet list. Offline demos must be believable.
+
+4. **The UI shows a visible stub-mode banner** on every page when the resolved provider is `stub`. Inject `llm_provider` into every template context. Silent stubs are a bug.
+
+---
+
 ## Integration Test Patterns
 
 ### Replacing an async init function in tests

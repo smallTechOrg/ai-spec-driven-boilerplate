@@ -155,9 +155,14 @@ Build immediately after scaffold. No gates until QA.
 
 ### Phase 2
 1. Implement: `tools/*.py` (stubs), `agent/state.py`, `agent/nodes.py`, `agent/graph.py`, `agent/runner.py`, `__main__.py`, `tests/integration/test_pipeline.py`
-2. Write `README.md` — setup, how to run offline, how to run for real, how to run tests. README must include `uv run alembic upgrade head` as an explicit step before running the app.
-3. Gate: `uv run pytest` must pass — DB URL must be set, LLM API key must NOT be required
-4. Commit: `phase-2: stubbed agent loop + README — gate PASSED (N/N tests)`
+2. **LLM provider layer:** `provider=auto` is the default — resolves to the real provider when the API key env var is set, otherwise to the stub (see `spec/engineering/code-style.md` § "LLM provider selection and stubs"). The user must never need to flip a second flag on top of setting the key.
+3. **Stub correctness:** the stub branches on explicit `<node:plan>` / `<node:draft>` / `<node:title>` tags that the nodes inject into their prompts — never on prose keywords. Stub "draft" output is article-shaped (paragraphs + headings), not a bullet list.
+4. **Stub-mode UI banner:** every rendered page shows a visible banner when the resolved provider is `stub`. Inject `llm_provider` into every template context.
+5. Write `README.md` — setup, how to run, how to run tests. Include `uv run alembic upgrade head` explicitly. Setting the API key is the primary path; stub mode is a fallback clearly labelled in the UI.
+6. **Golden-path UI smoke test** (mandatory if any UI/HTTP surface exists) — walks the full primary user flow via `TestClient` and asserts response **content**, not only status codes. See `spec/engineering/workflows/golden-path-smoke-test.md`.
+7. **Live-server check:** start the app with `uv run python -m <pkg>`, hit `/health` plus at least one real page via `curl`, both 200. Log curl exit codes in the session report.
+8. Gate: `uv run pytest` passes (DB URL set, LLM API key NOT required). Golden-path smoke + live-server check both green.
+9. Commit: `phase-2: stubbed agent loop + UI + README — gate PASSED (N/N tests)`
 
 Announce: "Skeleton is running." Point user to README.
 

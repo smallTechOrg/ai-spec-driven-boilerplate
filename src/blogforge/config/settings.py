@@ -18,10 +18,14 @@ class Settings(BaseSettings):
 
     @property
     def resolved_llm_provider(self) -> str:
-        """`auto` means: use gemini when a key is set, otherwise stub."""
-        if self.llm_provider == "auto":
-            return "gemini" if self.gemini_api_key else "stub"
-        return self.llm_provider
+        """`auto` means: use gemini when a key is set, otherwise stub.
+        Strips inline `#` comments and whitespace defensively — a stale .env
+        with `BLOGFORGE_LLM_PROVIDER=stub   # note` would otherwise pin stub.
+        """
+        raw = (self.llm_provider or "").split("#", 1)[0].strip().lower()
+        if raw in ("", "auto"):
+            return "gemini" if self.gemini_api_key.strip() else "stub"
+        return raw
 
 
 _settings: Settings | None = None

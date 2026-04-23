@@ -125,15 +125,17 @@ Then ask one question via `AskUserQuestion`:
 
 Build immediately after user approval. No further gates until QA.
 
+**Always follow the standard layout in `spec/engineering/project-layout.md`.** It contains exact file shapes for `session.py`, `conftest.py`, the stub tool pattern, and the integration test fixture. Copy those patterns — do not invent new ones.
+
 ### Phase 1
-1. Implement domain models, DB schema, migrations, repository, conftest, unit tests
-2. Run: `pytest tests/unit/` — must pass 100%
-3. Commit: `phase-1: domain models + schema — gate PASSED`
+1. Implement: `config.py`, `domain/models.py`, `db/models.py`, `db/session.py`, `db/repository.py`, `tests/conftest.py`, `tests/unit/db/test_repository.py`
+2. Gate command from `spec/engineering/tech-stack.md` — must pass 100%
+3. Commit: `phase-1: domain models + schema — gate PASSED (N/N tests)`
 
 ### Phase 2
-1. Implement agent state, nodes (stubbed), graph, runner, main.py, __main__.py, integration test
-2. Run: `pytest tests/integration/test_agent_pipeline.py` — must pass
-3. Commit: `phase-2: stubbed agent loop — gate PASSED`
+1. Implement: `tools/*.py` (stubs), `agent/state.py`, `agent/nodes.py`, `agent/graph.py`, `agent/runner.py`, `__main__.py`, `tests/integration/test_pipeline.py`
+2. Gate command from `spec/engineering/tech-stack.md` — must pass with **no env vars set**
+3. Commit: `phase-2: stubbed agent loop — gate PASSED (N/N tests)`
 
 After Phase 2: **announce the skeleton is running.** Tell the user how to start it and what they'll see.
 

@@ -29,6 +29,7 @@ spec/product/07-agent-graph.md      ← REQUIRED for any agent framework project
 spec/engineering/ai-agents.md
 spec/engineering/spec-driven.md
 spec/engineering/phases.md
+spec/engineering/project-layout.md
 spec/engineering/tech-stack.md
 spec/engineering/code-style.md
 ```

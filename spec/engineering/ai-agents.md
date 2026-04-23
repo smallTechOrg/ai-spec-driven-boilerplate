@@ -32,28 +32,30 @@ Minimum required sections:
 
 Update the report in real time. Do not reconstruct it from memory at the end.
 
-## 3. Gate Law (Non-Negotiable)
+## 3. Gate Law
 
-Every lifecycle stage — spec, tech design, plan — follows the same mandatory gate sequence:
+The goal is: **one prompt → working skeleton in ~10 minutes.** All decisions are captured upfront and approved once. There is exactly one user approval gate before code is written.
 
 ```
-[Sub-agent produces output]
+INTAKE (4 questions: scope, stack, trigger, constraints)
         ↓
-[Reviewer sub-agent runs and approves]  ← NEVER skip
+DRAFT (spec + tech design + plan produced together)
         ↓
-[User approves via AskUserQuestion]     ← NEVER skip
+ONE APPROVAL (user sees everything at once — one response to proceed)
         ↓
-[Next stage begins]
+BUILD (Phase 1 → Phase 2, each gated by passing tests)
 ```
 
-**Consequences of skipping a gate:**
-- A spec without spec-reviewer approval may have gaps that waste entire coding sessions
-- A tech design without review may contradict the spec
-- A plan without review may miss capabilities entirely
+**Rules that never change:**
+- Stack decisions (database, language, hosting) belong to the user — captured at intake, never chosen autonomously
+- No code is written before the single approval gate is cleared
+- Each build phase must pass its gate test before the next phase starts
+- Reviewers (spec-reviewer, plan-reviewer) run as background validation and surface blockers, but do not add approval rounds for v0.1
 
-If you find yourself starting a later stage without all prior gates having been explicitly cleared, stop immediately. Run the missing reviewer, surface the result, get user approval, then continue. Do not rationalize skipping ("I'm confident it's fine") — the gate exists precisely because confidence is not a substitute for review.
-
-The gate sequence was defined during the build of this boilerplate and is the ultimate workflow regardless of which project is built on it.
+**After v0.1 is running**, subsequent phases follow the standard gate:
+```
+[Phase implemented] → [gate test passes] → [committed] → [next phase]
+```
 
 ---
 

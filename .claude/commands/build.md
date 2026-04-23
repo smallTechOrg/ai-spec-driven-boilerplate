@@ -1,6 +1,6 @@
 # /build
 
-Kick off the agent-builder with your zero-shot idea.
+Kick off the agent-builder with your zero-shot idea. One prompt → working skeleton.
 
 ## Usage
 
@@ -19,31 +19,39 @@ Kick off the agent-builder with your zero-shot idea.
 ```
 
 ```
-/build An agent that watches my Shopify store for low inventory and auto-drafts restock emails to suppliers — use Python and FastAPI
+/build An agent that watches my Shopify store for low inventory and auto-drafts restock emails — Python, PostgreSQL, deploy to Railway
 ```
+
+## The more detail you give, the faster it goes
+
+Include in your prompt:
+- What the agent does
+- Tech preferences: language, database, hosting (e.g. "Python, PostgreSQL")
+- Key integrations or API keys you have
+- Any hard constraints
+
+The agent-builder asks **4 questions upfront** (scope, stack, output/trigger, constraints), then produces spec + tech design + build plan in one shot. You approve once, then it builds.
 
 ## What Happens
 
-The agent-builder sub-agent takes your idea and runs the full lifecycle:
-1. Asks clarifying questions until requirements are clear
-2. Spec-writer drafts the product spec; you approve
-3. Tech-designer proposes the stack; you approve
-4. Planner creates a phased build plan; you approve
-5. Builds phase by phase, with QA gates between each phase
-6. Drift audit at the end
-7. Hands off a working agent
+```
+Your prompt
+    ↓
+4 intake questions (scope, stack, trigger, constraints)
+    ↓
+Spec + tech design + v0.1 plan drafted together
+    ↓
+One summary → you approve once
+    ↓
+Phase 1: domain models + DB schema (tests pass)
+    ↓
+Phase 2: stubbed agent loop end-to-end (tests pass)
+    ↓
+Skeleton is running — iterate from here
+```
 
-You are consulted at each approval gate. Nothing proceeds without your sign-off.
-
-## Arguments
-
-The text after `/build` is your idea. The more detail you give, the fewer clarifying questions you'll be asked. You can include:
-- What the agent does
-- Who uses it
-- What integrations it needs
-- Tech preferences (language, framework, etc.)
-- Constraints (budget, latency, compliance)
+**Target: working skeleton in ~10 minutes.**
 
 ## Invocation
 
-This command invokes `.claude/agents/agent-builder.md`. The agent-builder will guide you through the rest.
+This command invokes `.claude/agents/agent-builder.md`.

@@ -13,6 +13,7 @@
   textarea { min-height: 8rem; }
   button { margin-top: 1rem; padding: .5rem 1rem; background: #0366d6; color: #fff; border: 0; border-radius: 4px; cursor: pointer; }
   .error { background: #ffecec; border: 1px solid #d33; color: #900; padding: .5rem 1rem; border-radius: 4px; margin-bottom: 1rem; }
+  .warn { background: #fff8e1; border: 1px solid #e0b000; color: #6b4e00; padding: .5rem 1rem; border-radius: 4px; margin-bottom: 1rem; font-size: .9rem; }
   .muted { color: #888; }
   ul { padding-left: 1.2rem; }
   .card { border: 1px solid #eee; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; }
@@ -26,6 +27,12 @@
   <a href="/writers">Writers</a>
   <a href="/articles">Articles</a>
 </nav>
+{% if llm_provider == "stub" %}
+<div class="warn">
+  <strong>Running in stub mode.</strong> Articles are placeholder text, not AI-generated.
+  Set <code>BLOGFORGE_GEMINI_API_KEY</code> in <code>.env</code> and restart to use Gemini.
+</div>
+{% endif %}
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 {% block content %}{% endblock %}
 </body>

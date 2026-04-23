@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from blogforge.config.settings import get_settings
 from blogforge.db import repository as repo
 from blogforge.db.session import new_session
 from blogforge.graph.runner import run_agent
@@ -28,6 +29,7 @@ def get_db():
 
 
 def render(request: Request, name: str, **ctx):
+    ctx.setdefault("llm_provider", get_settings().resolved_llm_provider)
     return templates.TemplateResponse(request, name, ctx)
 
 

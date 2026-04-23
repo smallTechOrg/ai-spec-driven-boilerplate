@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from blogforge.db import repository as repo
@@ -5,28 +6,37 @@ from blogforge.db.session import new_session
 from blogforge.graph.state import AgentState
 from blogforge.llm.client import get_llm
 
+log = logging.getLogger(__name__)
+
 
 def _prompt_outline(state: AgentState) -> str:
     return (
+        "<node:plan>\n"
         "You are ghostwriting a blog post. Produce a 3-6 bullet outline.\n\n"
         f"Voice guidelines:\n{state['guidelines']}\n\n"
         f"Writer persona:\n{state['persona']}\n\n"
-        f"Topic: {state['topic']}\n"
-        f"Notes: {state.get('notes') or '(none)'}\n\n"
+        f"topic: {state['topic']}\n"
+        f"notes: {state.get('notes') or '(none)'}\n\n"
         "Return only the outline, markdown bullets."
     )
 
 
 def _prompt_draft(state: AgentState) -> str:
     return (
-        "Expand this outline into a full blog post in markdown, matching the voice and persona.\n\n"
+        "<node:draft>\n"
+        "Expand this plan into a full blog post in markdown, matching the voice and persona.\n\n"
         f"Voice:\n{state['guidelines']}\n\nPersona:\n{state['persona']}\n\n"
-        f"Topic: {state['topic']}\n\nOutline:\n{state['outline']}\n"
+        f"topic: {state['topic']}\n\nPlan:\n{state['outline']}\n"
     )
 
 
-def _prompt_title(draft: str) -> str:
-    return f"Give a short, catchy title (no quotes, no 'Title:' prefix) for:\n\n{draft[:2000]}"
+def _prompt_title(state: AgentState) -> str:
+    return (
+        "<node:title>\n"
+        f"topic: {state['topic']}\n\n"
+        "Give a short, catchy title (no quotes, no 'Title:' prefix) for the article below.\n\n"
+        f"{(state.get('draft') or '')[:2000]}"
+    )
 
 
 def node_plan(state: AgentState) -> AgentState:
@@ -34,6 +44,7 @@ def node_plan(state: AgentState) -> AgentState:
         outline = get_llm().generate(_prompt_outline(state))
         return {**state, "outline": outline}
     except Exception as e:
+        log.exception("node_plan failed")
         return {**state, "error": f"plan: {e}"}
 
 
@@ -42,14 +53,15 @@ def node_draft(state: AgentState) -> AgentState:
         draft = get_llm().generate(_prompt_draft(state))
         return {**state, "draft": draft}
     except Exception as e:
+        log.exception("node_draft failed")
         return {**state, "error": f"draft: {e}"}
 
 
 def node_finalize(state: AgentState) -> AgentState:
     try:
         draft = state["draft"] or ""
-        title = get_llm().generate(_prompt_title(draft)) or state["topic"][:80]
-        title = title.strip().splitlines()[0][:200] if title.strip() else state["topic"][:80]
+        raw_title = get_llm().generate(_prompt_title(state))
+        title = (raw_title.strip().splitlines()[0][:200] if raw_title.strip() else state["topic"][:80]) or state["topic"][:80]
 
         with new_session() as db:
             article = repo.create_article(
@@ -63,10 +75,12 @@ def node_finalize(state: AgentState) -> AgentState:
             repo.complete_run(db, UUID(state["run_id"]), article_id=article.id)
         return {**state, "title": title, "body": draft, "article_id": str(article.id)}
     except Exception as e:
+        log.exception("node_finalize failed")
         return {**state, "error": f"finalize: {e}"}
 
 
 def node_handle_error(state: AgentState) -> AgentState:
+    log.error("agent run failed: run_id=%s error=%s", state.get("run_id"), state.get("error"))
     with new_session() as db:
         repo.fail_run(db, UUID(state["run_id"]), error_message=state.get("error") or "unknown error")
     return state

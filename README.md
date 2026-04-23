@@ -27,28 +27,31 @@ uv run alembic upgrade head
 uv run alembic current   # must print a revision hash, not blank
 ```
 
-## Run the app (stub / offline mode — default)
+## Run the app
+
+Set your Gemini key in `.env`:
+
+```
+BLOGFORGE_GEMINI_API_KEY=your-key-here
+```
+
+Then:
 
 ```bash
 uv run python -m blogforge
 ```
 
-Open http://localhost:8001, then:
+Open http://localhost:8001 and:
 1. Create a Voice (name + guidelines)
 2. Create a Writer linked to that voice
 3. Generate an article — pick the writer, enter a topic
 
-## Run with real Gemini
+### Offline / stub mode
 
-In `.env`:
-
-```
-BLOGFORGE_LLM_PROVIDER=gemini
-BLOGFORGE_GEMINI_API_KEY=your-key-here
-BLOGFORGE_LLM_MODEL=gemini-2.5-flash
-```
-
-Then `uv run python -m blogforge`.
+If no `BLOGFORGE_GEMINI_API_KEY` is set, the app runs against a deterministic
+stub provider — every page shows a yellow "Running in stub mode" banner and
+articles are placeholder text, not AI-generated. Useful for demos and tests;
+set the key to get real articles.
 
 ## Run tests
 

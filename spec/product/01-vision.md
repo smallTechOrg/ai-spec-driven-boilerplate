@@ -1,43 +1,22 @@
-# Vision
-
-> **Boilerplate status:** This file contains placeholders. The spec-writer sub-agent will fill these in based on your idea. Run `/build [your idea]` to start, or fill in the placeholders manually.
-
----
+# Vision — GitHub PR Staleness Monitor
 
 ## What This Agent Does
-
-<!-- FILL IN: One paragraph describing what this agent does, who uses it, and what problem it solves. -->
-
-## Who Uses It
-
-<!-- FILL IN: Primary user(s). What is their role? What are they trying to accomplish? -->
-
-## Core Problem Being Solved
-
-<!-- FILL IN: What manual or broken process does this agent replace or improve? -->
+Queries a GitHub org for open pull requests, identifies those with no activity in 3+ days, and posts a single Slack digest.
 
 ## Success Criteria
+- [ ] Fetches all open PRs across all repos in a configured GitHub org
+- [ ] Identifies PRs with no commits or review comments in the last 3 days
+- [ ] Posts one Slack message listing stale PRs (repo, title, author, days open)
+- [ ] If no stale PRs, posts nothing
+- [ ] Saves each run result to PostgreSQL
 
-<!-- FILL IN: How do we know the agent is working? List 3-5 measurable outcomes. -->
+## Out of Scope (v0.1)
+- Auto-assigning or closing PRs
+- Per-repo or per-author filtering
+- Web dashboard
+- Deduplication (don't re-notify same PR)
 
-- [ ] <!-- criterion 1 -->
-- [ ] <!-- criterion 2 -->
-- [ ] <!-- criterion 3 -->
-
-## What This Agent Does NOT Do (Out of Scope)
-
-<!-- FILL IN: Explicit exclusions prevent scope creep. List things the agent will never do. -->
-
-## Key Constraints
-
-<!-- FILL IN: Hard limits — budget, latency, compliance, API rate limits, etc. -->
-
-## Phases of Development
-
-<!-- FILL IN: High-level phases. The planner sub-agent will refine these into a detailed plan. -->
-
-| Phase | Description | Success Gate |
-|-------|-------------|--------------|
-| 1 | <!-- minimal working thing --> | <!-- test that proves it works --> |
-| 2 | <!-- next increment --> | <!-- test --> |
-| ... | | |
+## Future Phases
+- Deduplication: only notify about a PR once per week
+- Configurable staleness threshold per repo
+- Web dashboard for run history

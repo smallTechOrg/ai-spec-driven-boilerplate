@@ -186,6 +186,17 @@ async def create_post(session: AsyncSession, run_id: int, writer_id: int, topic:
     return _post_to_domain(row)
 
 
+async def update_post(session: AsyncSession, post_id: int, **fields: object) -> Post | None:
+    result = await session.execute(select(DBPost).where(DBPost.id == post_id))
+    row = result.scalar_one_or_none()
+    if row is None:
+        return None
+    for k, v in fields.items():
+        setattr(row, k, v)
+    await session.flush()
+    return _post_to_domain(row)
+
+
 async def get_posts(session: AsyncSession, writer_id: int | None = None,
                     limit: int = 20, offset: int = 0) -> list[Post]:
     q = select(DBPost).order_by(DBPost.created_at.desc()).limit(limit).offset(offset)

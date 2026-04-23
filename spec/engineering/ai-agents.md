@@ -15,7 +15,8 @@ Complete all steps in order before writing any code:
   - If incomplete: surface the agent-builder to the user; do not write application code
 - [ ] If spec is complete: read the full spec manifest in `CLAUDE.md`
 - [ ] Run `git status` — working tree must be clean before starting
-- [ ] Open a session report: `reports/sessions/YYYY-MM-DD-HHMMSS-[branch].md`
+- [ ] **Create the project directory** `<agent-slug>/` if it doesn't exist — never write agent code into the boilerplate root
+- [ ] Open a session report: `<agent-slug>/reports/sessions/YYYY-MM-DD-HHMMSS-[branch].md` — **must exist before Phase 1 starts**
   - Use the template in `spec/engineering/workflows/session-report.md`
 - [ ] Confirm which phase you are implementing (see `spec/engineering/phases.md`)
 

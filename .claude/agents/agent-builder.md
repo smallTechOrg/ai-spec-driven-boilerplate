@@ -28,8 +28,9 @@ Use `AskUserQuestion` if it is available in your tool list — it gives the user
 1. INTAKE (one round)   → All decisions captured upfront: scope, stack, constraints
 2. DRAFT (parallel)     → Spec + tech design + skeleton plan produced together
 3. ONE APPROVAL         → User sees everything at once, approves or adjusts in one response
-4. BUILD v0.1           → Phases 1+2 immediately: models + stubbed agent loop
-5. CONTINUE             → Remaining phases gated by QA; drift check at end
+4. SCAFFOLD             → Create project dir, session report, .env.example BEFORE any code
+5. BUILD v0.1           → Phases 1+2 immediately: models + stubbed agent loop + README
+6. CONTINUE             → Remaining phases gated by QA; drift check at end
 ```
 
 ---
@@ -121,9 +122,30 @@ Then ask one question via `AskUserQuestion`:
 
 ---
 
-## Stage 4 — Build v0.1 (Phases 1 + 2)
+## Stage 4 — Scaffold (Before Any Code)
 
-Build immediately after user approval. No further gates until QA.
+Immediately after user approval, before writing a single line of application code:
+
+1. **Create the project directory** — name it `<agent-slug>/` (e.g. `pr-monitor/`). All application code, spec, tests, and reports live inside this directory. **Never write the agent into the boilerplate root.**
+
+2. **Open a session report** at `<agent-slug>/reports/sessions/YYYY-MM-DD-HHMMSS-agent-builder.md`. Use today's date and time. Minimum sections: Goal, Phase, Steps (updated as you work), Prompt log. **This file must exist before Phase 1 begins.**
+
+3. **Create `.env.example`** in the project root listing every environment variable the agent will need, with placeholder values. Example:
+   ```
+   DATABASE_URL=postgresql+asyncpg://user:pass@localhost/dbname
+   GITHUB_TOKEN=ghp_...
+   SLACK_WEBHOOK_URL=https://hooks.slack.com/...
+   ```
+
+4. **Copy spec files** into `<agent-slug>/spec/` — product spec filled in from intake, tech-stack.md, project-layout.md.
+
+Log each of these in the session report before moving to Phase 1.
+
+---
+
+## Stage 5 — Build v0.1 (Phases 1 + 2)
+
+Build immediately after scaffold. No further gates until QA.
 
 **Always follow the standard layout in `spec/engineering/project-layout.md`.** It contains exact file shapes for `session.py`, `conftest.py`, the stub tool pattern, and the integration test fixture. Copy those patterns — do not invent new ones.
 
@@ -134,14 +156,20 @@ Build immediately after user approval. No further gates until QA.
 
 ### Phase 2
 1. Implement: `tools/*.py` (stubs), `agent/state.py`, `agent/nodes.py`, `agent/graph.py`, `agent/runner.py`, `__main__.py`, `tests/integration/test_pipeline.py`
-2. Gate command from `spec/engineering/tech-stack.md` — must pass with **no env vars set**
-3. Commit: `phase-2: stubbed agent loop — gate PASSED (N/N tests)`
+2. **Write `README.md`** in the project root — must include:
+   - What the agent does (2–3 sentences)
+   - Setup: `uv sync`, copy `.env.example` → `.env`, fill in values
+   - How to run offline (stub mode): exact command
+   - How to run for real: exact command + which env vars are required
+   - How to run tests: exact pytest command
+3. Gate command from `spec/engineering/tech-stack.md` — must pass with **no env vars set**
+4. Commit: `phase-2: stubbed agent loop + README — gate PASSED (N/N tests)`
 
-After Phase 2: **announce the skeleton is running.** Tell the user how to start it and what they'll see.
+After Phase 2: **announce the skeleton is running.** Point the user to the README for setup and run instructions.
 
 ---
 
-## Stage 5 — Remaining Phases (Gated by QA)
+## Stage 6 — Remaining Phases (Gated by QA)
 
 For each phase beyond Phase 2 in the plan:
 
@@ -155,7 +183,7 @@ For each phase beyond Phase 2 in the plan:
 
 ---
 
-## Stage 6 — Drift Check + Hand-Off
+## Stage 7 — Drift Check + Hand-Off
 
 After all planned phases:
 1. Invoke **drift-auditor** — fix any spec/code divergences
@@ -187,4 +215,6 @@ Pass all intake answers and prior decisions explicitly — sub-agents do not sha
 
 ## Reporting
 
-Open a session report at `reports/sessions/YYYY-MM-DD-HHMMSS-agent-builder.md` and log every stage transition, approval, and gate result.
+The session report lives at `<agent-slug>/reports/sessions/YYYY-MM-DD-HHMMSS-agent-builder.md`. It must be created during Stage 4 (Scaffold) — not at the end. Log every stage transition, approval, and gate result in real time as you work.
+
+**The session report is the user's audit trail.** Without it, they cannot tell what decisions were made, what tests passed, or what was deferred. A missing report is a build failure.

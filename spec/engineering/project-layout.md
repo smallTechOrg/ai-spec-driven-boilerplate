@@ -4,6 +4,19 @@ All agents built from this boilerplate must follow this layout exactly. The sale
 
 ---
 
+## README Requirements (Mandatory)
+
+Every generated project **must** have a README that:
+
+1. **States the working directory at the very top** — before any commands. Users must know to `cd` into `<agent-slug>/` before running anything. Make it a blockquote or bold warning, not a buried prose sentence.
+2. **Prefixes all commands with `uv run`** — never bare `alembic`, `pytest`, or `python`. Bare commands fail unless the venv is manually activated.
+3. **Includes `uv run alembic current` after `upgrade head`** — so the user can verify tables were actually created (blank output = silent failure).
+4. **Stays accurate** — every README command must be tested before a phase is marked complete. If a command fails, fix the README before claiming the phase is done.
+
+The README is the first thing a user touches. A wrong README fails the entire build regardless of whether the code works.
+
+---
+
 ## Directory Tree
 
 ```

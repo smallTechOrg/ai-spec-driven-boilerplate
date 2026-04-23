@@ -103,9 +103,15 @@ Each phase ends with a commit and passes QA before the next phase begins.
 .claude/
   agents/           ← Sub-agents (agent-builder, spec-writer, etc.)
   commands/         ← Slash commands (/build, /spec-check, /plan)
+.github/
+  copilot-instructions.md  ← Global Copilot instructions (mandatory spec reads)
+  agents/           ← Copilot agent mode definitions (drift-auditor, planner, etc.)
+  prompts/          ← Slash-style Copilot prompts (/plan, /challenge, /spec-check)
+  instructions/     ← Scoped auto-applied rules (code-style, secret-hygiene, etc.)
 spec/
   product/          ← What your agent does (fill this in or let spec-writer do it)
-  engineering/      ← How AI agents should write code for this project
+  engineering/      ← How AI agents should write code for this project (immutable rules)
+    workflows/      ← Step-by-step procedures for each agent/workflow type
 reports/
   sessions/         ← Auto-generated session logs from every AI coding session
 CLAUDE.md           ← Entry point for Claude Code
@@ -154,6 +160,19 @@ Each phase is resilient by design. The QA auditor will catch failures before the
 
 ---
 
+## Test-Branch Workflow
+
+The recommended way to iterate on this boilerplate:
+
+1. Keep `main` as the clean boilerplate — only spec, engineering rules, and agent config.
+2. For each build attempt, create a numbered test branch: `test-1`, `test-2`, etc.
+3. Give the agent-builder a single-line prompt on the test branch. Let it build.
+4. Review and test the result on that branch.
+5. **Never merge the generated application code back to main.** Test branches are disposable.
+6. If a run surfaces a boilerplate improvement (a clearer spec template, a missing rule), cherry-pick or manually apply that fix to `main`.
+
+---
+
 ## Contributing
 
-This is a boilerplate, not a framework. If you improve the agent orchestration or spec templates while building your agent, consider opening a PR so others benefit.
+This is a boilerplate, not a framework. Improvements to the spec templates, engineering rules, agent definitions, or workflow specs belong on `main`. Generated application code does not.

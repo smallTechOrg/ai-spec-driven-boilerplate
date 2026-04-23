@@ -79,11 +79,11 @@ Reason: Port 8000 is commonly occupied by other local services (other FastAPI ap
 
 Current safe defaults (as of 2026):
 
-| Provider | Default model |
-|----------|---------------|
-| Google Gemini | `gemini-2.0-flash` |
-| OpenAI | `gpt-4o-mini` |
-| Anthropic | `claude-3-5-haiku-latest` |
+| Provider | Default model | Notes |
+|----------|---------------|-------|
+| Google Gemini | `gemini-2.5-flash` | `gemini-2.0-flash` and `gemini-1.5-flash` unavailable for new users |
+| OpenAI | `gpt-4o-mini` | |
+| Anthropic | `claude-3-5-haiku-latest` | |
 
 ### DB Driver Rule
 

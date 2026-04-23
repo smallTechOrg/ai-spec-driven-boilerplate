@@ -1,43 +1,25 @@
-# Vision
-
-> **Boilerplate status:** This file contains placeholders. The spec-writer sub-agent will fill these in based on your idea. Run `/build [your idea]` to start, or fill in the placeholders manually.
-
----
+# Vision — Email Triage Agent
 
 ## What This Agent Does
-
-<!-- FILL IN: One paragraph describing what this agent does, who uses it, and what problem it solves. -->
+Reads unread emails from Gmail, classifies each as urgent/follow-up/ignore using Claude, drafts a reply for urgent emails, and saves all results to a local SQLite database.
 
 ## Who Uses It
-
-<!-- FILL IN: Primary user(s). What is their role? What are they trying to accomplish? -->
-
-## Core Problem Being Solved
-
-<!-- FILL IN: What manual or broken process does this agent replace or improve? -->
+A solo professional who wants to process a large inbox without reading every email manually.
 
 ## Success Criteria
+- [ ] Fetches unread emails from Gmail via Google API
+- [ ] Classifies each email as urgent / follow-up / ignore using Claude
+- [ ] For urgent emails: generates a draft reply using Claude
+- [ ] Saves classification + draft to SQLite (email_id, subject, classification, draft_reply)
+- [ ] CLI invocation: `python -m emailtriage run` — processes all unread, exits
 
-<!-- FILL IN: How do we know the agent is working? List 3-5 measurable outcomes. -->
+## Out of Scope (v0.1)
+- Actually sending emails
+- Web UI or dashboard
+- Scheduling / running automatically
+- Learning from user corrections
 
-- [ ] <!-- criterion 1 -->
-- [ ] <!-- criterion 2 -->
-- [ ] <!-- criterion 3 -->
-
-## What This Agent Does NOT Do (Out of Scope)
-
-<!-- FILL IN: Explicit exclusions prevent scope creep. List things the agent will never do. -->
-
-## Key Constraints
-
-<!-- FILL IN: Hard limits — budget, latency, compliance, API rate limits, etc. -->
-
-## Phases of Development
-
-<!-- FILL IN: High-level phases. The planner sub-agent will refine these into a detailed plan. -->
-
-| Phase | Description | Success Gate |
-|-------|-------------|--------------|
-| 1 | <!-- minimal working thing --> | <!-- test that proves it works --> |
-| 2 | <!-- next increment --> | <!-- test --> |
-| ... | | |
+## Future Phases
+- Auto-send approved drafts
+- Scheduled daily runs
+- Web UI to review and approve drafts

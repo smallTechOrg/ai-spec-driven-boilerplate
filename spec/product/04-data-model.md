@@ -1,34 +1,21 @@
 # Data Model
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after architecture is approved.
+## EmailResult
+| Field | Type | Notes |
+|-------|------|-------|
+| id | int PK | auto |
+| email_id | str | Gmail message ID |
+| subject | str | |
+| sender | str | |
+| classification | str | urgent / follow-up / ignore / error |
+| draft_reply | str? | null unless urgent |
+| processed_at | datetime | UTC |
 
----
-
-## Storage Technology
-
-<!-- FILL IN: What database/storage does this project use and why? -->
-
-## Entities
-
-<!-- FILL IN: One section per major entity. -->
-
-### Entity: <!-- Name -->
-
-<!-- FILL IN: What does this entity represent? -->
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| id | <!-- type --> | yes | Primary key |
-| <!-- field --> | <!-- type --> | <!-- yes/no --> | <!-- description --> |
-
-### Relationships
-
-<!-- FILL IN: How do entities relate to each other? -->
-
-## Data Lifecycle
-
-<!-- FILL IN: When is data created, updated, and deleted? Is anything time-boxed or archived? -->
-
-## Sensitive Data
-
-<!-- FILL IN: What fields contain PII or secrets? How are they protected? -->
+## Run
+| Field | Type | Notes |
+|-------|------|-------|
+| id | int PK | auto |
+| ran_at | datetime | UTC |
+| status | str | completed / failed |
+| emails_processed | int | |
+| error_message | str? | |

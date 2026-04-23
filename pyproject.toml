@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "emailtriage"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.40",
+    "langgraph>=0.2",
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+]
+
+[project.scripts]
+emailtriage = "emailtriage.__main__:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/emailtriage"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

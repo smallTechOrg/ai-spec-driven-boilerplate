@@ -50,7 +50,9 @@ Why: No separate database process; single file; easy to back up; appropriate for
 | `markdown` | latest | Markdown → HTML rendering |
 | `croniter` | latest | Cron expression validation |
 | `pydantic` | 2.x | Domain models + API validation |
-| `httpx` | latest | HTTP calls (Google Trends RSS) |
+| `duckduckgo-search` | latest | DuckDuckGo search (free, no API key) |
+| `tavily-python` | latest | Tavily search API client |
+| `httpx` | latest | Async HTTP calls |
 | `pytest` | latest | Testing |
 | `pytest-asyncio` | latest | Async test support |
 

@@ -2,7 +2,7 @@
 
 ## What It Does
 
-Selects N distinct blog topics for a generation run by combining niche-aware LLM brainstorming with Google Trends RSS signals, then filtering out topics already used in previous runs.
+Selects N distinct blog topics for a generation run by combining niche-aware LLM brainstorming with real-time web search signals (DuckDuckGo + Tavily), then filtering out topics already used in previous runs.
 
 ## Inputs
 
@@ -24,19 +24,23 @@ Selects N distinct blog topics for a generation run by combining niche-aware LLM
 | System | Operation | On Failure |
 |--------|-----------|------------|
 | Gemini API (text) | Generate 10 candidate topics from niche + themes | Raise error; abort run |
-| Google Trends RSS (`https://trends.google.com/trends/trendingsearches/daily/rss?geo=US`) | Fetch daily trending searches; filter titles that match niche keywords | Skip trending step; use LLM-only candidates |
+| DuckDuckGo Search (via `duckduckgo-search` library) | Search `"{niche} trending topics {current_month}"` — returns titles and snippets | Skip DuckDuckGo; continue with other sources |
+| Tavily Search API | Search `"{niche} latest trends {current_month}"` — returns richer, curated results | Skip Tavily; continue with other sources |
 
 ## Business Rules
 
 - Must return exactly `posts_count` topics
 - No topic in the output may appear in `used_topics` (case-insensitive, normalised)
-- If fewer than `posts_count` unique candidates remain after deduplication, generate a second LLM batch with the instruction "suggest different angles on [niche]"
-- Topics should be specific enough to write a focused 600–2000 word post (not "AI" but "How to automate your email inbox with AI in 2026")
-- Trending signals are used to bias selection, not to override niche — all topics must still fit the niche
+- DuckDuckGo and Tavily searches run in parallel; results are pooled and deduplicated by title similarity
+- Gemini selects final topics from the combined candidate pool (LLM brainstorm + DuckDuckGo + Tavily), filtered to those matching the niche
+- If fewer than `posts_count` unique candidates remain after deduplication, Gemini generates a second batch with "suggest different angles on [niche]"
+- Topics should be specific enough to write a focused post (not "AI" but "How to automate your email inbox with AI in 2026")
+- Trending signals bias selection toward timely topics — all selected topics must still fit the niche
 
 ## Success Criteria
 
 - [ ] Returns exactly `posts_count` topics
 - [ ] No returned topic matches any string in `used_topics` (after normalisation)
-- [ ] Each topic is a specific, writable blog post title or premise (not a one-word category)
-- [ ] When Google Trends is unavailable, falls back gracefully and still returns `posts_count` topics
+- [ ] Each topic is a specific, writable premise (not a one-word category)
+- [ ] When both DuckDuckGo and Tavily fail, falls back to LLM-only brainstorm and still returns `posts_count` topics
+- [ ] When only one search source fails, the other is still used (partial failure is not total failure)

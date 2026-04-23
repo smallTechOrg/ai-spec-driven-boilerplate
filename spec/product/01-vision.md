@@ -25,7 +25,7 @@ Writing consistently is hard. Topic ideation, drafting, and formatting take hour
 - [ ] Generated HTML site is browsable locally (index page + individual post pages) with no broken links
 - [ ] Dashboard lets the operator configure blog settings, manage writers, and trigger a run — all without touching files
 - [ ] Scheduled runs fire at the configured interval without manual intervention
-- [ ] A post generated in one run does not repeat a topic from any previous run
+- [ ] A post generated in one run does not repeat a topic from any previous run (topics compared case-insensitively; see `spec/product/04-data-model.md` — UsedTopic)
 
 ## What This Agent Does NOT Do (Out of Scope)
 

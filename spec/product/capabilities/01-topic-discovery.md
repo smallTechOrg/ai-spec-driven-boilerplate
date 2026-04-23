@@ -24,7 +24,7 @@ Selects N distinct blog topics for a generation run by combining niche-aware LLM
 | System | Operation | On Failure |
 |--------|-----------|------------|
 | Gemini API (text) | Generate 10 candidate topics from niche + themes | Raise error; abort run |
-| Google Trends RSS | Fetch trending topics in niche's category | Skip trending step; use LLM-only candidates |
+| Google Trends RSS (`https://trends.google.com/trends/trendingsearches/daily/rss?geo=US`) | Fetch daily trending searches; filter titles that match niche keywords | Skip trending step; use LLM-only candidates |
 
 ## Business Rules
 

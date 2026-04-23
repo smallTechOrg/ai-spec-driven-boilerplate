@@ -38,11 +38,11 @@ BlogForge runs as a single Python process. A FastAPI server exposes the web dash
 1. **Trigger:** Dashboard button or APScheduler fires `POST /runs/trigger`
 2. **Agent start:** LangGraph initialises `GenerationState` with blog config + writer list
 3. **Topic discovery:** Agent queries Gemini for niche-aligned topics, cross-references Google Trends RSS, filters out previously used topics
-4. **Post assignment:** Each topic is assigned to a writer (round-robin or random)
+4. **Post assignment:** Each topic is assigned to a writer via round-robin (see `spec/product/capabilities/05-writer-assignment.md`)
 5. **Post generation:** For each topic+writer pair, Gemini generates the full post text
 6. **Image generation:** Gemini Imagen generates a cover image for each post; saved to `output/images/`
 7. **Site rendering:** Agent writes individual post HTML files + updates `index.html`
-8. **Persist:** Posts and run metadata saved to SQLite
+8. **Persist:** Posts saved to SQLite incrementally as each completes (not batched); run status transitions to `completed` only after all posts are rendered
 9. **Done:** Run status updated to `completed`; dashboard reflects new posts
 
 ## External Dependencies
@@ -50,7 +50,7 @@ BlogForge runs as a single Python process. A FastAPI server exposes the web dash
 | Dependency | Purpose | Failure Mode |
 |------------|---------|--------------|
 | Google Gemini API (text) | Post generation, topic brainstorming | Log error, mark run as failed, retry on next scheduled run |
-| Google Gemini Imagen API | Cover image generation | Fall back to a placeholder image; post still published |
+| Google Gemini Imagen API | Cover image generation | Fall back to a placeholder SVG (see `spec/product/capabilities/03-image-generation.md`); post still published |
 | Google Trends RSS | Trending topic signals | Skip trending signals; use niche-only brainstorming |
 | SQLite | Config, posts, run history | Fatal — surface error immediately; do not start run |
 | Local filesystem | HTML output directory | Fatal — surface error if output dir is not writable |

@@ -68,7 +68,7 @@ A minimal, readable stylesheet: system font stack, max-width 720px centred, sens
 - Index is fully regenerated on every run (reflects all historical posts, not just the current run's)
 - Post HTML files are never deleted; if a slug already exists, it is overwritten (re-renders the same post)
 - `style.css` is written on first run only — if it already exists, it is left unchanged
-- All paths in HTML are relative (site must be portable — no absolute URLs)
+- All paths in HTML are relative (site must be portable — no absolute URLs); cover image paths are stored relative to output_dir by the image generation step (see `spec/product/capabilities/03-image-generation.md`) and the renderer uses them as-is in `<img src=...>` attributes
 - Output directory is created if it does not exist
 
 ## Success Criteria

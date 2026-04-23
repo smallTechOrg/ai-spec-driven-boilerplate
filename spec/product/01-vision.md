@@ -1,43 +1,35 @@
 # Vision
 
-> **Boilerplate status:** This file contains placeholders. The spec-writer sub-agent will fill these in based on your idea. Run `/build [your idea]` to start, or fill in the placeholders manually.
-
----
+> **Project:** PR Staleness Monitor
+> **Branch:** feat/test-run-1
 
 ## What This Agent Does
 
-<!-- FILL IN: One paragraph describing what this agent does, who uses it, and what problem it solves. -->
+Queries a GitHub org for all open pull requests across every repo, identifies PRs that have been open for more than 3 days without activity, and posts a single Slack digest message listing them.
 
 ## Who Uses It
 
-<!-- FILL IN: Primary user(s). What is their role? What are they trying to accomplish? -->
-
-## Core Problem Being Solved
-
-<!-- FILL IN: What manual or broken process does this agent replace or improve? -->
+An engineering team lead or DevOps engineer who wants daily visibility into stale PRs without checking GitHub manually.
 
 ## Success Criteria
 
-<!-- FILL IN: How do we know the agent is working? List 3-5 measurable outcomes. -->
+- [ ] Fetches all open PRs across all repos in a configured GitHub org
+- [ ] Identifies PRs with no activity (comments or commits) in the last 3 days
+- [ ] Posts one Slack message per run with a formatted list of stale PRs (repo, title, author, days open)
+- [ ] Runs reliably on a daily cron schedule
+- [ ] If no stale PRs exist, posts nothing (no noise)
 
-- [ ] <!-- criterion 1 -->
-- [ ] <!-- criterion 2 -->
-- [ ] <!-- criterion 3 -->
+## Out of Scope (v0.1)
 
-## What This Agent Does NOT Do (Out of Scope)
+- Auto-assigning or auto-closing PRs
+- Per-repo configuration or filtering
+- Web dashboard or API
+- Email notifications
+- Tracking which PRs were already notified (deduplication)
 
-<!-- FILL IN: Explicit exclusions prevent scope creep. List things the agent will never do. -->
+## Future Phases
 
-## Key Constraints
-
-<!-- FILL IN: Hard limits — budget, latency, compliance, API rate limits, etc. -->
-
-## Phases of Development
-
-<!-- FILL IN: High-level phases. The planner sub-agent will refine these into a detailed plan. -->
-
-| Phase | Description | Success Gate |
-|-------|-------------|--------------|
-| 1 | <!-- minimal working thing --> | <!-- test that proves it works --> |
-| 2 | <!-- next increment --> | <!-- test --> |
-| ... | | |
+- Deduplication: only notify about a PR once until it gets activity
+- Per-repo or per-author filtering rules
+- Web dashboard to configure thresholds and channels
+- Multi-channel routing (different Slack channels per team)

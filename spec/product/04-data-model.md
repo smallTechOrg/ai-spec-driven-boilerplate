@@ -1,34 +1,16 @@
 # Data Model
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after architecture is approved.
-
----
-
-## Storage Technology
-
-<!-- FILL IN: What database/storage does this project use and why? -->
-
 ## Entities
 
-<!-- FILL IN: One section per major entity. -->
+### Run
+Tracks each execution of the agent.
 
-### Entity: <!-- Name -->
+| Field | Type | Notes |
+|-------|------|-------|
+| id | int PK | auto |
+| ran_at | datetime | UTC, when the run started |
+| status | str | "completed" / "failed" |
+| stale_pr_count | int | number of stale PRs found |
+| error_message | str? | set if status is "failed" |
 
-<!-- FILL IN: What does this entity represent? -->
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| id | <!-- type --> | yes | Primary key |
-| <!-- field --> | <!-- type --> | <!-- yes/no --> | <!-- description --> |
-
-### Relationships
-
-<!-- FILL IN: How do entities relate to each other? -->
-
-## Data Lifecycle
-
-<!-- FILL IN: When is data created, updated, and deleted? Is anything time-boxed or archived? -->
-
-## Sensitive Data
-
-<!-- FILL IN: What fields contain PII or secrets? How are they protected? -->
+No other entities for v0.1 — PRs are not persisted.

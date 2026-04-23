@@ -1,50 +1,38 @@
 # Architecture
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved.
-
----
-
 ## System Overview
 
-<!-- FILL IN: One paragraph describing the system at a high level. Who/what interacts with it? -->
+A Python process runs on a cron schedule (via APScheduler or system cron). On each run: fetch all open PRs from GitHub API, filter for staleness, post a Slack digest via webhook.
 
 ## Component Map
 
-<!-- FILL IN: List the major components and what each does. -->
-
 ```
-[Component A]
-    ↓
-[Component B]   ←→   [External Service]
-    ↓
-[Component C]
+[Cron / APScheduler]
+        │
+        ▼
+[Agent Runner]
+        │
+   ┌────┴────┐
+   │         │
+[GitHub API] [Slack Webhook]
+        │
+   [PostgreSQL]
+   (run history)
 ```
-
-## Layers
-
-<!-- FILL IN: Describe the layers of the system (e.g., API → Agent Loop → Tools → Storage). -->
-
-| Layer | Responsibility |
-|-------|----------------|
-| <!-- layer --> | <!-- responsibility --> |
 
 ## Data Flow
 
-<!-- FILL IN: Walk through the main data flow from trigger to output. -->
-
-1. Trigger: <!-- how does the agent start? (cron, webhook, user input, etc.) -->
-2. <!-- step 2 -->
-3. <!-- step 3 -->
-4. Output: <!-- what does the agent produce? -->
+1. Cron fires `run_agent()`
+2. Agent fetches all repos in org via GitHub API (paginated)
+3. For each repo, fetches open PRs
+4. Filters: last activity > 3 days ago
+5. If stale PRs found: formats and posts Slack digest
+6. Saves run record to PostgreSQL (timestamp, PR count, status)
 
 ## External Dependencies
 
-<!-- FILL IN: APIs, services, databases the agent depends on. -->
-
 | Dependency | Purpose | Failure Mode |
 |------------|---------|--------------|
-| <!-- name --> | <!-- what it does --> | <!-- what happens if it's down --> |
-
-## Deployment Model
-
-<!-- FILL IN: How does this run? (local script, cloud function, long-running service, etc.) -->
+| GitHub API | Fetch repos + PRs | Log error, mark run failed, no Slack post |
+| Slack Webhook | Post digest | Log error, mark run failed |
+| PostgreSQL | Run history | Log error, skip persistence — run still executes |

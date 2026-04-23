@@ -1,58 +1,68 @@
 # Tech Stack
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved. The user may override specific choices before the tech-designer is invoked.
-
----
-
 ## Language
 
-<!-- FILL IN: e.g., Python 3.12 / TypeScript 5 / Go 1.22 -->
+Python 3.12
 
-**Why:** <!-- reason for this choice -->
+**Why:** User preference. Strong ecosystem for ML/LLM integrations; `google-generativeai` SDK is Python-first.
 
 ## Agent Framework
 
-<!-- FILL IN: e.g., LangGraph / CrewAI / AutoGen / custom / none -->
+None — simple linear pipeline.
 
-**Why:** <!-- reason for this choice -->
+**Why:** The pipeline has two sequential nodes with no branching or cycles. Adding LangGraph would be over-engineering for this scope.
 
 ## LLM Provider
 
-<!-- FILL IN: e.g., Anthropic Claude / OpenAI GPT / Google Gemini -->
+Google Gemini Vision
 
-**Model:** <!-- specific model, e.g., claude-sonnet-4-6 -->
+**Model:** `gemini-2.0-flash` (configurable via `FOOD_TRACKER_LLM_MODEL`)
 
-**Why:** <!-- reason -->
+**Why:** User has a Gemini API key. `gemini-2.0-flash` supports image inputs and structured JSON output.
 
 ## Backend Framework (if applicable)
 
-<!-- FILL IN: e.g., FastAPI / Express / Django / none -->
+FastAPI 0.115+ with Jinja2 server-rendered templates.
 
 ## Database (if applicable)
 
-<!-- FILL IN: e.g., PostgreSQL / SQLite / Redis / none -->
+PostgreSQL (user preference)
 
-**ORM/ODM:** <!-- e.g., SQLAlchemy 2.0 / Prisma / none -->
+**ORM/ODM:** SQLAlchemy 2.0 (declarative `Mapped` types) + Alembic for migrations
 
 ## Frontend (if applicable)
 
-<!-- FILL IN: e.g., Next.js 15 / React / Vue / none -->
+None — server-rendered HTML via Jinja2. No JavaScript framework.
 
 ## Key Libraries
 
-<!-- FILL IN: List the important libraries and what each does. -->
-
 | Library | Version | Purpose |
 |---------|---------|---------|
-| <!-- name --> | <!-- version --> | <!-- purpose --> |
+| fastapi | >=0.115 | HTTP framework |
+| uvicorn | latest | ASGI server |
+| jinja2 | latest | HTML templating |
+| python-multipart | latest | multipart/form-data parsing |
+| sqlalchemy | >=2.0 | ORM |
+| alembic | latest | DB migrations |
+| psycopg2-binary | latest | PostgreSQL driver (production dep, not dev-only) |
+| google-generativeai | latest | Gemini Vision SDK |
+| pillow | latest | Image validation |
+| pydantic-settings | latest | Env var config with validation |
+| structlog | latest | Structured logging |
+| pytest | latest | Test runner |
+| pytest-asyncio | latest | Async test support |
+| httpx | latest | TestClient for integration tests |
 
 ## What to Avoid
 
-<!-- FILL IN: Libraries, patterns, or approaches that are explicitly off-limits and why. -->
+- **SQLite** — tests must run against PostgreSQL (same as production)
+- **LangGraph / CrewAI** — unnecessary for a two-node linear pipeline
+- **Bare `alembic` or `pytest` commands** — always prefix with `uv run`
+- **Hardcoded model names** — always use `FOOD_TRACKER_LLM_MODEL` env var
 
 ## Dependency Management
 
-<!-- FILL IN: e.g., uv + pyproject.toml / npm / pnpm / go modules -->
+`uv` + `pyproject.toml`
 
 ---
 

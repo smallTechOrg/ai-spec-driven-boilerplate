@@ -1,0 +1,36 @@
+[project]
+name = "food-tracker"
+version = "0.1.0"
+description = "Food photo analysis agent — upload a photo, get calories and macros"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]",
+    "jinja2",
+    "python-multipart",
+    "sqlalchemy>=2.0",
+    "alembic",
+    "psycopg2-binary",
+    "google-generativeai",
+    "pillow",
+    "pydantic-settings",
+    "structlog",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/food_tracker"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

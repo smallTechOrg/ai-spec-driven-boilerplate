@@ -17,27 +17,55 @@ These apply regardless of language or framework:
 
 ## Naming Conventions
 
-<!-- FILL IN: Filled in by tech-designer based on language choice. -->
+- **Modules/packages:** `snake_case` (e.g. `food_tracker`, `llm_client`)
+- **Classes:** `PascalCase` (e.g. `FoodLog`, `GeminiProvider`)
+- **Functions/variables:** `snake_case` (e.g. `analyse_food`, `image_bytes`)
+- **Constants:** `UPPER_SNAKE_CASE` (e.g. `MAX_UPLOAD_BYTES`)
+- **Pydantic models:** `PascalCase` with a descriptive suffix — `NutritionResult`, `FoodLogCreate`
+- **Test files:** `test_<module>.py`; test functions `test_<behaviour>()`
 
 ## File Organization
 
-<!-- FILL IN: Filled in by tech-designer. How are files grouped — by layer, by feature, by type? -->
+Files are grouped by layer (not by feature), matching the layout in `spec/engineering/project-layout.md`:
+
+- `api/` — HTTP routers only; no business logic
+- `graph/` — pipeline state, nodes, runner
+- `llm/` — LLM provider abstraction
+- `domain/` — Pydantic domain models
+- `db/` — SQLAlchemy ORM models, session, Alembic
 
 ## Error Handling Pattern
 
-<!-- FILL IN: Filled in by tech-designer. How are errors represented and propagated? -->
+- Raise `fastapi.HTTPException` from routers for client-facing errors
+- Nodes set `FoodState.error` on unrecoverable failures; the runner re-raises as an `HTTPException`
+- Never swallow exceptions silently; always log before re-raising
+- Use `structlog.get_logger()` at module level; bind `run_id` and `provider` to every log event
 
 ## Logging Pattern
 
-<!-- FILL IN: Filled in by tech-designer. Structured vs. unstructured? What fields are always included? -->
+Structured logging via `structlog`. Every log event must include:
+- `event` — what happened (verb phrase: `"image_received"`, `"analysis_complete"`)
+- `provider` — `"gemini"` or `"stub"`
+- `run_id` — the `FoodLog.id` (if available at that point)
+
+Never log `image_bytes` or API keys.
 
 ## Testing Conventions
 
-<!-- FILL IN: Filled in by tech-designer. Unit test location, naming, runner. -->
+- Test runner: `uv run pytest`
+- Unit tests: `tests/unit/` — no DB, no network; mock all external calls
+- Integration tests: `tests/integration/` — real PostgreSQL (test DB), stubbed LLM
+- `conftest.py` creates and tears down the test schema automatically
+- Test DB URL: `TEST_DATABASE_URL` env var (default `postgresql://localhost/food_tracker_test`)
+- Every test that writes to DB must use a transaction that rolls back on teardown
 
 ## What NOT to Do
 
-<!-- FILL IN: Anti-patterns specific to this tech stack. Filled in by tech-designer. -->
+- Do not use `dict` as a return type across module boundaries — use Pydantic models
+- Do not use `print()` for logging — use `structlog`
+- Do not import `settings` directly in test files — use the `settings` fixture from `conftest.py`
+- Do not write bare `alembic` or `pytest` commands in docs — always prefix with `uv run`
+- Do not use the old Starlette `TemplateResponse` signature (see Framework Gotchas below)
 
 ---
 

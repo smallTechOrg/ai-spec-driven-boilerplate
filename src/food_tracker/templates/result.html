@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% if provider == "stub" %}
+<div class="stub-banner">
+  ⚠ DEMO MODE — results are simulated, not real AI output
+</div>
+{% endif %}
+
+<div class="card">
+  <h2 style="font-size:1.5rem;margin-bottom:1rem;">{{ food_name }}</h2>
+
+  <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+    <div style="flex:1;min-width:120px;text-align:center;padding:1rem;
+                background:#f0fdf4;border-radius:6px;border:1px solid #86efac;">
+      <div style="font-size:1.8rem;font-weight:700;color:#16a34a;">{{ calories_kcal | int }}</div>
+      <div style="font-size:.85rem;color:#15803d;">kcal</div>
+    </div>
+    <div style="flex:1;min-width:120px;text-align:center;padding:1rem;
+                background:#eff6ff;border-radius:6px;border:1px solid #93c5fd;">
+      <div style="font-size:1.8rem;font-weight:700;color:#1d4ed8;">{{ protein_g }}g</div>
+      <div style="font-size:.85rem;color:#1e40af;">protein</div>
+    </div>
+    <div style="flex:1;min-width:120px;text-align:center;padding:1rem;
+                background:#fff7ed;border-radius:6px;border:1px solid #fdba74;">
+      <div style="font-size:1.8rem;font-weight:700;color:#c2410c;">{{ carbs_g }}g</div>
+      <div style="font-size:.85rem;color:#9a3412;">carbs</div>
+    </div>
+    <div style="flex:1;min-width:120px;text-align:center;padding:1rem;
+                background:#fdf4ff;border-radius:6px;border:1px solid #d8b4fe;">
+      <div style="font-size:1.8rem;font-weight:700;color:#7e22ce;">{{ fat_g }}g</div>
+      <div style="font-size:.85rem;color:#6b21a8;">fat</div>
+    </div>
+  </div>
+
+  <p style="font-size:.8rem;color:#9ca3af;margin-bottom:1.5rem;">
+    Log ID: {{ run_id }} &middot; Provider: {{ provider }}
+  </p>
+
+  <a href="/" style="display:inline-block;padding:.5rem 1rem;background:#f3f4f6;
+     border-radius:4px;font-size:.9rem;">
+    ← Analyse another photo
+  </a>
+</div>
+{% endblock %}

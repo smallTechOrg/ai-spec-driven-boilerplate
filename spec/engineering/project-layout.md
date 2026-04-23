@@ -8,7 +8,7 @@ All agents built from this boilerplate must follow this layout exactly. The sale
 
 Every generated project **must** have a README that:
 
-1. **States the working directory at the very top** — before any commands. Users must know to `cd` into `<agent-slug>/` before running anything. Make it a blockquote or bold warning, not a buried prose sentence.
+1. **States "all commands run from the repo root"** — the repo root IS the project (no subdirectory to cd into). Put this as a blockquote or bold warning at the very top, before any other content.
 2. **Prefixes all commands with `uv run`** — never bare `alembic`, `pytest`, or `python`. Bare commands fail unless the venv is manually activated.
 3. **Includes `uv run alembic current` after `upgrade head`** — so the user can verify tables were actually created (blank output = silent failure).
 4. **Stays accurate** — every README command must be tested before a phase is marked complete. If a command fails, fix the README before claiming the phase is done.
@@ -19,65 +19,77 @@ The README is the first thing a user touches. A wrong README fails the entire bu
 
 ## Directory Tree
 
+The repo root **is** the agent project. There is no `<agent-slug>/` subdirectory — boilerplate files (`spec/`, `reports/`, `.github/`, `AGENTS.md`, `CLAUDE.md`) coexist with project files at the root.
+
 ```
-<agent-slug>/                         ← isolated project dir, never in boilerplate root
+<repo root>                           ← repo root IS the agent project
 ├── src/
-│   ├── <package>/                    ← Python package (snake_case matches slug)
-│   │   ├── __init__.py               ← __version__ = "0.1.0"
-│   │   ├── api/                      ← FastAPI routers
-│   │   │   ├── __init__.py           ← create_app() factory + lifespan
-│   │   │   ├── _common.py            ← ok(), api_error()
-│   │   │   └── <resource>.py         ← one router per domain entity
-│   │   ├── config/
-│   │   │   ├── __init__.py
-│   │   │   └── settings.py           ← Pydantic BaseSettings with env prefix
-│   │   ├── db/
-│   │   │   ├── __init__.py
-│   │   │   ├── models.py             ← SQLAlchemy 2.0 declarative (Mapped types)
-│   │   │   └── session.py            ← engine + sessionmaker + init_db
-│   │   ├── domain/
-│   │   │   ├── __init__.py           ← re-exports all domain models
-│   │   │   └── <entity>.py           ← Pydantic BaseModel per entity
-│   │   ├── graph/
-│   │   │   ├── __init__.py
-│   │   │   ├── agent.py              ← StateGraph compiled once at startup
-│   │   │   ├── nodes.py              ← node functions: (state) → state
-│   │   │   ├── edges.py              ← conditional routing functions
-│   │   │   ├── state.py              ← AgentState TypedDict
-│   │   │   └── runner.py             ← run_agent() entry point
-│   │   ├── llm/
-│   │   │   ├── __init__.py
-│   │   │   ├── client.py             ← LLMClient wrapper
-│   │   │   └── providers/
-│   │   │       ├── base.py           ← abstract LLMProvider
-│   │   │       ├── factory.py        ← create_llm_client()
-│   │   │       └── anthropic.py      ← default provider
-│   │   ├── tools/                    ← pure functions: (inputs) → domain models
-│   │   │   └── <tool>.py
-│   │   ├── prompts/                  ← LLM prompt templates (.md files)
-│   │   │   └── <name>.md
-│   │   └── observability/
-│   │       ├── __init__.py
-│   │       └── events.py             ← structlog configuration
-│   └── tests/
-│       ├── conftest.py               ← settings singleton reset fixture
-│       ├── unit/
-│       │   ├── test_smoke.py         ← import pkg; assert __version__
-│       │   ├── config/test_settings.py
-│       │   ├── db/test_models.py
-│       │   ├── domain/test_models.py
-│       │   └── graph/test_agent.py   ← graph compiles without env vars
-│       └── integration/
-│           └── test_pipeline.py      ← stub run, one DB record, status=completed
+│   └── <package>/                    ← Python package (snake_case matches slug)
+│       ├── __init__.py               ← __version__ = "0.1.0"
+│       ├── api/                      ← FastAPI routers
+│       │   ├── __init__.py           ← create_app() factory + lifespan
+│       │   ├── _common.py            ← ok(), api_error()
+│       │   └── <resource>.py         ← one router per domain entity
+│       ├── config/
+│       │   ├── __init__.py
+│       │   └── settings.py           ← Pydantic BaseSettings with env prefix
+│       ├── db/
+│       │   ├── __init__.py
+│       │   ├── models.py             ← SQLAlchemy 2.0 declarative (Mapped types)
+│       │   └── session.py            ← engine + sessionmaker + init_db
+│       ├── domain/
+│       │   ├── __init__.py           ← re-exports all domain models
+│       │   └── <entity>.py           ← Pydantic BaseModel per entity
+│       ├── graph/
+│       │   ├── __init__.py
+│       │   ├── agent.py              ← StateGraph compiled once at startup
+│       │   ├── nodes.py              ← node functions: (state) → state
+│       │   ├── edges.py              ← conditional routing functions
+│       │   ├── state.py              ← AgentState TypedDict
+│       │   └── runner.py             ← run_agent() entry point
+│       ├── llm/
+│       │   ├── __init__.py
+│       │   ├── client.py             ← LLMClient wrapper
+│       │   └── providers/
+│       │       ├── base.py           ← abstract LLMProvider
+│       │       ├── factory.py        ← create_llm_client()
+│       │       └── anthropic.py      ← default provider
+│       ├── tools/                    ← pure functions: (inputs) → domain models
+│       │   └── <tool>.py
+│       ├── prompts/                  ← LLM prompt templates (.md files)
+│       │   └── <name>.md
+│       └── observability/
+│           ├── __init__.py
+│           └── events.py             ← structlog configuration
+├── tests/                            ← tests at repo root, NOT inside src/
+│   ├── conftest.py                   ← settings singleton reset fixture
+│   ├── unit/
+│   │   ├── test_smoke.py             ← import pkg; assert __version__
+│   │   ├── config/test_settings.py
+│   │   ├── db/test_models.py
+│   │   ├── domain/test_models.py
+│   │   └── graph/test_agent.py       ← graph compiles without env vars
+│   └── integration/
+│       └── test_pipeline.py          ← stub run, one DB record, status=completed
 ├── alembic/
 │   ├── env.py                        ← reads DB URL from settings; sets target_metadata = Base.metadata
 │   ├── script.py.mako                ← REQUIRED — standard mako template; alembic revision fails without it
 │   └── versions/0001_initial.py      ← generated by: uv run alembic revision --autogenerate -m "initial"
-├── spec/                             ← copy of spec files for this agent
+├── spec/                             ← agent spec files (preserved from boilerplate)
 ├── reports/
 │   └── sessions/                     ← session report created BEFORE Phase 1
+├── .github/                          ← preserved from boilerplate
+├── AGENTS.md                         ← preserved from boilerplate
+├── CLAUDE.md                         ← preserved from boilerplate
 ├── pyproject.toml
 ├── alembic.ini
+├── .env.example
+└── README.md                         ← replaces the boilerplate README
+```
+
+**Critical:** `tests/` is at the repo root — **not** inside `src/`. The `pyproject.toml` must have `testpaths = ["tests"]` (not `["src/tests"]`).
+
+---
 ├── .env.example
 └── README.md
 ```
@@ -121,9 +133,11 @@ def downgrade() -> None:
 
 ### Phase 1 alembic sequence (mandatory, in order)
 
+All commands run from the **repo root** (where `alembic.ini` and `pyproject.toml` live).
+
 ```bash
 # 1. Create the alembic/ directory and files (env.py, alembic.ini, script.py.mako)
-# 2. Define all SQLAlchemy models in db/models.py
+# 2. Define all SQLAlchemy models in src/<package>/db/models.py
 # 3. Generate the initial migration — requires the DB to be reachable and DATABASE_URL to be set:
 uv run alembic revision --autogenerate -m "initial"
 # 4. Apply the migration:

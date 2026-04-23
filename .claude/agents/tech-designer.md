@@ -92,6 +92,21 @@ Fill in these files with your decisions:
 1. `spec/engineering/tech-stack.md` — complete the template with your decisions
 2. `spec/engineering/code-style.md` — fill in the language-specific sections
 3. `spec/product/02-architecture.md` — if any sections were left empty (deployment model, components), fill them in now that you know the tech stack
+4. **`spec/product/07-agent-graph.md` — REQUIRED if you chose an agent framework (LangGraph, CrewAI, AutoGen, etc.)**
+
+### Agent Graph Spec (mandatory when using an agent framework)
+
+If you chose an agent framework, you must create `spec/product/07-agent-graph.md` as part of the tech design. It must define:
+
+- **State type** — every field, its type, and what populates it
+- **Nodes** — for each node: what it reads from state, what it writes to state, what external calls it makes, how it handles errors (partial failure vs. fatal)
+- **Edge topology** — which node flows to which, under what condition (ASCII diagram required)
+- **Error handler node** — what it does on fatal failure (update DB, log, terminate)
+- **Finalize node** — how a successful run is closed out
+- **Graph assembly** — pseudocode showing how nodes and edges are wired (≤ 60 lines)
+- **Concurrency model** — one run at a time? parallel nodes? checkpointing strategy?
+
+Use `spec/product/07-agent-graph.md` in the boilerplate as a template (it ships with `<!-- FILL IN -->` placeholders). The spec-reviewer will reject the tech design as a blocker if this file is missing or incomplete when an agent framework is in use.
 
 Then produce a summary for the agent-builder:
 

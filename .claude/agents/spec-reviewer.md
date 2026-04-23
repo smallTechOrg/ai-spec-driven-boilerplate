@@ -18,6 +18,19 @@ You are invoked by the agent-builder after the spec-writer produces a draft, and
 - [ ] Every external call has a defined failure mode
 - [ ] Success criteria are testable (not vague like "it works well")
 
+### Agent Graph (CRITICAL BLOCKER — applies when project uses an agent framework)
+
+If the tech design specifies LangGraph, CrewAI, AutoGen, or any agent orchestration framework, `spec/product/07-agent-graph.md` **must** exist and contain all of the following before the spec is approved:
+
+- [ ] `GenerationState` (or equivalent) fully typed with every field named and typed
+- [ ] Every node listed with: what it reads from state, what it writes to state, external calls it makes, and how it handles errors
+- [ ] Edge topology diagram (which node connects to which, under what condition)
+- [ ] Error handler node defined (what it does when a fatal error occurs)
+- [ ] Graph assembly pseudocode (≤ 60 lines, shows how nodes/edges are wired)
+- [ ] Concurrency model (one run at a time? parallel nodes? checkpointing?)
+
+**Do not approve the spec if the project uses an agent framework and this file is absent or incomplete. Return NEEDS REVISION with this as a critical issue.**
+
 ### Coherence
 
 - [ ] No contradictions between spec files (e.g., architecture says X, a capability says not-X)

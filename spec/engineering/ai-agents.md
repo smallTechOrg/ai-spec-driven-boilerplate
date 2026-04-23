@@ -32,7 +32,32 @@ Minimum required sections:
 
 Update the report in real time. Do not reconstruct it from memory at the end.
 
-## 3. Spec-First Rule
+## 3. Gate Law (Non-Negotiable)
+
+Every lifecycle stage — spec, tech design, plan — follows the same mandatory gate sequence:
+
+```
+[Sub-agent produces output]
+        ↓
+[Reviewer sub-agent runs and approves]  ← NEVER skip
+        ↓
+[User approves via AskUserQuestion]     ← NEVER skip
+        ↓
+[Next stage begins]
+```
+
+**Consequences of skipping a gate:**
+- A spec without spec-reviewer approval may have gaps that waste entire coding sessions
+- A tech design without review may contradict the spec
+- A plan without review may miss capabilities entirely
+
+If you find yourself starting a later stage without all prior gates having been explicitly cleared, stop immediately. Run the missing reviewer, surface the result, get user approval, then continue. Do not rationalize skipping ("I'm confident it's fine") — the gate exists precisely because confidence is not a substitute for review.
+
+The gate sequence was defined during the build of this boilerplate and is the ultimate workflow regardless of which project is built on it.
+
+---
+
+## 4. Spec-First Rule
 
 **No code change without a spec backing it.**
 
@@ -44,7 +69,7 @@ If you are asked to implement something not in the spec:
 
 See `spec/engineering/spec-driven.md` for full details.
 
-## 4. Phase Discipline
+## 5. Phase Discipline
 
 **Never start phase N+1 while phase N is incomplete or failing.**
 
@@ -55,7 +80,7 @@ Each phase ends when:
 
 See `spec/engineering/phases.md` for the phase definitions and gates.
 
-## 5. Git Discipline
+## 6. Git Discipline
 
 - Commit every logical unit of work — never let the working tree stay dirty for more than one logical change
 - Push after every commit on feature branches
@@ -68,7 +93,7 @@ See `spec/engineering/phases.md` for the phase definitions and gates.
 2. If dirty: commit the changes
 3. Confirm the working tree is clean before replying
 
-## 6. Test Before Claiming Done
+## 7. Test Before Claiming Done
 
 A phase is not done until tests pass. "It looks right" is not a test.
 
@@ -76,14 +101,14 @@ A phase is not done until tests pass. "It looks right" is not a test.
 - Run the full test suite before marking a phase complete
 - If tests fail, fix them before moving on
 
-## 7. Error Resilience
+## 8. Error Resilience
 
 Every external call (API, database, LLM) must have:
 - Error handling that doesn't crash the agent
 - Logged failures (to file or stdout at minimum)
 - Graceful degradation (the agent continues if a non-critical step fails)
 
-## 8. No Gold-Plating
+## 9. No Gold-Plating
 
 Build what the spec says, nothing more.
 
@@ -92,7 +117,7 @@ Build what the spec says, nothing more.
 - No premature abstractions
 - If you spot a future improvement, add it to `reports/sessions/[current].md` under "Future improvements" and keep moving
 
-## 9. When Stuck
+## 10. When Stuck
 
 If requirements are unclear:
 1. Stop
@@ -104,7 +129,7 @@ If the spec is ambiguous:
 2. Propose an interpretation
 3. Wait for confirmation before implementing
 
-## 10. Closing a Session
+## 11. Closing a Session
 
 Before ending a session:
 - [ ] Working tree is clean (all changes committed and pushed)

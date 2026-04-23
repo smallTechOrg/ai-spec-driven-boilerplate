@@ -50,49 +50,90 @@ When the user gives you an idea (via `/build [idea]` or direct conversation):
 
 ## Stage 2 — Spec
 
+**This stage has two mandatory review gates before proceeding.**
+
+### 2a — Spec Writing
 1. Invoke the **spec-writer** sub-agent with all intake information collected so far
-2. spec-writer produces a draft spec (fills in `spec/product/` files)
-3. Invoke the **spec-reviewer** sub-agent to review the draft
-4. If spec-reviewer flags issues: send them back to spec-writer with the feedback; iterate
-5. When spec-reviewer approves: present the spec summary to the user
-6. Ask the user: "Does this match your vision? Any changes before we proceed?"
-7. Incorporate user feedback → repeat spec-reviewer → repeat until user approves
-8. **Gate:** Spec is approved by both spec-reviewer and user before proceeding
+2. spec-writer fills in all `spec/product/` files (no `<!-- FILL IN -->` placeholders remaining)
+
+### 2b — Spec Review Gate (MANDATORY — never skip)
+3. Invoke the **spec-reviewer** sub-agent on the draft
+4. spec-reviewer returns: `APPROVED` or `NEEDS REVISION` with a list of issues
+5. If `NEEDS REVISION`: send feedback back to spec-writer; iterate until spec-reviewer returns `APPROVED`
+6. **Do not proceed past this point until spec-reviewer explicitly approves**
+
+### 2c — User Approval Gate (MANDATORY — never skip)
+7. Surface the spec-reviewer's approval and a summary of what was written to the user
+8. Use `AskUserQuestion` to ask: "Does this spec match your vision?" with options: Looks good / I have changes / Show me the full spec
+9. If the user has changes: incorporate → re-run spec-reviewer → re-present
+10. **Gate:** Both spec-reviewer AND user have approved before Stage 3 begins
 
 **What makes a spec complete:**
 - All `<!-- FILL IN -->` placeholders in `spec/product/` are replaced
 - Every capability has a file in `spec/product/capabilities/`
-- Success criteria are measurable
+- Every external call has a defined failure mode
+- Success criteria are testable (not vague)
 - Out-of-scope items are explicitly listed
 
 ---
 
 ## Stage 3 — Tech Design
 
+**This stage has two mandatory review gates before proceeding.**
+
+### 3a — Tech Design
 1. Invoke the **tech-designer** sub-agent with the approved product spec
-2. tech-designer proposes:
-   - Language and runtime
-   - Agent framework (LangGraph, CrewAI, custom, etc.)
-   - LLM provider and model
-   - Database (if needed)
-   - API/CLI/UI stack (if needed)
-   - Key libraries
-3. Present the tech design to the user: "Here's what the tech-designer recommends..."
-4. Ask: "Any changes? Or shall we proceed with this stack?"
-5. Incorporate feedback → finalize `spec/engineering/tech-stack.md` and `spec/engineering/code-style.md`
-6. **Gate:** User approves tech design before proceeding
+2. tech-designer fills in `spec/engineering/tech-stack.md` and `spec/engineering/code-style.md`
+
+### 3b — Tech Design Review Gate (MANDATORY — never skip)
+3. Invoke the **spec-reviewer** sub-agent on the tech design files
+4. spec-reviewer checks: does the tech design cover all capabilities? Are there gaps or contradictions?
+5. If issues found: send back to tech-designer; iterate until spec-reviewer approves
+6. **Do not proceed until spec-reviewer approves the tech design**
+
+### 3c — User Approval Gate (MANDATORY — never skip)
+7. Present the tech design summary to the user via `AskUserQuestion`: "Does this tech stack work for you?"
+8. If the user wants changes: incorporate → re-run spec-reviewer on tech design → re-present
+9. **Gate:** Both spec-reviewer AND user have approved before Stage 4 begins
 
 ---
 
 ## Stage 4 — Planning
 
-1. Invoke the **planner** sub-agent with approved spec + tech design
-2. Planner produces a phased plan adapted to this project (see `spec/engineering/phases.md` for the template)
-3. Invoke the **plan-reviewer** sub-agent to validate the plan against the spec
-4. If plan-reviewer flags issues: send back to planner with feedback; iterate
-5. Present the plan to the user: "Here are the phases we'll build through..."
-6. Ask: "Does this order make sense? Any phases you want to add or remove?"
-7. **Gate:** User approves the plan before building starts
+**This stage has two mandatory review gates before proceeding.**
+
+### 4a — Plan Generation
+1. Invoke the **planner** sub-agent with the approved spec + approved tech design
+2. Planner produces a phased plan adapted to this project
+
+### 4b — Plan Review Gate (MANDATORY — never skip)
+3. Invoke the **plan-reviewer** sub-agent on the plan
+4. plan-reviewer checks: are all capabilities covered? Is Phase 2 a working minimal thing? Are gate tests specific?
+5. If issues found: send back to planner; iterate until plan-reviewer approves
+6. **Do not proceed until plan-reviewer approves**
+
+### 4c — User Approval Gate (MANDATORY — never skip)
+7. Present the plan to the user via `AskUserQuestion`: "Does this phased plan make sense?"
+8. If the user wants changes: incorporate → re-run plan-reviewer → re-present
+9. **Gate:** Both plan-reviewer AND user have approved before any code is written
+
+---
+
+## Gate Law
+
+**Every stage has the same mandatory gate sequence:**
+
+```
+[Sub-agent does work]
+      ↓
+[Reviewer sub-agent approves]   ← NEVER skip this
+      ↓
+[User approves via AskUserQuestion]  ← NEVER skip this
+      ↓
+[Next stage begins]
+```
+
+Skipping a reviewer gate is a defect in the agent-builder. If you find yourself proceeding without a reviewer having run, stop, run the reviewer, and surface the result before continuing. This applies even if you are "confident" the output is correct.
 
 ---
 

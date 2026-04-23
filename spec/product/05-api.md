@@ -1,41 +1,26 @@
 # API
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent. Delete this file if the agent has no external API surface (e.g., it's a pure CLI tool or background worker).
+## Style
 
----
+Server-rendered HTML via FastAPI + Jinja2. No JSON API in v0.1.
 
-## API Style
+## Routes
 
-<!-- FILL IN: REST / GraphQL / CLI / webhook / none -->
-
-## Endpoints / Commands
-
-<!-- FILL IN: One section per endpoint or command. -->
-
-### `<!-- METHOD /path or command name -->`
-
-**Purpose:** <!-- what this endpoint does -->
-
-**Request:**
-```json
-{
-  "<!-- field -->": "<!-- type and description -->"
-}
-```
-
-**Response:**
-```json
-{
-  "<!-- field -->": "<!-- type and description -->"
-}
-```
-
-**Error cases:**
-| Status | Condition |
-|--------|-----------|
-| 400 | <!-- bad input --> |
-| 500 | <!-- internal error --> |
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/` | Dashboard (list voices, writers, recent articles) |
+| GET | `/voices` | List voices |
+| GET | `/voices/new` | Voice form |
+| POST | `/voices` | Create voice |
+| GET | `/writers` | List writers |
+| GET | `/writers/new` | Writer form |
+| POST | `/writers` | Create writer |
+| GET | `/articles` | List articles |
+| GET | `/articles/new` | New article form (pick writer + topic) |
+| POST | `/articles` | Generate article (invokes LangGraph synchronously) |
+| GET | `/articles/{id}` | View article |
+| GET | `/health` | JSON `{status:"ok"}` |
 
 ## Authentication
 
-<!-- FILL IN: How are API callers authenticated? -->
+None (local single-user).

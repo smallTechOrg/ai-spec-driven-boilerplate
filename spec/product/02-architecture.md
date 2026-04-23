@@ -1,50 +1,49 @@
 # Architecture
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved.
-
----
-
 ## System Overview
 
-<!-- FILL IN: One paragraph describing the system at a high level. Who/what interacts with it? -->
+Single-process Python app. FastAPI serves Jinja2-rendered HTML pages for CRUD on Voices/Writers and article generation. A LangGraph state machine runs in-process to produce articles via Gemini.
 
 ## Component Map
 
-<!-- FILL IN: List the major components and what each does. -->
-
 ```
-[Component A]
+[Browser]
+    ↓ HTTP
+[FastAPI + Jinja2 UI]
     ↓
-[Component B]   ←→   [External Service]
+[Repository (SQLAlchemy)]   →   [PostgreSQL]
     ↓
-[Component C]
+[LangGraph Runner]
+    ↓
+[LLM Client (Gemini)]       →   [Google Gemini API]
 ```
 
 ## Layers
 
-<!-- FILL IN: Describe the layers of the system (e.g., API → Agent Loop → Tools → Storage). -->
-
 | Layer | Responsibility |
 |-------|----------------|
-| <!-- layer --> | <!-- responsibility --> |
+| `api/` | FastAPI routes, Jinja2 templates, form handling |
+| `graph/` | LangGraph state machine (plan → draft → finalize) |
+| `llm/` | Gemini provider + stub provider for tests |
+| `db/` | SQLAlchemy models, session factory |
+| `domain/` | Pydantic models (boundary types) |
+| `config/` | Settings (Pydantic BaseSettings) |
 
 ## Data Flow
 
-<!-- FILL IN: Walk through the main data flow from trigger to output. -->
-
-1. Trigger: <!-- how does the agent start? (cron, webhook, user input, etc.) -->
-2. <!-- step 2 -->
-3. <!-- step 3 -->
-4. Output: <!-- what does the agent produce? -->
+1. User opens `/`, creates a Voice, then a Writer linked to that Voice
+2. User opens `/articles/new`, picks writer + types topic, submits
+3. FastAPI route creates an `AgentRun` row, invokes LangGraph runner
+4. Runner loads writer + voice, runs plan → draft → finalize nodes
+5. Final article saved; user is redirected to the article page
 
 ## External Dependencies
 
-<!-- FILL IN: APIs, services, databases the agent depends on. -->
-
 | Dependency | Purpose | Failure Mode |
 |------------|---------|--------------|
-| <!-- name --> | <!-- what it does --> | <!-- what happens if it's down --> |
+| PostgreSQL | Persistence | App won't start |
+| Google Gemini API | Article generation | Article creation returns error; existing articles still viewable |
 
 ## Deployment Model
 
-<!-- FILL IN: How does this run? (local script, cloud function, long-running service, etc.) -->
+Local `uv run python -m blogforge` → FastAPI on `http://localhost:8001`.

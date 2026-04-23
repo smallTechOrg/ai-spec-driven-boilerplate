@@ -1,43 +1,48 @@
 # Vision
 
-> **Boilerplate status:** This file contains placeholders. The spec-writer sub-agent will fill these in based on your idea. Run `/build [your idea]` to start, or fill in the placeholders manually.
-
----
-
 ## What This Agent Does
 
-<!-- FILL IN: One paragraph describing what this agent does, who uses it, and what problem it solves. -->
+BlogForge is a single-user, local-first blog generator. The user defines a **Voice** (tone/style guidelines) and creates **Writer** personas that embody that voice. Through a simple web UI, the user picks a writer + topic; a LangGraph pipeline (plan → draft → finalize) calls Gemini to produce an **Article** persisted in PostgreSQL and viewable in the UI.
 
 ## Who Uses It
 
-<!-- FILL IN: Primary user(s). What is their role? What are they trying to accomplish? -->
+A solo content creator who wants consistent-voice blog drafts without prompting an LLM from scratch each time.
 
 ## Core Problem Being Solved
 
-<!-- FILL IN: What manual or broken process does this agent replace or improve? -->
+Pasting voice guidelines into chat for each article is lossy and inconsistent. BlogForge captures voice + writer persona as first-class data and reuses them deterministically.
 
 ## Success Criteria
 
-<!-- FILL IN: How do we know the agent is working? List 3-5 measurable outcomes. -->
+- [ ] User can create a Voice and a Writer via the web UI
+- [ ] User submits topic + writer → article is generated and saved
+- [ ] Every article links to writer, voice, topic, timestamp
+- [ ] No per-article prompt engineering required
 
-- [ ] <!-- criterion 1 -->
-- [ ] <!-- criterion 2 -->
-- [ ] <!-- criterion 3 -->
+## Out of Scope (v0.1)
 
-## What This Agent Does NOT Do (Out of Scope)
-
-<!-- FILL IN: Explicit exclusions prevent scope creep. List things the agent will never do. -->
+- Article editing / regeneration / versioning
+- Multi-writer debates
+- Auth, multi-user
+- Publishing / export integrations
 
 ## Key Constraints
 
-<!-- FILL IN: Hard limits — budget, latency, compliance, API rate limits, etc. -->
+- Local-only (no hosting)
+- Single LLM provider: Google Gemini
+- Latency: article in < 60s
 
-## Phases of Development
+## Phases
 
-<!-- FILL IN: High-level phases. The planner sub-agent will refine these into a detailed plan. -->
+| Phase | Description | Gate |
+|-------|-------------|------|
+| 1 | Domain models (Voice, Writer, Article, AgentRun) + Postgres schema + repository | `uv run pytest tests/unit` green |
+| 2 | LangGraph pipeline stubbed + FastAPI+Jinja UI + README | `uv run pytest` green, no API key required |
+| 3 | Real Gemini integration | End-to-end article generated with real LLM |
 
-| Phase | Description | Success Gate |
-|-------|-------------|--------------|
-| 1 | <!-- minimal working thing --> | <!-- test that proves it works --> |
-| 2 | <!-- next increment --> | <!-- test --> |
-| ... | | |
+## Future Phases
+
+- Article editing / versioning / regeneration
+- Export to markdown, publish to CMS
+- Multi-writer editorial flow
+- Voice auto-extraction from sample writing

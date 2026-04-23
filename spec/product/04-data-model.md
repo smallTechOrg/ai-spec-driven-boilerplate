@@ -1,34 +1,61 @@
 # Data Model
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after architecture is approved.
-
----
-
 ## Storage Technology
 
-<!-- FILL IN: What database/storage does this project use and why? -->
+PostgreSQL 15+ via SQLAlchemy 2.0 + Alembic.
 
 ## Entities
 
-<!-- FILL IN: One section per major entity. -->
-
-### Entity: <!-- Name -->
-
-<!-- FILL IN: What does this entity represent? -->
-
+### Voice
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| id | <!-- type --> | yes | Primary key |
-| <!-- field --> | <!-- type --> | <!-- yes/no --> | <!-- description --> |
+| id | uuid | yes | PK |
+| name | str (unique) | yes | Display name |
+| description | str | yes | One-liner about the voice |
+| guidelines | text | yes | Markdown — do's and don'ts |
+| created_at | timestamptz | yes | |
 
-### Relationships
+### Writer
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | uuid | yes | PK |
+| name | str | yes | Display name |
+| persona | text | yes | Markdown — background/expertise |
+| voice_id | uuid FK → voice.id | yes | |
+| created_at | timestamptz | yes | |
 
-<!-- FILL IN: How do entities relate to each other? -->
+### Article
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | uuid | yes | PK |
+| writer_id | uuid FK → writer.id | yes | |
+| voice_id | uuid FK → voice.id | yes | Denormalized for history |
+| topic | str | yes | |
+| title | str | yes | |
+| body | text | yes | Markdown |
+| created_at | timestamptz | yes | |
+
+### AgentRun
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | uuid | yes | PK |
+| article_id | uuid FK, nullable | no | Null on failure |
+| writer_id | uuid FK | yes | |
+| topic | str | yes | |
+| status | enum(pending,completed,failed) | yes | |
+| error_message | text | no | |
+| created_at | timestamptz | yes | |
+
+## Relationships
+
+- Voice 1 — N Writer
+- Writer 1 — N Article
+- Writer 1 — N AgentRun
 
 ## Data Lifecycle
 
-<!-- FILL IN: When is data created, updated, and deleted? Is anything time-boxed or archived? -->
+No automatic deletion. User deletes manually (future).
 
 ## Sensitive Data
 
-<!-- FILL IN: What fields contain PII or secrets? How are they protected? -->
+None in v0.1.

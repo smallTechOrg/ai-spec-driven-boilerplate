@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 
 import aiofiles
+from google import genai
 
 from blogforge.config import settings
 
@@ -17,20 +18,40 @@ SVG_PLACEHOLDER = """\
     </linearGradient>
   </defs>
   <rect width="1200" height="630" fill="url(#g)" />
-  <text x="600" y="315" font-family="sans-serif" font-size="48" fill="white"
+  <text x="600" y="315" font-family="sans-serif" font-size="40" fill="white"
         text-anchor="middle" dominant-baseline="middle">{title}</text>
 </svg>
 """
 
 
-async def generate_image(post_id: int, title: str) -> str:
-    """Stub: writes an SVG placeholder and returns its path."""
-    await asyncio.sleep(0)
-    images_dir = Path(settings.images_dir)
-    images_dir.mkdir(parents=True, exist_ok=True)
-    path = images_dir / f"post-{post_id}-cover.svg"
-    content = SVG_PLACEHOLDER.format(title=title[:40])
+async def _write_svg(path: Path, title: str) -> None:
     async with aiofiles.open(path, "w") as f:
-        await f.write(content)
-    logger.info("image_generation.stub", extra={"post_id": post_id, "path": str(path)})
-    return str(path)
+        await f.write(SVG_PLACEHOLDER.format(title=title[:60]))
+
+
+def _generate_png(prompt: str) -> bytes:
+    client = genai.Client(api_key=settings.gemini_api_key)
+    response = client.models.generate_images(
+        model="imagen-3.0-generate-002",
+        prompt=prompt,
+        config={"number_of_images": 1, "aspect_ratio": "16:9"},
+    )
+    return response.generated_images[0].image.image_bytes
+
+
+async def generate_image(post_id: int, title: str) -> str:
+    images_dir = settings.images_path()
+    png_path = images_dir / f"post-{post_id}-cover.png"
+    svg_path = images_dir / f"post-{post_id}-cover.svg"
+
+    try:
+        prompt = f"Blog cover image for article titled '{title}'. Professional, modern, 1200x630, no text."
+        image_bytes = await asyncio.to_thread(_generate_png, prompt)
+        async with aiofiles.open(png_path, "wb") as f:
+            await f.write(image_bytes)
+        logger.info("image_generation.ok", extra={"post_id": post_id, "path": str(png_path)})
+        return str(png_path)
+    except Exception as exc:
+        logger.warning("image_generation.fallback", extra={"post_id": post_id, "error": str(exc)})
+        await _write_svg(svg_path, title)
+        return str(svg_path)

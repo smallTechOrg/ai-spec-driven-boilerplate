@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BlogForge</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8f9fa;color:#212529}
+  header{background:#4f46e5;color:#fff;padding:1rem 2rem;display:flex;align-items:center;gap:1rem}
+  header h1{font-size:1.4rem;font-weight:700}
+  nav{display:flex;gap:0;border-bottom:2px solid #4f46e5;background:#fff;padding:0 2rem}
+  nav button{padding:.75rem 1.5rem;border:none;background:none;cursor:pointer;font-size:.95rem;color:#666;border-bottom:3px solid transparent;margin-bottom:-2px}
+  nav button.active{color:#4f46e5;border-bottom-color:#4f46e5;font-weight:600}
+  main{max-width:960px;margin:2rem auto;padding:0 1rem}
+  .tab{display:none}.tab.active{display:block}
+  .card{background:#fff;border-radius:8px;padding:1.5rem;margin-bottom:1rem;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  label{display:block;margin-bottom:.25rem;font-size:.875rem;font-weight:500;color:#495057}
+  input,textarea,select{width:100%;padding:.5rem .75rem;border:1px solid #ced4da;border-radius:6px;font-size:.95rem;margin-bottom:1rem}
+  textarea{resize:vertical;min-height:80px}
+  .btn{padding:.6rem 1.4rem;border:none;border-radius:6px;font-size:.95rem;cursor:pointer;font-weight:500}
+  .btn-primary{background:#4f46e5;color:#fff}.btn-primary:hover{background:#4338ca}
+  .btn-danger{background:#dc3545;color:#fff}.btn-danger:hover{background:#b02a37}
+  .btn-sm{padding:.35rem .9rem;font-size:.85rem}
+  .alert{padding:.75rem 1rem;border-radius:6px;margin-bottom:1rem;display:none}
+  .alert-ok{background:#d1fae5;color:#065f46}.alert-err{background:#fee2e2;color:#991b1b}
+  .row{display:flex;gap:1rem;flex-wrap:wrap}
+  .col{flex:1;min-width:200px}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:.6rem .75rem;border-bottom:1px solid #e9ecef;font-size:.9rem}
+  th{font-weight:600;color:#495057;background:#f8f9fa}
+  .badge{display:inline-block;padding:.2rem .55rem;border-radius:12px;font-size:.78rem;font-weight:600}
+  .badge-ok{background:#d1fae5;color:#065f46}.badge-fail{background:#fee2e2;color:#991b1b}
+  .badge-run{background:#dbeafe;color:#1e40af}.badge-skip{background:#f3f4f6;color:#6b7280}
+  .post-card{border:1px solid #e9ecef;border-radius:8px;padding:1rem;margin-bottom:.75rem;background:#fff}
+  .post-card h3{font-size:1rem;margin-bottom:.3rem}
+  .post-card .meta{font-size:.8rem;color:#6b7280}
+  .post-img{width:120px;height:63px;object-fit:cover;border-radius:4px;float:right;margin-left:1rem}
+  .spinner{display:inline-block;width:18px;height:18px;border:3px solid #c7d2fe;border-top-color:#4f46e5;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:.4rem}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #run-status{padding:.75rem 1rem;border-radius:6px;margin-bottom:1rem;display:none;font-weight:500}
+</style>
+</head>
+<body>
+<header><h1>✏️ BlogForge</h1><span id="blog-name-header" style="opacity:.8"></span></header>
+<nav>
+  <button class="active" onclick="showTab('settings')">Settings</button>
+  <button onclick="showTab('writers')">Writers</button>
+  <button onclick="showTab('generate')">Generate</button>
+  <button onclick="showTab('library')">Library</button>
+</nav>
+<main>
+
+<!-- SETTINGS TAB -->
+<div id="tab-settings" class="tab active">
+  <div class="card">
+    <h2 style="margin-bottom:1rem">Blog Settings</h2>
+    <div id="settings-alert" class="alert"></div>
+    <div class="row">
+      <div class="col">
+        <label>Blog Name</label><input id="s-name" placeholder="The Curious Mind">
+        <label>Tagline</label><input id="s-tagline" placeholder="Short tagline">
+        <label>Niche</label><input id="s-niche" placeholder="AI tools for solopreneurs">
+      </div>
+      <div class="col">
+        <label>Themes (comma-separated)</label>
+        <input id="s-themes" placeholder="productivity, automation">
+        <label>Posts per run</label>
+        <input id="s-ppr" type="number" min="1" max="10" value="3">
+        <label>Schedule (cron, optional)</label>
+        <input id="s-cron" placeholder="0 8 * * 1  (Mon 8am)">
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+  </div>
+</div>
+
+<!-- WRITERS TAB -->
+<div id="tab-writers" class="tab">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <h2>Writers</h2>
+      <button class="btn btn-primary btn-sm" onclick="showWriterForm()">+ Add Writer</button>
+    </div>
+    <div id="writers-alert" class="alert"></div>
+    <div id="writer-form" style="display:none;border:1px solid #e9ecef;border-radius:8px;padding:1rem;margin-bottom:1rem">
+      <h3 style="margin-bottom:.75rem" id="writer-form-title">New Writer</h3>
+      <input type="hidden" id="w-id">
+      <label>Name</label><input id="w-name" placeholder="Alex Chen">
+      <label>Persona prompt</label><textarea id="w-persona" rows="4" placeholder="You are Alex, a pragmatic engineer who explains AI with real examples..."></textarea>
+      <label>Bio</label><textarea id="w-bio" rows="2" placeholder="Alex is a software engineer..."></textarea>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-primary btn-sm" onclick="saveWriter()">Save</button>
+        <button class="btn btn-sm" style="background:#e9ecef" onclick="hideWriterForm()">Cancel</button>
+      </div>
+    </div>
+    <div id="writers-list"></div>
+  </div>
+</div>
+
+<!-- GENERATE TAB -->
+<div id="tab-generate" class="tab">
+  <div class="card">
+    <h2 style="margin-bottom:1rem">Generate Posts</h2>
+    <div id="run-status"></div>
+    <label>Posts to generate</label>
+    <input id="g-count" type="number" min="1" max="10" value="3" style="max-width:120px">
+    <button class="btn btn-primary" id="trigger-btn" onclick="triggerRun()">Run Now</button>
+  </div>
+  <div class="card">
+    <h2 style="margin-bottom:1rem">Run History</h2>
+    <div id="runs-list"></div>
+  </div>
+</div>
+
+<!-- LIBRARY TAB -->
+<div id="tab-library" class="tab">
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.5rem">
+    <h2>Content Library</h2>
+    <button class="btn btn-primary btn-sm" onclick="loadPosts()">Refresh</button>
+  </div>
+  <div id="posts-list"></div>
+  <div id="post-detail" style="display:none" class="card">
+    <button class="btn btn-sm" style="background:#e9ecef;margin-bottom:1rem" onclick="closePost()">← Back</button>
+    <h2 id="pd-title" style="margin-bottom:.5rem"></h2>
+    <div id="pd-meta" style="font-size:.85rem;color:#6b7280;margin-bottom:1rem"></div>
+    <div id="pd-body" style="line-height:1.7"></div>
+  </div>
+</div>
+
+</main>
+<script>
+const API = '';
+let pollTimer = null;
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'settings') loadSettings();
+  if (name === 'writers') loadWriters();
+  if (name === 'generate') { loadRuns(); checkActiveRun(); }
+  if (name === 'library') loadPosts();
+}
+
+function alert_(id, msg, ok) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.className = 'alert ' + (ok ? 'alert-ok' : 'alert-err');
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 4000);
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────
+async function loadSettings() {
+  try {
+    const r = await fetch(API + '/blog');
+    if (r.status === 404) return;
+    const d = await r.json();
+    document.getElementById('s-name').value = d.name || '';
+    document.getElementById('s-tagline').value = d.tagline || '';
+    document.getElementById('s-niche').value = d.niche || '';
+    document.getElementById('s-themes').value = (d.themes || []).join(', ');
+    document.getElementById('s-ppr').value = d.posts_per_run || 3;
+    document.getElementById('s-cron').value = d.schedule_cron || '';
+    document.getElementById('blog-name-header').textContent = d.name || '';
+  } catch(e) { console.error(e); }
+}
+
+async function saveSettings() {
+  const body = {
+    name: document.getElementById('s-name').value.trim(),
+    tagline: document.getElementById('s-tagline').value.trim() || null,
+    niche: document.getElementById('s-niche').value.trim(),
+    themes: document.getElementById('s-themes').value.split(',').map(t=>t.trim()).filter(Boolean),
+    posts_per_run: parseInt(document.getElementById('s-ppr').value),
+    schedule_cron: document.getElementById('s-cron').value.trim() || null,
+  };
+  try {
+    const r = await fetch(API + '/blog', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const d = await r.json();
+    if (!r.ok) { alert_('settings-alert', d.detail || 'Error', false); return; }
+    document.getElementById('blog-name-header').textContent = d.name || '';
+    alert_('settings-alert', 'Settings saved!', true);
+  } catch(e) { alert_('settings-alert', 'Network error', false); }
+}
+
+// ── Writers ───────────────────────────────────────────────────────────────
+async function loadWriters() {
+  const r = await fetch(API + '/writers');
+  const d = await r.json();
+  const el = document.getElementById('writers-list');
+  if (!d.writers.length) { el.innerHTML = '<p style="color:#6b7280">No writers yet. Add one!</p>'; return; }
+  el.innerHTML = '<table><thead><tr><th>Name</th><th>Bio</th><th>Status</th><th></th></tr></thead><tbody>' +
+    d.writers.map(w => `<tr>
+      <td><strong>${esc(w.name)}</strong></td>
+      <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.bio)}</td>
+      <td><span class="badge ${w.is_active ? 'badge-ok' : 'badge-skip'}">${w.is_active ? 'Active' : 'Inactive'}</span></td>
+      <td style="display:flex;gap:.4rem">
+        <button class="btn btn-sm" style="background:#e9ecef" onclick='editWriter(${JSON.stringify(w)})'>Edit</button>
+        ${w.is_active ? `<button class="btn btn-danger btn-sm" onclick="deleteWriter(${w.id})">Deactivate</button>` : ''}
+      </td>
+    </tr>`).join('') + '</tbody></table>';
+}
+
+function showWriterForm() { document.getElementById('writer-form').style.display='block'; document.getElementById('w-id').value=''; document.getElementById('w-name').value=''; document.getElementById('w-persona').value=''; document.getElementById('w-bio').value=''; document.getElementById('writer-form-title').textContent='New Writer'; }
+function hideWriterForm() { document.getElementById('writer-form').style.display='none'; }
+function editWriter(w) { showWriterForm(); document.getElementById('w-id').value=w.id; document.getElementById('w-name').value=w.name; document.getElementById('w-persona').value=w.persona_prompt; document.getElementById('w-bio').value=w.bio; document.getElementById('writer-form-title').textContent='Edit Writer'; }
+
+async function saveWriter() {
+  const id = document.getElementById('w-id').value;
+  const body = { name: document.getElementById('w-name').value.trim(), persona_prompt: document.getElementById('w-persona').value.trim(), bio: document.getElementById('w-bio').value.trim() };
+  const url = id ? API+'/writers/'+id : API+'/writers';
+  const method = id ? 'PUT' : 'POST';
+  const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const d = await r.json();
+  if (!r.ok) { alert_('writers-alert', d.detail || 'Error', false); return; }
+  hideWriterForm(); alert_('writers-alert', 'Writer saved!', true); loadWriters();
+}
+
+async function deleteWriter(id) {
+  if (!confirm('Deactivate this writer?')) return;
+  await fetch(API+'/writers/'+id, {method:'DELETE'});
+  loadWriters();
+}
+
+// ── Generate ──────────────────────────────────────────────────────────────
+async function checkActiveRun() {
+  const r = await fetch(API + '/runs');
+  const d = await r.json();
+  const active = d.runs.find(r => r.status === 'running');
+  if (active) startPolling(active.id);
+}
+
+async function triggerRun() {
+  const count = parseInt(document.getElementById('g-count').value);
+  const r = await fetch(API + '/runs/trigger', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({posts_count:count})});
+  const d = await r.json();
+  if (!r.ok) { setRunStatus('Error: ' + (d.detail || 'unknown'), 'err'); return; }
+  setRunStatus('Run started — generating ' + d.posts_requested + ' posts…', 'run');
+  loadRuns();
+  // poll runs list to detect completion
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    await loadRuns();
+    const r2 = await fetch(API + '/runs');
+    const d2 = await r2.json();
+    const still = d2.runs.find(r => r.status === 'running');
+    if (!still) { clearInterval(pollTimer); pollTimer = null; setRunStatus('Run complete!', 'ok'); }
+  }, 4000);
+}
+
+function startPolling(run_id) {
+  setRunStatus('Run in progress…', 'run');
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    const r = await fetch(API + '/runs/' + run_id);
+    const d = await r.json();
+    if (d.status !== 'running') { clearInterval(pollTimer); pollTimer = null; setRunStatus('Run ' + d.status, d.status === 'completed' ? 'ok' : 'err'); loadRuns(); }
+  }, 4000);
+}
+
+function setRunStatus(msg, type) {
+  const el = document.getElementById('run-status');
+  el.style.display = 'block';
+  el.style.background = type === 'ok' ? '#d1fae5' : type === 'err' ? '#fee2e2' : '#dbeafe';
+  el.style.color = type === 'ok' ? '#065f46' : type === 'err' ? '#991b1b' : '#1e40af';
+  el.innerHTML = (type === 'run' ? '<span class="spinner"></span>' : '') + msg;
+}
+
+async function loadRuns() {
+  const r = await fetch(API + '/runs');
+  const d = await r.json();
+  const el = document.getElementById('runs-list');
+  if (!d.runs.length) { el.innerHTML = '<p style="color:#6b7280">No runs yet.</p>'; return; }
+  el.innerHTML = '<table><thead><tr><th>ID</th><th>Trigger</th><th>Status</th><th>Posts</th><th>Started</th></tr></thead><tbody>' +
+    d.runs.slice(0,20).map(r => `<tr>
+      <td>#${r.id}</td><td>${esc(r.trigger)}</td>
+      <td><span class="badge ${r.status==='completed'?'badge-ok':r.status==='running'?'badge-run':'badge-fail'}">${esc(r.status)}</span></td>
+      <td>${r.posts_completed}/${r.posts_requested}</td>
+      <td style="font-size:.82rem;color:#6b7280">${r.started_at ? new Date(r.started_at).toLocaleString() : '—'}</td>
+    </tr>`).join('') + '</tbody></table>';
+}
+
+// ── Library ───────────────────────────────────────────────────────────────
+async function loadPosts() {
+  const r = await fetch(API + '/posts?limit=50');
+  const d = await r.json();
+  const list = document.getElementById('posts-list');
+  const detail = document.getElementById('post-detail');
+  detail.style.display = 'none'; list.style.display = 'block';
+  if (!d.posts.length) { list.innerHTML = '<div class="card" style="color:#6b7280">No posts yet. Trigger a run to generate content.</div>'; return; }
+  list.innerHTML = d.posts.map(p => `
+    <div class="post-card" onclick="openPost(${p.id})" style="cursor:pointer">
+      ${p.cover_image_path ? `<img class="post-img" src="/images/${encodeURIComponent(p.cover_image_path.split('/').pop())}" onerror="this.style.display='none'">` : ''}
+      <h3>${esc(p.title)}</h3>
+      <div class="meta">${esc(p.topic)} · ${p.published_at ? new Date(p.published_at).toLocaleDateString() : ''}</div>
+    </div>`).join('');
+}
+
+async function openPost(id) {
+  const r = await fetch(API + '/runs/0');  // we'll use the posts endpoint
+  // fetch from posts list — for now do a run lookup
+  const pr = await fetch(API + '/posts?limit=100');
+  const pd = await pr.json();
+  const post = pd.posts.find(p => p.id === id);
+  if (!post) return;
+  document.getElementById('posts-list').style.display = 'none';
+  const detail = document.getElementById('post-detail');
+  detail.style.display = 'block';
+  document.getElementById('pd-title').textContent = post.title;
+  document.getElementById('pd-meta').textContent = post.topic + (post.published_at ? ' · ' + new Date(post.published_at).toLocaleDateString() : '');
+  document.getElementById('pd-body').innerHTML = post.content_html || '<p>' + esc(post.content_markdown || '') + '</p>';
+}
+
+function closePost() {
+  document.getElementById('post-detail').style.display = 'none';
+  document.getElementById('posts-list').style.display = 'block';
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// init
+loadSettings();
+</script>
+</body>
+</html>

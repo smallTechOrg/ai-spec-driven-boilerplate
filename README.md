@@ -1,159 +1,147 @@
-# AI Agent Boilerplate — Spec-Driven, Zero-Shot to Working Agent
+# BlogForge — Autonomous Blog Generation Agent
 
-This is a boilerplate for building AI agents spec-first. Give it a one-line idea. Walk away with a working, tested, phased agent.
-
----
-
-## What This Is
-
-A starting point for anyone who wants to build an AI agent without writing boilerplate from scratch. The repo ships with:
-
-- A structured **spec template** covering product vision, architecture, capabilities, data model, API, and UI
-- An **agent-builder** sub-agent that orchestrates the full build lifecycle
-- Sub-agents for spec writing, reviewing, tech design, planning, and auditing
-- Engineering rules baked into the spec so every AI coding session is consistent
-- Phase-gated implementation — minimal working thing first, then iterative expansion
+BlogForge generates full blog posts (text + cover images) on a schedule, with no manual writing required. Configure your blog identity and writer personas once; the agent picks topics, writes posts, and stores them in a content library you can browse in a web dashboard.
 
 ---
 
-## How to Use This
+## What It Does
 
-### Step 1 — Clone and configure
+1. **Discovers topics** — searches DuckDuckGo + Tavily for niche-relevant trending content, merges with Gemini-brainstormed ideas, deduplicates against all previously used topics
+2. **Generates posts** — each post is written by an assigned writer persona using Gemini Flash (800–1500 words, structured Markdown, unique slug)
+3. **Generates cover images** — Gemini Imagen produces a 1200×630 cover image per post, saved to `./images/`; SVG placeholder used as fallback
+4. **Stores in a content library** — all posts and metadata persist in a local SQLite database
+5. **Serves a dashboard** — FastAPI web UI to configure settings, manage writers, trigger runs, and browse posts
+6. **Runs on a schedule** — APScheduler fires generation runs at a configured cron interval
+
+---
+
+## Current Status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Domain models + SQLite schema | ✅ Complete (21/21 tests) |
+| 2 | Core agent loop (stubbed) | ✅ Complete (5/5 tests) |
+| 3 | Real Gemini text generation | Pending |
+| 4 | Real Gemini Imagen cover images | Pending |
+| 5 | Topic discovery (DuckDuckGo + Tavily + Gemini) | Pending |
+| 6 | APScheduler cron scheduling | Pending |
+| 7 | Web dashboard (4 tabs) | Pending |
+| 8 | Integration tests | Pending |
+| 9 | Observability + polish | Pending |
+
+---
+
+## Setup
+
+### Requirements
+
+- Python 3.12+
+- [`uv`](https://github.com/astral-sh/uv) for dependency management
+- A Google Gemini API key (text + Imagen access)
+- A Tavily API key (optional — topic discovery degrades gracefully without it)
+
+### Install
 
 ```bash
-git clone https://github.com/smallTechOrg/ai-spec-driven-boilerplate.git my-agent
-cd my-agent
+git clone https://github.com/smallTechOrg/ai-spec-driven-boilerplate.git blogforge
+cd blogforge
+git checkout feat/blog-generator
+uv sync
 cp .env.example .env
+# edit .env — set GEMINI_API_KEY and optionally TAVILY_API_KEY
 ```
 
-### Step 2 — Open in Claude Code (or any AI coding assistant)
+### Run
 
 ```bash
-claude
+python -m blogforge serve
+# or: blogforge serve (after uv install)
 ```
 
-### Step 3 — Kick off the agent builder with your idea
+Dashboard available at `http://localhost:8000`.
 
-```
-/build I want an agent that monitors my Shopify store for low-inventory products and automatically drafts restock emails to suppliers
-```
+### Test
 
-Or just describe your idea naturally — the agent-builder will take it from there.
+```bash
+python -m pytest
+```
 
 ---
 
-## What Happens Next (Fully Automated)
+## Configuration
 
-The **agent-builder** orchestrates this sequence:
+All configuration is via environment variables (`.env` file):
 
-```
-Your idea
-    ↓
-[spec-writer]     → Asks clarifying questions → Drafts product spec
-    ↓
-[spec-reviewer]   → Checks coherence, flags gaps → Requests revisions
-    ↓
-[spec-writer]     → Iterates until spec is complete
-    ↓
-[tech-designer]   → Proposes tech stack, architecture, data model
-    ↓
-You approve the spec & tech design
-    ↓
-[planner]         → Breaks work into phases (minimal → complete)
-    ↓
-[plan-reviewer]   → Validates plan against spec
-    ↓
-Phase 1: Build the minimal working agent (core loop, no polish)
-    ↓
-[qa-auditor]      → Tests phase 1
-    ↓
-Phase 2, 3, ... : Iterate and expand
-    ↓
-[drift-auditor]   → Ensures code matches spec throughout
-    ↓
-Hand-off to you
-```
-
-**Nothing is skipped.** If a phase fails QA, it stays in that phase until it passes.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GEMINI_API_KEY` | required | Google Gemini API key |
+| `TAVILY_API_KEY` | optional | Tavily search API key |
+| `DATABASE_URL` | `sqlite+aiosqlite:///./data/blogforge.db` | SQLite database path |
+| `IMAGES_DIR` | `./images` | Cover image storage directory |
+| `HOST` | `0.0.0.0` | Server bind address |
+| `PORT` | `8000` | Server port |
 
 ---
 
-## Development Phases (Default Model)
+## Architecture
 
-| Phase | What Gets Built |
-|-------|-----------------|
-| 1 | Domain models + data layer |
-| 2 | Core agent loop (no integrations, stubbed tools) |
-| 3 | First real integration (the "happy path" end-to-end) |
-| 4 | Error handling, retries, resilience |
-| 5 | Remaining integrations |
-| 6 | API / CLI surface |
-| 7 | Basic UI (if needed) |
-| 8 | Integration tests |
-| 9 | Observability + logging |
-| 10 | Polish, documentation, hand-off |
+```
+[Dashboard UI]  ←HTTP→  [FastAPI Server]
+                              │
+                    ┌─────────┴────────────┐
+                    │                      │
+             [APScheduler]         [LangGraph Agent]
+             (cron triggers)               │
+                    │        ┌─────────────┴──────────────┐
+                    └────────►                            │
+                             [SQLite DB]         [External APIs]
+                             (content library)   ┌──────────────────┐
+                                       │         │ Gemini Flash     │
+                                  [./images/]    │ Gemini Imagen    │
+                                  (cover imgs)   │ DuckDuckGo       │
+                                                 │ Tavily           │
+                                                 └──────────────────┘
+```
 
-Each phase ends with a commit and passes QA before the next phase begins.
+**Agent pipeline (LangGraph):**
+```
+topic_discovery → writer_assignment → post_generation → image_generation → finalize
+       ↓error                ↓error
+   handle_error          handle_error
+```
 
 ---
 
-## Repo Layout
+## Project Layout
 
 ```
-.claude/
-  agents/           ← Sub-agents (agent-builder, spec-writer, etc.)
-  commands/         ← Slash commands (/build, /spec-check, /plan)
+src/blogforge/
+  agent/          ← LangGraph state, nodes, graph, runner
+  tools/          ← topic_discovery, post_generation, image_generation
+  db/             ← SQLAlchemy models, session, repository
+  domain/         ← Pydantic domain models
+  api/            ← FastAPI routes (Phase 7)
+  dashboard/      ← HTML/CSS/JS dashboard (Phase 7)
+  config.py       ← Settings via pydantic-settings
+  main.py         ← FastAPI app factory
 spec/
-  product/          ← What your agent does (fill this in or let spec-writer do it)
-  engineering/      ← How AI agents should write code for this project
-reports/
-  sessions/         ← Auto-generated session logs from every AI coding session
-CLAUDE.md           ← Entry point for Claude Code
-AGENTS.md           ← Entry point for OpenAI Codex / GitHub Copilot
-.env.example        ← Environment variable template
+  product/        ← Vision, architecture, capabilities, data model, API, UI, agent graph
+  engineering/    ← Tech stack, code style, phases, AI agent rules
+tests/
+  unit/           ← Unit tests per module
+  integration/    ← End-to-end pipeline tests
 ```
 
 ---
 
-## Manually Editing the Spec
+## Spec
 
-If you prefer to write the spec yourself before involving AI:
+Full spec lives in `spec/product/`. Key files:
 
-1. Open `spec/product/01-vision.md` and fill in the placeholders
-2. Work through each file in `spec/product/` in order
-3. Once the spec is complete, run `/plan` to jump straight to the planning phase
+- [Vision](spec/product/01-vision.md) — what it does, success criteria, out of scope
+- [Architecture](spec/product/02-architecture.md) — component map and data flow
+- [Agent Graph](spec/product/07-agent-graph.md) — LangGraph state, nodes, edge topology
+- [Data Model](spec/product/04-data-model.md) — entities and relationships
+- [Capabilities](spec/product/capabilities/) — one file per feature
 
----
-
-## Rules That AI Agents Follow
-
-Every AI session in this repo follows the rules in `spec/engineering/ai-agents.md`:
-
-- Read the full spec before writing any code
-- Open a session report at `reports/sessions/`
-- Commit every logical unit of work (never accumulate uncommitted changes)
-- One phase at a time — no skipping
-- Write tests before marking a phase complete
-- Update this README whenever the project layout changes
-
----
-
-## FAQ
-
-**Can I use this without Claude Code?**
-Yes. `AGENTS.md` has the same entry point for OpenAI Codex and GitHub Copilot. The sub-agents are plain markdown files.
-
-**What if my agent needs a database?**
-The spec template includes a data model section. The tech-designer sub-agent will recommend the right database for your use case.
-
-**What if I already have a tech stack in mind?**
-Tell the agent-builder upfront: `/build [idea] — use Python + FastAPI + PostgreSQL`. It will skip the tech design Q&A for those decisions.
-
-**What if something breaks?**
-Each phase is resilient by design. The QA auditor will catch failures before the next phase starts. You can always re-run a phase.
-
----
-
-## Contributing
-
-This is a boilerplate, not a framework. If you improve the agent orchestration or spec templates while building your agent, consider opening a PR so others benefit.
+This branch is built on the [ai-spec-driven-boilerplate](https://github.com/smallTechOrg/ai-spec-driven-boilerplate) — see `main` for the template.

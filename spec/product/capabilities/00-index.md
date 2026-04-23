@@ -10,3 +10,7 @@
 | 4 | Site Rendering — export content library to static HTML + CSS | **Future phase** | [04-site-rendering.md](04-site-rendering.md) |
 | 5 | Writer Assignment — round-robin topic→writer pairing | Active | [05-writer-assignment.md](05-writer-assignment.md) |
 | 6 | Scheduling — cron-based automatic runs via APScheduler | Active | [06-scheduling.md](06-scheduling.md) |
+
+## Agent Graph Spec
+
+See `spec/product/07-agent-graph.md` for the full LangGraph topology: state shape, node contracts, edge conditions, graph assembly, and error handling. This must exist and be reviewed before Phase 2 implementation begins.

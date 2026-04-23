@@ -21,16 +21,19 @@ A starting template for building AI agents. The spec in `spec/` is either:
 ```
 spec/product/01-vision.md
 spec/product/02-architecture.md
-spec/product/03-capabilities/       ← all files
+spec/product/capabilities/          ← all files
 spec/product/04-data-model.md
 spec/product/05-api.md
 spec/product/06-ui.md
+spec/product/07-agent-graph.md      ← REQUIRED if project uses an agent framework
 spec/engineering/ai-agents.md
 spec/engineering/spec-driven.md
 spec/engineering/phases.md
 spec/engineering/tech-stack.md
 spec/engineering/code-style.md
 ```
+
+**`07-agent-graph.md` is mandatory for any project that uses LangGraph, CrewAI, AutoGen, or any agent orchestration framework.** If it does not exist, do not start Phase 2 implementation — raise this as a blocker to the user.
 
 ## If the Spec Is Not Ready
 

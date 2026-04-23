@@ -58,6 +58,16 @@
 
 ## Permanent Rules (apply to all projects, not filled in by tech-designer)
 
+### Default Dev Port
+
+All generated projects **must** use **port 8001** as the default development port (not 8000).
+
+Reason: Port 8000 is commonly occupied by other local services (other FastAPI apps, Django, http.server, etc.). Using 8001 avoids startup failures with no code change needed.
+
+- `__main__.py` must hard-code `port=8001` (not 8000) unless overridden by an env var
+- README must reference `http://localhost:8001`
+- `.env.example` should include `PORT=8001` if the port is configurable
+
 ### DB Driver Rule
 
 The database driver (e.g. `psycopg2-binary` for PostgreSQL, `asyncpg` for async PostgreSQL) **must be declared in the main `[project.dependencies]` block**, never in `[dependency-groups.dev]` or equivalent dev-only groups.

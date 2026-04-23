@@ -1,50 +1,66 @@
 # Architecture
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved.
-
----
-
 ## System Overview
 
-<!-- FILL IN: One paragraph describing the system at a high level. Who/what interacts with it? -->
+BlogForge runs as a single Python process. A FastAPI server exposes the web dashboard and an internal REST API. An embedded APScheduler fires generation runs on a cron schedule. The LangGraph agent executes the generation pipeline (topic discovery → post writing → image generation → site rendering) and persists results to SQLite. Generated HTML files are written to a configurable output directory.
 
 ## Component Map
 
-<!-- FILL IN: List the major components and what each does. -->
-
 ```
-[Component A]
-    ↓
-[Component B]   ←→   [External Service]
-    ↓
-[Component C]
+[Dashboard UI]  ←HTTP→  [FastAPI Server]
+                              │
+                    ┌─────────┴────────────┐
+                    │                      │
+             [APScheduler]         [LangGraph Agent]
+             (cron triggers)               │
+                    │              ┌───────┴────────┐
+                    └──────────────►               │
+                                  [SQLite DB]  [Gemini API]
+                                               (text + image)
+                                       │
+                                  [HTML Output Dir]
 ```
 
 ## Layers
 
-<!-- FILL IN: Describe the layers of the system (e.g., API → Agent Loop → Tools → Storage). -->
-
 | Layer | Responsibility |
 |-------|----------------|
-| <!-- layer --> | <!-- responsibility --> |
+| API (FastAPI) | Dashboard endpoints, run trigger, config CRUD, writer CRUD |
+| Agent (LangGraph) | Orchestrates the generation pipeline; manages state across nodes |
+| Tools | Individual functions: topic_discovery, write_post, generate_image, render_site |
+| Domain | Pydantic models for Blog, Writer, Post, Run, Topic |
+| Storage | SQLite via SQLAlchemy 2.0; generated HTML files on disk |
+| LLM / Image | Google Gemini for text; Gemini Imagen for cover images |
+| Scheduler | APScheduler (AsyncIOScheduler) for cron-based runs |
 
 ## Data Flow
 
-<!-- FILL IN: Walk through the main data flow from trigger to output. -->
-
-1. Trigger: <!-- how does the agent start? (cron, webhook, user input, etc.) -->
-2. <!-- step 2 -->
-3. <!-- step 3 -->
-4. Output: <!-- what does the agent produce? -->
+1. **Trigger:** Dashboard button or APScheduler fires `POST /runs/trigger`
+2. **Agent start:** LangGraph initialises `GenerationState` with blog config + writer list
+3. **Topic discovery:** Agent queries Gemini for niche-aligned topics, cross-references Google Trends RSS, filters out previously used topics
+4. **Post assignment:** Each topic is assigned to a writer (round-robin or random)
+5. **Post generation:** For each topic+writer pair, Gemini generates the full post text
+6. **Image generation:** Gemini Imagen generates a cover image for each post; saved to `output/images/`
+7. **Site rendering:** Agent writes individual post HTML files + updates `index.html`
+8. **Persist:** Posts and run metadata saved to SQLite
+9. **Done:** Run status updated to `completed`; dashboard reflects new posts
 
 ## External Dependencies
 
-<!-- FILL IN: APIs, services, databases the agent depends on. -->
-
 | Dependency | Purpose | Failure Mode |
 |------------|---------|--------------|
-| <!-- name --> | <!-- what it does --> | <!-- what happens if it's down --> |
+| Google Gemini API (text) | Post generation, topic brainstorming | Log error, mark run as failed, retry on next scheduled run |
+| Google Gemini Imagen API | Cover image generation | Fall back to a placeholder image; post still published |
+| Google Trends RSS | Trending topic signals | Skip trending signals; use niche-only brainstorming |
+| SQLite | Config, posts, run history | Fatal — surface error immediately; do not start run |
+| Local filesystem | HTML output directory | Fatal — surface error if output dir is not writable |
 
 ## Deployment Model
 
-<!-- FILL IN: How does this run? (local script, cloud function, long-running service, etc.) -->
+Single Python process run locally or on a VPS:
+
+```bash
+python -m blogforge serve   # starts FastAPI + APScheduler
+```
+
+The dashboard is served at `http://localhost:8000`. The generated site is in `./output/` (configurable). The operator is responsible for deploying `./output/` to a static host (Netlify, GitHub Pages, etc.).

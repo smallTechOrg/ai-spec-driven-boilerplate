@@ -1,55 +1,66 @@
-# Tech Stack
-
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved. The user may override specific choices before the tech-designer is invoked.
-
----
+# Tech Stack — BlogForge
 
 ## Language
 
-<!-- FILL IN: e.g., Python 3.12 / TypeScript 5 / Go 1.22 -->
+**Python 3.12**
 
-**Why:** <!-- reason for this choice -->
+Why: Strong ecosystem for LLM integrations, async support, LangGraph is Python-native, and the team has Gemini API access via the `google-generativeai` SDK.
 
 ## Agent Framework
 
-<!-- FILL IN: e.g., LangGraph / CrewAI / AutoGen / custom / none -->
+**LangGraph**
 
-**Why:** <!-- reason for this choice -->
+Why: The generation pipeline has 5 sequential nodes (topic discovery → writer assignment → post generation → image generation → site rendering) with state that flows through. LangGraph's StateGraph with a linear topology handles this cleanly and gives checkpointing for free.
 
 ## LLM Provider
 
-<!-- FILL IN: e.g., Anthropic Claude / OpenAI GPT / Google Gemini -->
+**Google Gemini** — `gemini-2.0-flash` (text generation)
 
-**Model:** <!-- specific model, e.g., claude-sonnet-4-6 -->
+**Google Imagen** — `imagen-3.0-generate-002` (image generation)
 
-**Why:** <!-- reason -->
+Both accessed via `google-generativeai` SDK. This is the only provider in use (per operator constraint).
 
-## Backend Framework (if applicable)
+## Backend Framework
 
-<!-- FILL IN: e.g., FastAPI / Express / Django / none -->
+**FastAPI** — serves the dashboard UI and REST API.
 
-## Database (if applicable)
+**Uvicorn** — ASGI server.
 
-<!-- FILL IN: e.g., PostgreSQL / SQLite / Redis / none -->
+## Database
 
-**ORM/ODM:** <!-- e.g., SQLAlchemy 2.0 / Prisma / none -->
+**SQLite** via SQLAlchemy 2.0 ORM + Alembic migrations.
 
-## Frontend (if applicable)
+Why: No separate database process; single file; easy to back up; appropriate for single-user deployment with low write volume.
 
-<!-- FILL IN: e.g., Next.js 15 / React / Vue / none -->
+## Scheduler
+
+**APScheduler** (AsyncIOScheduler) — embedded in the FastAPI process.
 
 ## Key Libraries
 
-<!-- FILL IN: List the important libraries and what each does. -->
-
 | Library | Version | Purpose |
 |---------|---------|---------|
-| <!-- name --> | <!-- version --> | <!-- purpose --> |
-
-## What to Avoid
-
-<!-- FILL IN: Libraries, patterns, or approaches that are explicitly off-limits and why. -->
+| `google-generativeai` | latest | Gemini text + Imagen API client |
+| `langgraph` | latest | Agent pipeline orchestration |
+| `fastapi` | latest | REST API + dashboard server |
+| `uvicorn` | latest | ASGI server |
+| `sqlalchemy` | 2.x | ORM |
+| `alembic` | latest | DB migrations |
+| `apscheduler` | 3.x | Cron scheduling |
+| `markdown` | latest | Markdown → HTML rendering |
+| `croniter` | latest | Cron expression validation |
+| `pydantic` | 2.x | Domain models + API validation |
+| `httpx` | latest | HTTP calls (Google Trends RSS) |
+| `pytest` | latest | Testing |
+| `pytest-asyncio` | latest | Async test support |
 
 ## Dependency Management
 
-<!-- FILL IN: e.g., uv + pyproject.toml / npm / pnpm / go modules -->
+`uv` + `pyproject.toml`
+
+## What to Avoid
+
+- No OpenAI, Anthropic, or other LLM providers (operator has Gemini access only)
+- No JavaScript frameworks in the dashboard (vanilla JS + HTML only — no npm, no build step)
+- No external message queues or task runners (APScheduler embedded is sufficient)
+- No Docker requirement (must run with `python -m blogforge serve`)

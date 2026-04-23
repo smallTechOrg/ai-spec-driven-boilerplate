@@ -68,6 +68,23 @@ Reason: Port 8000 is commonly occupied by other local services (other FastAPI ap
 - README must reference `http://localhost:8001`
 - `.env.example` should include `PORT=8001` if the port is configurable
 
+### LLM Model Name Rule
+
+**Always use a current, verified model name — never a deprecated or guessed one.**
+
+- For Google Gemini: use **`gemini-2.0-flash`** as the default (not `gemini-1.5-flash` — deprecated and removed from the API).
+- Model names change. Before hardcoding any model identifier, verify it exists by calling the provider's `ListModels` API or checking current documentation.
+- The model name must be configurable via an env var (e.g. `APPNAME_LLM_MODEL`) so it can be changed without a code deployment.
+- A 404 NOT_FOUND error from the LLM API almost always means the model name is wrong — check the name first before debugging anything else.
+
+Current safe defaults (as of 2026):
+
+| Provider | Default model |
+|----------|---------------|
+| Google Gemini | `gemini-2.0-flash` |
+| OpenAI | `gpt-4o-mini` |
+| Anthropic | `claude-3-5-haiku-latest` |
+
 ### DB Driver Rule
 
 The database driver (e.g. `psycopg2-binary` for PostgreSQL, `asyncpg` for async PostgreSQL) **must be declared in the main `[project.dependencies]` block**, never in `[dependency-groups.dev]` or equivalent dev-only groups.

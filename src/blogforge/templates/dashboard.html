@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>BlogForge</h1>
+<p class="muted">Define your voice, create writers, generate articles.</p>
+<div class="card">
+  <strong>{{ voices|length }}</strong> voice(s) · <strong>{{ writers|length }}</strong> writer(s)
+  <p>
+    <a href="/voices/new">+ new voice</a> &nbsp;
+    <a href="/writers/new">+ new writer</a> &nbsp;
+    <a href="/articles/new">+ new article</a>
+  </p>
+</div>
+<h2>Recent articles</h2>
+{% if not articles %}<p class="muted">No articles yet.</p>{% endif %}
+<ul>
+{% for a in articles %}
+  <li><a href="/articles/{{ a.id }}">{{ a.title }}</a> <span class="muted">— {{ a.topic }}</span></li>
+{% endfor %}
+</ul>
+{% endblock %}

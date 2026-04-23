@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Writers</h1>
+<p><a href="/writers/new">+ new writer</a></p>
+{% for w in writers %}
+  <div class="card"><strong>{{ w.name }}</strong></div>
+{% else %}
+  <p class="muted">No writers yet. <a href="/voices/new">Create a voice first.</a></p>
+{% endfor %}
+{% endblock %}

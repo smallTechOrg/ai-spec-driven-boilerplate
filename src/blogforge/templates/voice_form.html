@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>New voice</h1>
+<form method="post" action="/voices">
+  <label>Name<input type="text" name="name" required /></label>
+  <label>Description<input type="text" name="description" required /></label>
+  <label>Guidelines (markdown)<textarea name="guidelines" required placeholder="- Clear, concrete.&#10;- No jargon.&#10;- Short sentences."></textarea></label>
+  <button type="submit">Create voice</button>
+</form>
+{% endblock %}

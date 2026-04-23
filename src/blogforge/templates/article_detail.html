@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ article.title }}{% endblock %}
+{% block content %}
+<p><a href="/articles">← all articles</a></p>
+<h1>{{ article.title }}</h1>
+<p class="muted">Topic: {{ article.topic }} · {{ article.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+<article>{{ article.body | markdown | safe }}</article>
+{% endblock %}

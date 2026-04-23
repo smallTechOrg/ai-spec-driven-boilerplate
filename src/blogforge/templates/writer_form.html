@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>New writer</h1>
+{% if not voices %}
+  <p class="error">Create a voice before creating a writer. <a href="/voices/new">Create voice</a></p>
+{% else %}
+<form method="post" action="/writers">
+  <label>Name<input type="text" name="name" required /></label>
+  <label>Voice
+    <select name="voice_id" required>
+      {% for v in voices %}<option value="{{ v.id }}">{{ v.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Persona (markdown)<textarea name="persona" required placeholder="Background, expertise, quirks..."></textarea></label>
+  <button type="submit">Create writer</button>
+</form>
+{% endif %}
+{% endblock %}

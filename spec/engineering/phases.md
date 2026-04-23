@@ -16,14 +16,22 @@ The planner sub-agent will customize this for your project, but the general stru
 - Define all core data types (Pydantic models, TypeScript interfaces, etc.)
 - Set up the database schema (if applicable)
 - No business logic yet
-- **Gate:** All models defined, schema migrated, basic CRUD tests pass
+- **Gate (all must pass):**
+  1. `pyproject.toml` declares the DB driver in `[project.dependencies]` (e.g. `psycopg2-binary` for PostgreSQL) — never dev-only
+  2. `uv run alembic upgrade head` succeeds against the configured database — this must be run and confirmed, not assumed
+  3. Basic CRUD unit tests pass
+  4. Working tree is clean and committed
 
 ### Phase 2 — Core Agent Loop (Stubbed)
 - Implement the agent's main loop from start to finish
 - **All external calls are hardcoded stubs — zero real API calls, zero network I/O**
 - LLM calls return a hardcoded string. Search calls return a hardcoded list. File writes use a temp path.
 - The agent must run fully offline. If `pytest` requires an API key to pass, Phase 2 is not done.
-- **Gate:** Agent runs end-to-end; at least one record written to DB; run status "completed"; `pytest` passes with no env vars set
+- **Gate (all must pass):**
+  1. Agent runs end-to-end; at least one record written to DB; run status "completed"
+  2. `pytest` passes against the **production DB driver** (e.g. PostgreSQL via psycopg2) — not SQLite
+  3. Tests are fully automated: `conftest.py` creates and tears down the test schema; no manual DB setup steps
+  4. No LLM API key required to pass tests
 
 ### Phase 3 — First Real Integration
 - Replace the most critical stub with a real external call
@@ -70,8 +78,11 @@ A phase is complete when ALL of the following are true:
 3. Working tree is clean
 4. Session report reflects phase completion
 5. qa-auditor sub-agent (or manual QA checklist) has signed off
+6. For Phase 1 specifically: `alembic upgrade head` has been run against the real DB and succeeded
 
 **Never mark a phase complete if any gate is red.**
+
+**Never claim a phase passes based on tests alone if those tests use a different DB driver than production.** SQLite tests passing does not mean PostgreSQL migrations work.
 
 ## Phase Tracking
 
@@ -94,12 +105,12 @@ The gate test command depends on the project language. The tech-designer sets th
 
 | Language | Phase 1 gate | Phase 2 gate |
 |----------|-------------|-------------|
-| Python | `pytest tests/unit/` | `pytest tests/integration/` |
-| TypeScript (Bun) | `bun test tests/unit/` | `bun test tests/integration/` |
-| TypeScript (Node) | `npx vitest run tests/unit/` | `npx vitest run tests/integration/` |
-| Go | `go test ./internal/...` | `go test ./...` |
+| Python | `uv run alembic upgrade head` + `uv run pytest` | `uv run pytest` (PostgreSQL, automated via conftest) |
+| TypeScript (Bun) | migration tool + `bun test tests/unit/` | `bun test tests/integration/` |
+| TypeScript (Node) | migration tool + `npx vitest run tests/unit/` | `npx vitest run tests/integration/` |
+| Go | `migrate up` + `go test ./internal/...` | `go test ./...` |
 
-The Phase 2 gate must pass with **no real env vars set** regardless of language.
+The Phase 2 gate must pass with **no LLM API key set** regardless of language. The DB URL must be set — tests need a real database, they just don't need a real LLM.
 
 ## TypeScript/Bun Phase 2 Test Pattern
 

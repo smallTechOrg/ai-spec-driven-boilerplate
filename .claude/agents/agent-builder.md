@@ -143,14 +143,20 @@ Build immediately after scaffold. No gates until QA.
 **Follow the standard layout in `spec/engineering/project-layout.md` exactly.**
 
 ### Phase 1
-1. Implement: `config.py`, `domain/models.py`, `db/models.py`, `db/session.py`, `db/repository.py`, `tests/conftest.py`, `tests/unit/db/test_repository.py`
-2. Gate: pytest must pass 100%
-3. Commit: `phase-1: domain models + schema — gate PASSED (N/N tests)`
+1. Implement: `config.py`, `domain/models.py`, `db/models.py`, `db/session.py`, `db/repository.py`
+2. Create `alembic/script.py.mako` — use the verbatim template in `spec/engineering/project-layout.md` § "alembic/script.py.mako". **This file must exist before running any alembic command.**
+3. Create `alembic/env.py` and `alembic.ini` — `env.py` must read `DATABASE_URL` from settings and set `target_metadata = Base.metadata`
+4. Run `uv run alembic revision --autogenerate -m "initial"` — this generates `alembic/versions/0001_initial.py`
+5. Run `uv run alembic upgrade head` — applies the migration; tables now exist in PostgreSQL
+6. Verify: `uv run alembic current` must output a revision hash, not blank. Blank = no migration applied = Phase 1 not done.
+7. Implement: `tests/conftest.py`, `tests/unit/db/test_repository.py` — tests use the **same PostgreSQL driver** (psycopg2), not SQLite. `conftest.py` creates tables via `Base.metadata.create_all` against the test DB URL.
+8. Gate: `uv run pytest` must pass 100% against PostgreSQL
+9. Commit: `phase-1: domain models + schema — gate PASSED (N/N tests)`
 
 ### Phase 2
 1. Implement: `tools/*.py` (stubs), `agent/state.py`, `agent/nodes.py`, `agent/graph.py`, `agent/runner.py`, `__main__.py`, `tests/integration/test_pipeline.py`
-2. Write `README.md` — setup, how to run offline, how to run for real, how to run tests.
-3. Gate: pytest must pass with **no env vars set**
+2. Write `README.md` — setup, how to run offline, how to run for real, how to run tests. README must include `uv run alembic upgrade head` as an explicit step before running the app.
+3. Gate: `uv run pytest` must pass — DB URL must be set, LLM API key must NOT be required
 4. Commit: `phase-2: stubbed agent loop + README — gate PASSED (N/N tests)`
 
 Announce: "Skeleton is running." Point user to README.

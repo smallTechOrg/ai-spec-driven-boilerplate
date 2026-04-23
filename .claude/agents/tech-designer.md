@@ -142,3 +142,20 @@ Then produce a summary for the agent-builder:
 ```
 
 If there are no open questions, say "No open questions — ready for user approval."
+
+---
+
+## Required: Phase Gate Commands
+
+At the end of `spec/engineering/tech-stack.md`, always add a section:
+
+```markdown
+## Phase Gate Commands
+
+| Phase | Gate command |
+|-------|-------------|
+| 1 | `[test command for unit tests]` |
+| 2 | `[test command for integration tests]` |
+```
+
+These must reflect the actual language and test runner chosen. The agent-builder uses these to run gates without guessing.

@@ -85,3 +85,36 @@ The planner sub-agent may merge, split, or reorder phases based on your project'
 - A project with many integrations may split phase 5 into multiple phases
 
 Whatever the planner decides, the core principle holds: **minimal working thing first**.
+
+---
+
+## Language-Specific Gate Commands
+
+The gate test command depends on the project language. The tech-designer sets this in `spec/engineering/tech-stack.md`; the planner uses it in phase definitions.
+
+| Language | Phase 1 gate | Phase 2 gate |
+|----------|-------------|-------------|
+| Python | `pytest tests/unit/` | `pytest tests/integration/` |
+| TypeScript (Bun) | `bun test tests/unit/` | `bun test tests/integration/` |
+| TypeScript (Node) | `npx vitest run tests/unit/` | `npx vitest run tests/integration/` |
+| Go | `go test ./internal/...` | `go test ./...` |
+
+The Phase 2 gate must pass with **no real env vars set** regardless of language.
+
+## TypeScript/Bun Phase 2 Test Pattern
+
+```typescript
+// tests/integration/pipeline.test.ts
+import { describe, it, expect, beforeEach } from "bun:test";
+
+// Use an in-memory or tmp SQLite DB for tests — never real PostgreSQL
+// Stub all external HTTP calls with a simple mock
+
+describe("pipeline", () => {
+  it("runs end-to-end with stubs", async () => {
+    // stub external calls
+    // call runner
+    // assert DB record created with correct status
+  });
+});
+```

@@ -61,6 +61,33 @@ For each capability, create `spec/product/capabilities/NN-capability-name.md`:
 
 ---
 
+## MVP Scoping — Read This First
+
+**Your primary job is ruthless scope reduction.** The goal is a working agent in one iteration cycle (~10 minutes of build time). Everything that is not strictly required for the core loop to run belongs in a `## Future Phases` section of `01-vision.md`, not in a capability file.
+
+Before writing each capability, ask:
+> *If I removed this entirely, would the agent still do its one core thing?*
+
+If yes — defer it. One sentence in `## Future Phases` is enough.
+
+**Scope cuts that are almost always right for v1:**
+
+| Usually v1 | Almost always future |
+|-----------|---------------------|
+| One output format | Multiple output formats |
+| One trigger (manual OR scheduled — not both) | Both manual + scheduled triggers |
+| One external data source | Multiple parallel sources |
+| Config file or env vars | Config CRUD API |
+| CLI or REST — not both | Full web dashboard |
+| Core happy path only | Retry logic, rate limiting, observability |
+| SQLite local file | Remote DB, multi-tenancy |
+
+**Target:** 2–4 capabilities max for v1. If you have more than 5, go back and defer — you have not scoped ruthlessly enough.
+
+**The ten-minute test:** Could a single developer implement this spec and have it running in ~10 minutes? If not, cut more.
+
+---
+
 ## Writing Principles
 
 - **Be specific.** "The agent searches the web" is too vague. "The agent calls the Tavily search API with the company name and returns the top 5 results" is a spec.

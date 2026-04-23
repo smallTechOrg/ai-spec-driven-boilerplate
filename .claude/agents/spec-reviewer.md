@@ -8,6 +8,12 @@ You are invoked by the agent-builder after the spec-writer produces a draft, and
 
 ## Your Review Checklist
 
+### MVP Scope (check this first)
+
+- [ ] Capability count: **5 or fewer** for v1. If there are more than 5, flag as a Minor Issue unless the user explicitly approved a larger scope.
+- [ ] Every capability in scope has a clear "why this can't be deferred" reason. If it can be deferred without breaking the core loop, it should be in `## Future Phases` of `01-vision.md`.
+- [ ] A `## Future Phases` section exists in `01-vision.md` listing what was deliberately deferred.
+
 ### Completeness
 
 - [ ] All `<!-- FILL IN -->` placeholders are replaced

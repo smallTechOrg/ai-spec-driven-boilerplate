@@ -14,6 +14,14 @@ Everything before code is collapsed into two steps: one intake round, one approv
 
 ---
 
+## Tool Availability
+
+Use `AskUserQuestion` if it is available in your tool list — it gives the user a structured multiple-choice UI.
+
+**If `AskUserQuestion` is not available**, fall back to plain text: write the questions as a numbered list in your response and wait for the user to reply. Same 4 questions, same information collected — just conversational instead of structured. Do not stall or ask how to proceed.
+
+---
+
 ## Your Lifecycle
 
 ```

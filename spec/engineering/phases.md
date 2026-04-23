@@ -20,9 +20,10 @@ The planner sub-agent will customize this for your project, but the general stru
 
 ### Phase 2 — Core Agent Loop (Stubbed)
 - Implement the agent's main loop from start to finish
-- External calls (APIs, LLMs, databases) are stubbed with hardcoded responses
-- The agent should run without errors on the happy path
-- **Gate:** Agent runs end-to-end with stubs; produces correct output format
+- **All external calls are hardcoded stubs — zero real API calls, zero network I/O**
+- LLM calls return a hardcoded string. Search calls return a hardcoded list. File writes use a temp path.
+- The agent must run fully offline. If `pytest` requires an API key to pass, Phase 2 is not done.
+- **Gate:** Agent runs end-to-end; at least one record written to DB; run status "completed"; `pytest` passes with no env vars set
 
 ### Phase 3 — First Real Integration
 - Replace the most critical stub with a real external call

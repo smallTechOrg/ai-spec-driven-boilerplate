@@ -28,16 +28,20 @@ When the user gives you an idea (via `/build [idea]` or direct conversation):
 
 1. Acknowledge the idea in one sentence
 2. Use the **`AskUserQuestion` tool** to ask clarifying questions dynamically — 1 to 4 questions per round, as structured multiple-choice prompts.
-   - **Round 1 (MVP scope):** Lead with the scope question — "What's the absolute minimum this needs to do for you to call it working?" Force a choice between a narrow, fast v1 vs. the full vision. The other 1–3 questions in this round cover: output destination, trigger model, core output format.
-   - **Round 2+:** Follow-up based on answers, drilling into specifics. Only ask what's genuinely ambiguous.
+   - **Round 1 — Scope + Stack (always these two, plus up to 2 more):**
+     - Q1: MVP scope — "What's the minimum this needs to do for you to call it working?" (narrow fast v1 vs. full vision)
+     - Q2: **Stack preferences** — language, database, hosting. This is mandatory. Never let the tech-designer pick these autonomously. Ask the user upfront: "Any tech preferences? (e.g. Python, PostgreSQL, deploy to Railway)" If they say none, the tech-designer will propose and confirm before proceeding.
+     - Q3–4: output format, trigger model, or other high-priority unknowns specific to this idea
+   - **Round 2+:** Follow-up based on answers, drilling into specifics only if genuinely ambiguous.
    - Stop when you have enough for a complete, unambiguous spec.
 3. Tell the user: "I have enough to start the spec. The spec-writer will draft it now — I'll show you the result for approval."
 
-**The MVP scope question is always Round 1, Question 1.** Frame it as a choice between:
-- "Just the core loop working, everything else is future" (fast)
-- "The full feature set described" (slower — confirm they want this before building)
+**Stack preferences must be collected in Round 1.** The following decisions belong to the user, not the tech-designer:
+- **Database** — PostgreSQL vs SQLite vs Redis vs none. Never default without asking.
+- **Language** — Python vs TypeScript vs Go. Ask if not stated.
+- **Hosting target** — local vs VPS vs cloud function vs managed platform. Ask if deployment will affect architecture.
 
-If the user picks the full feature set, that is fine — but name it explicitly and make sure the spec-writer knows to mark anything beyond the core loop as a future phase.
+If the user has no preference on a stack item, note it explicitly. The tech-designer will then propose a recommendation and the agent-builder will confirm it with the user via `AskUserQuestion` before writing any code.
 
 **How to use AskUserQuestion for intake:**
 - Frame each question with clear options (2–4 choices) based on common patterns for that type of agent
@@ -47,9 +51,8 @@ If the user picks the full feature set, that is fine — but name it explicitly 
 - If the user picks "Other", treat their free-text answer as a requirement and incorporate it
 
 **Principles:**
-- Ask questions until ambiguities are resolved; don't guess
-- Every question should move toward a complete, unambiguous spec
-- If the user says "just build it", default to minimal scope — fast iteration beats comprehensive v1
+- Stack decisions (database, language, hosting) are user decisions, not AI defaults
+- If the user says "just build it", default to minimal scope — but still confirm stack choices before proceeding
 - Never ask more than 4 questions in one round — dynamic Q&A is about conversation, not a form
 
 ---

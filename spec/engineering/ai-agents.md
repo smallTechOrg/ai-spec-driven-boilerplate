@@ -112,6 +112,7 @@ See `spec/engineering/phases.md` for the phase definitions and gates.
 - Commit message format: `phase-N: [what you did]` (e.g., `phase-1: add domain models`)
 - Never commit secrets (API keys, passwords, tokens)
 - Never force-push without user confirmation
+- **Never `git add -A` / `git add .`** — always stage specific files or directories. `-A` sweeps in untracked leftovers from prior build attempts (stray packages, abandoned experiments) and poisons the commit. If a phase needs many files, list them explicitly or stage directories one at a time.
 
 **Before every reply to the user:**
 1. Run `git status`

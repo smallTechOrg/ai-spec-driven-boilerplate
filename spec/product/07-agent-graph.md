@@ -1,53 +1,14 @@
 # Agent Graph
 
-> **Boilerplate status:** Required when the project uses an agent framework (LangGraph, CrewAI, AutoGen, etc.). Filled in by the tech-designer sub-agent as part of the tech design stage.
->
-> If your project has no agent framework (e.g., it's a simple script or API), delete this file.
->
-> The spec-reviewer treats this file as a **CRITICAL BLOCKER** — the tech design will not be approved if this file is absent or incomplete when an agent framework is in use.
+## Not Applicable
 
----
+This project does not use an agent framework (no LangGraph, CrewAI, AutoGen, or equivalent). The agent is a single stateless LLM call:
 
-## State
-
-<!-- FILL IN: Define the agent's state type. Every field must be named and typed. -->
-
-```python
-class AgentState(TypedDict):
-    # Identity
-    run_id: int
-    # ... add all fields
-
-    # Pipeline data (populated progressively by nodes)
-    # ...
-
-    # Control
-    error: str | None   # set by any node on fatal failure
+```
+city (str)  →  build_prompt()  →  LLMProvider.call()  →  parse_response()  →  ItineraryResponse
 ```
 
----
-
-## Nodes
-
-<!-- FILL IN: One section per node. -->
-
-### `node_[name]`
-
-**Reads from state:** <!-- field names -->
-
-**Writes to state:** <!-- field names -->
-
-**External calls:**
-
-| System | Operation | On Failure |
-|--------|-----------|------------|
-| <!-- system --> | <!-- what it calls --> | <!-- fatal (set error) or partial (log and continue) --> |
-
-**Behaviour:** <!-- one paragraph describing what this node does -->
-
----
-
-## Edge Topology
+No state machine, no graph, no multi-step pipeline. If scope expands (e.g., multi-step planning, tool use), this file will be updated and an agent framework will be introduced.
 
 <!-- FILL IN: ASCII diagram of node flow. Show conditional edges explicitly. -->
 

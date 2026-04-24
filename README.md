@@ -1,32 +1,98 @@
-# AI Agent Boilerplate — Spec-Driven, Zero-Shot to Working Agent
+# Travel & Food Itinerary Agent
 
-This is a boilerplate for building AI agents spec-first. Give it a one-line idea. Walk away with a working, tested, phased agent.
+> **All commands run from the repo root.**
 
----
+A Streamlit web app powered by Google Gemini. Enter a city → get the top 3 places to visit (with descriptions and opening hours/tips) plus 1 local dish to try.
 
-## What This Is
-
-A starting point for anyone who wants to build an AI agent without writing boilerplate from scratch. The repo ships with:
-
-- A structured **spec template** covering product vision, architecture, capabilities, data model, API, and UI
-- An **agent-builder** sub-agent that orchestrates the full build lifecycle
-- Sub-agents for spec writing, reviewing, tech design, planning, and auditing
-- Engineering rules baked into the spec so every AI coding session is consistent
-- Phase-gated implementation — minimal working thing first, then iterative expansion
+Works fully offline in stub/demo mode when no API key is set — a visible banner tells you.
 
 ---
 
-## How to Use This
+## Quick Start
 
-### Step 1 — Clone and configure
+### 1. Prerequisites
 
-```bash
-git clone https://github.com/smallTechOrg/ai-spec-driven-boilerplate.git my-agent
-cd my-agent
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) (`pip install uv` or `irm https://astral.sh/uv/install.ps1 | iex` on Windows)
+
+### 2. Install dependencies
+
+```
+# from repo root
+uv sync --extra dev
+```
+
+### 3. Configure environment
+
+```
+# from repo root
 cp .env.example .env
 ```
 
-### Step 2 — Open in Claude Code (or any AI coding assistant)
+Edit `.env` and set your Google Gemini API key:
+
+```
+GOOGLE_API_KEY=your-key-here
+TRAVEL_LLM_MODEL=gemini-2.5-flash
+```
+
+Leave `GOOGLE_API_KEY` blank to run in stub mode (no API key required for demo).
+
+### 4. Run the app
+
+```
+# from repo root
+uv run streamlit run src/travel_itinerary/app.py
+```
+
+Open http://localhost:8501 in your browser.
+
+---
+
+## Run Tests
+
+```
+# from repo root
+uv run pytest tests/ -v
+```
+
+---
+
+## Project Structure
+
+```
+src/travel_itinerary/
+    app.py              ← Streamlit entry point
+    config/settings.py  ← reads GOOGLE_API_KEY + TRAVEL_LLM_MODEL from env
+    domain/models.py    ← Pydantic: Place, Dish, ItineraryResponse
+    llm/
+        client.py       ← LLMClient + create_client() factory
+        providers.py    ← StubProvider (offline) + GeminiProvider (real)
+tests/
+    unit/               ← domain model + LLM client tests (no API key needed)
+spec/                   ← product and engineering spec
+```
+
+---
+
+## How It Works
+
+1. User enters a city name in the Streamlit UI and clicks "Get Itinerary"
+2. `LLMClient` builds a structured prompt and calls the configured provider
+3. If `GOOGLE_API_KEY` is set: calls Google Gemini (`gemini-2.5-flash`)
+4. If no key: returns hardcoded demo data with a visible stub banner
+5. Response is parsed into Pydantic models and rendered as cards
+
+---
+
+## Stub Mode
+
+When `GOOGLE_API_KEY` is not set, the app runs in stub mode:
+- A yellow warning banner is shown on every page load
+- Output is hardcoded demo data (not real AI responses)
+- All tests pass without an API key
+
+
 
 ```bash
 claude

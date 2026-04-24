@@ -1,54 +1,51 @@
 # Tech Stack
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved. The user may override specific choices before the tech-designer is invoked.
-
----
-
 ## Language
 
-<!-- FILL IN: e.g., Python 3.12 / TypeScript 5 / Go 1.22 -->
+Python 3.12
 
-**Why:** <!-- reason for this choice -->
+**Why:** Streamlit and google-generativeai are Python-first; uv is the boilerplate standard.
 
 ## Agent Framework
 
-<!-- FILL IN: e.g., LangGraph / CrewAI / AutoGen / custom / none -->
+None
 
-**Why:** <!-- reason for this choice -->
+**Why:** The agent is a single LLM call — no multi-step graph or tool use required.
 
 ## LLM Provider
 
-<!-- FILL IN: e.g., Anthropic Claude / OpenAI GPT / Google Gemini -->
+Google Gemini
 
-**Model:** <!-- specific model, e.g., claude-sonnet-4-6 -->
+**Model:** `gemini-2.5-flash` (configurable via `TRAVEL_LLM_MODEL` env var)
 
-**Why:** <!-- reason -->
+**Why:** User choice.
 
 ## Backend Framework (if applicable)
 
-<!-- FILL IN: e.g., FastAPI / Express / Django / none -->
+None — Streamlit handles the web layer.
 
 ## Database (if applicable)
 
-<!-- FILL IN: e.g., PostgreSQL / SQLite / Redis / none -->
-
-**ORM/ODM:** <!-- e.g., SQLAlchemy 2.0 / Prisma / none -->
+None — agent is stateless.
 
 ## Frontend (if applicable)
 
-<!-- FILL IN: e.g., Next.js 15 / React / Vue / none -->
+Streamlit — Python-based reactive web framework.
 
 ## Key Libraries
 
-<!-- FILL IN: List the important libraries and what each does. -->
-
 | Library | Version | Purpose |
 |---------|---------|---------|
-| <!-- name --> | <!-- version --> | <!-- purpose --> |
+| streamlit | latest | Web UI |
+| google-generativeai | latest | Gemini LLM client |
+| pydantic | ^2 | Domain models + settings |
+| pydantic-settings | ^2 | Env var config |
+| pytest | latest | Test runner |
 
 ## What to Avoid
 
-<!-- FILL IN: Libraries, patterns, or approaches that are explicitly off-limits and why. -->
+- SQLite or any database — not needed, keep it stateless
+- LangGraph / CrewAI / agent frameworks — overkill for a single LLM call
 
 ## Dependency Management
 

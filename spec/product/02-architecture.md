@@ -1,50 +1,47 @@
 # Architecture
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved.
-
----
-
 ## System Overview
 
-<!-- FILL IN: One paragraph describing the system at a high level. Who/what interacts with it? -->
+A single-process Streamlit web application. The user submits a city name via the browser; the app calls Google Gemini with a structured prompt; Gemini returns a JSON-shaped response that is parsed into Pydantic models and rendered back to the user. No database, no background workers.
 
 ## Component Map
 
-<!-- FILL IN: List the major components and what each does. -->
-
 ```
-[Component A]
-    ↓
-[Component B]   ←→   [External Service]
-    ↓
-[Component C]
+[Browser / Streamlit UI]
+    ↓  city name
+[LLMClient]
+    ↓  prompt
+[Google Gemini API]  ← real in Phase 3, stub in Phase 2
+    ↓  JSON response
+[Pydantic domain models]
+    ↓  typed ItineraryResponse
+[Streamlit UI renders places + dish]
 ```
 
 ## Layers
 
-<!-- FILL IN: Describe the layers of the system (e.g., API → Agent Loop → Tools → Storage). -->
-
 | Layer | Responsibility |
 |-------|----------------|
-| <!-- layer --> | <!-- responsibility --> |
+| UI (`app.py`) | Streamlit form, result rendering, stub banner |
+| LLM (`llm/`) | Abstract `LLMProvider`, `StubProvider`, `GeminiProvider`, factory |
+| Domain (`domain/models.py`) | Pydantic models: `Place`, `Dish`, `ItineraryResponse` |
+| Config (`config/settings.py`) | Pydantic `BaseSettings`, reads `GOOGLE_API_KEY` + `TRAVEL_LLM_MODEL` |
 
 ## Data Flow
 
-<!-- FILL IN: Walk through the main data flow from trigger to output. -->
-
-1. Trigger: <!-- how does the agent start? (cron, webhook, user input, etc.) -->
-2. <!-- step 2 -->
-3. <!-- step 3 -->
-4. Output: <!-- what does the agent produce? -->
+1. Trigger: User types a city name in the Streamlit text input and clicks "Get Itinerary"
+2. `app.py` calls `LLMClient.get_itinerary(city)`
+3. `LLMClient` builds a prompt and calls the configured provider (Stub or Gemini)
+4. Provider returns a JSON string; `LLMClient` parses it into `ItineraryResponse`
+5. Output: Streamlit renders 3 place cards and 1 dish card
 
 ## External Dependencies
 
-<!-- FILL IN: APIs, services, databases the agent depends on. -->
-
 | Dependency | Purpose | Failure Mode |
 |------------|---------|--------------|
-| <!-- name --> | <!-- what it does --> | <!-- what happens if it's down --> |
+| Google Gemini API | Generate itinerary text | Falls back to stub banner + error message |
 
 ## Deployment Model
 
-<!-- FILL IN: How does this run? (local script, cloud function, long-running service, etc.) -->
+Local development: `uv run streamlit run src/travel_itinerary/app.py`
+No cloud deployment in scope for v0.1.

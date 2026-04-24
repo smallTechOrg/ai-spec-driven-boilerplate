@@ -1,41 +1,13 @@
 # API
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent. Delete this file if the agent has no external API surface (e.g., it's a pure CLI tool or background worker).
-
----
-
 ## API Style
 
-<!-- FILL IN: REST / GraphQL / CLI / webhook / none -->
+None — this project has no external API surface. It is a Streamlit web application; all interaction is via the browser UI.
 
 ## Endpoints / Commands
 
-<!-- FILL IN: One section per endpoint or command. -->
-
-### `<!-- METHOD /path or command name -->`
-
-**Purpose:** <!-- what this endpoint does -->
-
-**Request:**
-```json
-{
-  "<!-- field -->": "<!-- type and description -->"
-}
-```
-
-**Response:**
-```json
-{
-  "<!-- field -->": "<!-- type and description -->"
-}
-```
-
-**Error cases:**
-| Status | Condition |
-|--------|-----------|
-| 400 | <!-- bad input --> |
-| 500 | <!-- internal error --> |
+N/A
 
 ## Authentication
 
-<!-- FILL IN: How are API callers authenticated? -->
+N/A — the app is single-user, local. The `GOOGLE_API_KEY` env var authenticates the app to Google Gemini; it is not exposed to the browser.

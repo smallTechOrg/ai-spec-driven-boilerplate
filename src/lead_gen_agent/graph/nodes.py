@@ -7,6 +7,36 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+
+
+_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
+
+
+def _parse_json(raw: str):
+    """Parse a JSON payload from an LLM response that may be wrapped in
+    ```json ... ``` fences or padded with prose. Raises json.JSONDecodeError
+    if no JSON is recoverable."""
+    if raw is None:
+        raise json.JSONDecodeError("empty response", "", 0)
+    text = raw.strip()
+    if not text:
+        raise json.JSONDecodeError("empty response", "", 0)
+    m = _FENCE_RE.search(text)
+    if m:
+        text = m.group(1).strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # Fallback: slice from first bracket to last matching bracket.
+        for opener, closer in (("[", "]"), ("{", "}")):
+            i, j = text.find(opener), text.rfind(closer)
+            if i != -1 and j != -1 and j > i:
+                try:
+                    return json.loads(text[i : j + 1])
+                except json.JSONDecodeError:
+                    continue
+        raise
 
 from lead_gen_agent.config.settings import get_settings
 from lead_gen_agent.db import repository as repo
@@ -47,7 +77,9 @@ def extract_node(state: AgentState) -> AgentState:
     )
     try:
         raw = get_llm_client().complete(prompt)
-        records = json.loads(raw)
+        records = _parse_json(raw)
+        if not isinstance(records, list):
+            records = records.get("records", []) if isinstance(records, dict) else []
         candidates = [
             Candidate(
                 name=r.get("name", "Unknown"),
@@ -84,7 +116,7 @@ def score_node(state: AgentState) -> AgentState:
         )
         try:
             raw = client.complete(prompt)
-            obj = json.loads(raw)
+            obj = _parse_json(raw)
             score = int(obj.get("score", 50))
             score = max(0, min(100, score))
             rationale = str(obj.get("rationale") or "")[:400]

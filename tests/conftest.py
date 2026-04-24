@@ -9,6 +9,7 @@ os.environ.setdefault(
     "LEADGEN_DATABASE_URL",
     "postgresql+psycopg2://sai@localhost:5432/lead_gen_agent_test",
 )
+os.environ["LEADGEN_LLM_PROVIDER"] = "stub"
 
 
 @pytest.fixture(autouse=True)

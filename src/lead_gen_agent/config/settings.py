@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -28,19 +27,20 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        populate_by_name=True,
     )
 
     database_url: str = Field(default="postgresql+psycopg2://sai@localhost:5432/lead_gen_agent")
     llm_provider: str = Field(default="auto")
     llm_model: str = Field(default="gemini-2.5-flash")
     log_level: str = Field(default="INFO")
+    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
 
     @property
     def resolved_llm_provider(self) -> str:
         raw = _clean(self.llm_provider).lower() or "auto"
         if raw == "auto":
-            key = _clean(os.environ.get("GEMINI_API_KEY"))
-            return "gemini" if key else "stub"
+            return "gemini" if _clean(self.gemini_api_key) else "stub"
         return raw
 
 

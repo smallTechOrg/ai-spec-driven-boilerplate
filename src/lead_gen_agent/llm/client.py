@@ -9,6 +9,6 @@ def get_llm_client() -> LLMProvider:
     provider = settings.resolved_llm_provider
     if provider == "gemini":
         from lead_gen_agent.llm.providers.gemini import GeminiProvider
-        return GeminiProvider(model=settings.llm_model)
+        return GeminiProvider(model=settings.llm_model, api_key=settings.gemini_api_key)
     from lead_gen_agent.llm.providers.stub import StubProvider
     return StubProvider()

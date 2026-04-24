@@ -9,11 +9,12 @@ class Settings(BaseSettings):
         env_prefix="FOOD_TRACKER_",
         env_file=".env",
         env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     database_url: str
     gemini_api_key: SecretStr | None = None
-    llm_model: str = "gemini-2.0-flash"
+    llm_model: str = "gemini-2.5-flash"
     max_upload_bytes: int = 10 * 1024 * 1024  # 10 MB
     port: int = 8001
 

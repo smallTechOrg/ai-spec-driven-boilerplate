@@ -61,7 +61,7 @@ async def analyze(
 
     if state["error"]:
         log.error("analyze.pipeline_error", error=state["error"])
-        raise HTTPException(status_code=422, detail=state["error"])
+        return render(request, "error.html", detail=state["error"])
 
     return render(
         request,

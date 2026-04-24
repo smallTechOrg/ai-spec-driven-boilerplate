@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}EU Lead Gen Agent{% endblock %}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f8f9fa; color: #212529; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+    nav { background: #1a1a2e; color: #fff; padding: 0.75rem 1.5rem; display: flex; align-items: center; gap: 1.5rem; }
+    nav a { color: #c9d1d9; text-decoration: none; font-weight: 500; }
+    nav a:hover { color: #fff; }
+    nav .brand { font-weight: 700; font-size: 1.1rem; color: #fff; }
+    .banner-stub { background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.9rem; }
+    .banner-stub strong { color: #856404; }
+    h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 1rem; }
+    h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th { background: #f1f3f5; text-align: left; padding: 0.6rem 0.75rem; border-bottom: 2px solid #dee2e6; }
+    td { padding: 0.55rem 0.75rem; border-bottom: 1px solid #dee2e6; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    .badge { display: inline-block; padding: 0.2em 0.55em; border-radius: 12px; font-size: 0.78rem; font-weight: 600; }
+    .badge-new { background: #d1ecf1; color: #0c5460; }
+    .badge-contacted { background: #d4edda; color: #155724; }
+    .badge-rejected { background: #f8d7da; color: #721c24; }
+    .badge-running { background: #fff3cd; color: #856404; }
+    .badge-completed { background: #d4edda; color: #155724; }
+    .badge-failed { background: #f8d7da; color: #721c24; }
+    .badge-stub { background: #fff3cd; color: #856404; }
+    .btn { display: inline-block; padding: 0.45rem 1rem; border-radius: 6px; font-size: 0.9rem; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
+    .btn-primary { background: #1a1a2e; color: #fff; }
+    .btn-primary:hover { background: #16213e; }
+    .btn-secondary { background: #e9ecef; color: #495057; }
+    .btn-secondary:hover { background: #dee2e6; }
+    .btn-sm { padding: 0.3rem 0.7rem; font-size: 0.82rem; }
+    form .row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; align-items: flex-end; }
+    form label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.3rem; color: #495057; }
+    form input, form select { padding: 0.4rem 0.6rem; border: 1px solid #ced4da; border-radius: 5px; font-size: 0.9rem; width: 100%; }
+    .field { display: flex; flex-direction: column; min-width: 140px; flex: 1; }
+    .empty-state { text-align: center; padding: 3rem; color: #6c757d; }
+    .why-fit { font-size: 0.82rem; color: #495057; max-width: 350px; }
+    .alert-danger { background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 6px; padding: 0.75rem 1rem; color: #721c24; margin-bottom: 1rem; }
+    a { color: #0070f3; }
+  </style>
+</head>
+<body>
+<nav>
+  <span class="brand">🔍 EU Lead Gen</span>
+  <a href="/">Dashboard</a>
+  <a href="/runs/new">New Search</a>
+</nav>
+<div class="container">
+  {% if llm_provider == "stub" %}
+  <div class="banner-stub">
+    <strong>⚠ Stub mode</strong> — results are simulated. Set <code>LGA_GEMINI_API_KEY</code> in <code>.env</code> to use real data.
+  </div>
+  {% endif %}
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>

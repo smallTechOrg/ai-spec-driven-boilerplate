@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Run Results — EU Lead Gen Agent{% endblock %}
+{% block content %}
+<div style="margin-bottom:1rem;">
+  <a href="/" class="btn btn-secondary btn-sm">← Back to dashboard</a>
+</div>
+
+<h1>Run Results</h1>
+
+<div class="card">
+  <div class="row" style="gap:2rem;">
+    <div><strong>Country:</strong> {{ run.country }}</div>
+    <div><strong>Industry:</strong> {{ run.industry }}</div>
+    {% if run.size_min or run.size_max %}<div><strong>Headcount:</strong> {{ run.size_min or '—' }}–{{ run.size_max or '∞' }}</div>{% endif %}
+    <div><strong>Status:</strong> <span class="badge badge-{{ run.status }}">{{ run.status }}</span></div>
+    <div><strong>Leads found:</strong> {{ run.lead_count or 0 }}</div>
+    <div><strong>Started:</strong> {{ run.created_at.strftime('%d %b %Y %H:%M') if run.created_at else '—' }}</div>
+  </div>
+</div>
+
+{% if run.status == 'failed' %}
+<div class="alert-danger">
+  <strong>Run failed:</strong> {{ run.error_message or 'Unknown error' }}
+</div>
+{% endif %}
+
+{% if leads %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+  <span style="color:#6c757d; font-size:0.88rem;">{{ leads | length }} lead{% if leads | length != 1 %}s{% endif %} in this run</span>
+  <a href="/leads/export.csv" class="btn btn-secondary btn-sm">⬇ Export all leads CSV</a>
+</div>
+<div class="card" style="padding:0; overflow:hidden;">
+  <table>
+    <thead>
+      <tr>
+        <th>Company</th>
+        <th>Country</th>
+        <th>Industry</th>
+        <th>Headcount</th>
+        <th>Why they fit</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lead in leads %}
+      <tr>
+        <td>
+          {% if lead.website %}<a href="{{ lead.website }}" target="_blank" rel="noopener">{{ lead.company_name }}</a>
+          {% else %}{{ lead.company_name }}{% endif %}
+          <div style="font-size:0.78rem; color:#6c757d;">{{ lead.domain }}</div>
+        </td>
+        <td>{{ lead.country }}</td>
+        <td>{{ lead.industry or '—' }}</td>
+        <td>{{ lead.headcount_estimate or '—' }}</td>
+        <td><div class="why-fit">{{ lead.why_fit or '—' }}</div></td>
+        <td><span class="badge badge-{{ lead.status }}">{{ lead.status }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% elif run.status == 'completed' %}
+<div class="empty-state">
+  <p>No leads were found for this search. <a href="/runs/new">Try different criteria</a>.</p>
+</div>
+{% endif %}
+{% endblock %}

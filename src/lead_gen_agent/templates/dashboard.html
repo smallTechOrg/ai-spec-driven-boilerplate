@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — EU Lead Gen Agent{% endblock %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+  <h1>Lead Dashboard</h1>
+  <a href="/runs/new" class="btn btn-primary">+ New Search</a>
+</div>
+
+<div class="card">
+  <form method="get" action="/">
+    <div class="row">
+      <div class="field">
+        <label>Country</label>
+        <input name="country" value="{{ filters.country }}" placeholder="e.g. DE">
+      </div>
+      <div class="field">
+        <label>Industry</label>
+        <input name="industry" value="{{ filters.industry }}" placeholder="e.g. retail">
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select name="status">
+          <option value="">All</option>
+          <option value="new" {% if filters.status == 'new' %}selected{% endif %}>New</option>
+          <option value="contacted" {% if filters.status == 'contacted' %}selected{% endif %}>Contacted</option>
+          <option value="rejected" {% if filters.status == 'rejected' %}selected{% endif %}>Rejected</option>
+        </select>
+      </div>
+      <div class="field" style="min-width:auto; flex:0;">
+        <label>&nbsp;</label>
+        <button type="submit" class="btn btn-primary">Filter</button>
+      </div>
+      <div class="field" style="min-width:auto; flex:0;">
+        <label>&nbsp;</label>
+        <a href="/" class="btn btn-secondary">Reset</a>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+  <span style="color:#6c757d; font-size:0.88rem;">{{ leads | length }} lead{% if leads | length != 1 %}s{% endif %}</span>
+  <a href="/leads/export.csv?country={{ filters.country }}&industry={{ filters.industry }}&status={{ filters.status }}"
+     class="btn btn-secondary btn-sm">⬇ Export CSV</a>
+</div>
+
+{% if leads %}
+<div class="card" style="padding:0; overflow:hidden;">
+  <table>
+    <thead>
+      <tr>
+        <th>Company</th>
+        <th>Country</th>
+        <th>Industry</th>
+        <th>Headcount</th>
+        <th>Why they fit</th>
+        <th>Status</th>
+        <th>Found</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lead in leads %}
+      <tr>
+        <td>
+          {% if lead.website %}<a href="{{ lead.website }}" target="_blank" rel="noopener">{{ lead.company_name }}</a>
+          {% else %}{{ lead.company_name }}{% endif %}
+          <div style="font-size:0.78rem; color:#6c757d;">{{ lead.domain }}</div>
+        </td>
+        <td>{{ lead.country }}</td>
+        <td>{{ lead.industry or '—' }}</td>
+        <td>{{ lead.headcount_estimate or '—' }}</td>
+        <td><div class="why-fit">{{ lead.why_fit or '—' }}</div></td>
+        <td><span class="badge badge-{{ lead.status }}">{{ lead.status }}</span></td>
+        <td style="white-space:nowrap; font-size:0.8rem; color:#6c757d;">
+          {{ lead.created_at.strftime('%d %b %Y') if lead.created_at else '—' }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <p>No leads found. <a href="/runs/new">Start a new search</a> to discover EU SMBs.</p>
+</div>
+{% endif %}
+
+{% if runs %}
+<h2 style="margin-top:2rem;">Recent Runs</h2>
+<div class="card" style="padding:0; overflow:hidden;">
+  <table>
+    <thead>
+      <tr><th>Criteria</th><th>Status</th><th>Leads</th><th>Started</th></tr>
+    </thead>
+    <tbody>
+      {% for run in runs %}
+      <tr>
+        <td><a href="/runs/{{ run.id }}">{{ run.country }} / {{ run.industry }}</a></td>
+        <td><span class="badge badge-{{ run.status }}">{{ run.status }}</span></td>
+        <td>{{ run.lead_count or 0 }}</td>
+        <td style="font-size:0.8rem; color:#6c757d;">{{ run.created_at.strftime('%d %b %Y %H:%M') if run.created_at else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

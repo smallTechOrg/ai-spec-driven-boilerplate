@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}New Search — EU Lead Gen Agent{% endblock %}
+{% block content %}
+<h1>Find New Leads</h1>
+<div class="card" style="max-width:520px;">
+  <form method="post" action="/runs">
+    <div class="row">
+      <div class="field">
+        <label for="country">Country *</label>
+        <select name="country" id="country" required>
+          <option value="">— select —</option>
+          <option value="AT">Austria</option>
+          <option value="BE">Belgium</option>
+          <option value="HR">Croatia</option>
+          <option value="CZ">Czech Republic</option>
+          <option value="DK">Denmark</option>
+          <option value="EE">Estonia</option>
+          <option value="FI">Finland</option>
+          <option value="FR">France</option>
+          <option value="DE">Germany</option>
+          <option value="GR">Greece</option>
+          <option value="HU">Hungary</option>
+          <option value="IE">Ireland</option>
+          <option value="IT">Italy</option>
+          <option value="LV">Latvia</option>
+          <option value="LT">Lithuania</option>
+          <option value="LU">Luxembourg</option>
+          <option value="NL">Netherlands</option>
+          <option value="PL">Poland</option>
+          <option value="PT">Portugal</option>
+          <option value="RO">Romania</option>
+          <option value="SK">Slovakia</option>
+          <option value="SI">Slovenia</option>
+          <option value="ES">Spain</option>
+          <option value="SE">Sweden</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="industry">Industry / Sector *</label>
+        <input type="text" name="industry" id="industry" placeholder="e.g. retail, logistics, manufacturing" required>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="size_min">Min employees</label>
+        <input type="number" name="size_min" id="size_min" placeholder="e.g. 10" min="1">
+      </div>
+      <div class="field">
+        <label for="size_max">Max employees</label>
+        <input type="number" name="size_max" id="size_max" placeholder="e.g. 250" min="1">
+      </div>
+    </div>
+    <div style="margin-top:1rem;">
+      <button type="submit" class="btn btn-primary">🔍 Find Leads</button>
+      <a href="/" class="btn btn-secondary" style="margin-left:0.5rem;">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

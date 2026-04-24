@@ -133,3 +133,55 @@ async def _use_test_db(monkeypatch, tmp_path):
 ```
 
 Use `tmp_path` (not `:memory:`) for integration tests — it avoids shared-state issues across tests.
+
+---
+
+## Pydantic-settings — Always Set `extra="ignore"`
+
+`pydantic-settings` reads **the entire `.env` file** and passes every key to Pydantic for validation. If the `.env` file contains variables the `Settings` model doesn't declare (e.g. `TEST_DATABASE_URL`, `EDITOR`, CI vars), Pydantic will raise:
+
+```
+ValidationError: Extra inputs are not permitted [type=extra_forbidden]
+```
+
+**Fix:** always set `extra="ignore"` in the `model_config`:
+
+```python
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="APPNAME_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",          # ← required — .env may contain vars we don't own
+    )
+```
+
+This is mandatory for any project whose `.env` contains variables owned by other tools (test runners, editors, CI, Docker, etc.).
+
+---
+
+## Pipeline Errors — Render an Error Template, Never Raise HTTPException
+
+When an LLM pipeline node fails (provider 4xx/5xx, invalid response, timeout), the failure propagates back to the route via the pipeline state's `error` field.
+
+**Do not** re-raise this as an `HTTPException`:
+
+```python
+# WRONG — returns a bare JSON error body to the browser with a 422 status
+if state["error"]:
+    raise HTTPException(status_code=422, detail=state["error"])
+```
+
+**Do** render the error template instead:
+
+```python
+# CORRECT — shows the user a readable error page with a "Try again" link
+if state["error"]:
+    log.error("analyze.pipeline_error", error=state["error"])
+    return render(request, "error.html", detail=state["error"])
+```
+
+The `error.html` template must always exist and must include a link back to the upload/start page.
+Every web route that calls `run_pipeline()` (or equivalent) must follow this pattern.

@@ -1,50 +1,57 @@
 # Architecture
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved.
-
----
-
 ## System Overview
 
-<!-- FILL IN: One paragraph describing the system at a high level. Who/what interacts with it? -->
+The EU Lead Gen Agent is a locally-run web application. A data consultant fills a search form in the browser; the FastAPI server queues a LangGraph pipeline run that calls Gemini (with Google Search Grounding) to discover and enrich SMB leads; results are persisted in PostgreSQL and displayed in a browsable dashboard with CSV export.
 
 ## Component Map
 
-<!-- FILL IN: List the major components and what each does. -->
-
 ```
-[Component A]
-    ↓
-[Component B]   ←→   [External Service]
-    ↓
-[Component C]
+Browser
+    │  POST /runs  (criteria)
+    ▼
+FastAPI  ←────────────────────────  Jinja2 templates
+    │
+    ▼
+LangGraph pipeline
+    │
+    ├── search_node  ──►  Gemini API (Google Search Grounding)
+    │
+    └── enrich_node  ──►  Gemini API (structured extraction)
+    │
+    ▼
+PostgreSQL  (leads, search_runs)
+    │
+    ▼
+FastAPI  GET /leads  ──►  Dashboard + CSV export
 ```
 
 ## Layers
 
-<!-- FILL IN: Describe the layers of the system (e.g., API → Agent Loop → Tools → Storage). -->
-
 | Layer | Responsibility |
 |-------|----------------|
-| <!-- layer --> | <!-- responsibility --> |
+| Web (FastAPI + Jinja2) | Receive search criteria, serve dashboard, stream run status |
+| Graph (LangGraph) | Orchestrate search → enrich pipeline per run |
+| LLM (Gemini 2.5 Flash) | Discover company names; extract firmographic fields |
+| Repository (SQLAlchemy) | Persist and query leads + search runs |
+| Database (PostgreSQL) | Durable storage with dedup on company domain |
 
 ## Data Flow
 
-<!-- FILL IN: Walk through the main data flow from trigger to output. -->
-
-1. Trigger: <!-- how does the agent start? (cron, webhook, user input, etc.) -->
-2. <!-- step 2 -->
-3. <!-- step 3 -->
-4. Output: <!-- what does the agent produce? -->
+1. **Trigger:** User submits the search form (country, industry, headcount range)
+2. FastAPI creates a `SearchRun` record (status = `running`) and starts the LangGraph graph synchronously
+3. `search_node` calls Gemini with a grounded prompt; extracts a list of company names + domains
+4. `enrich_node` calls Gemini once per company; extracts firmographic fields and a "why fit" summary
+5. `save_node` upserts each `Lead` into PostgreSQL (dedup on domain); marks run `completed`
+6. **Output:** Leads visible in dashboard; downloadable as CSV
 
 ## External Dependencies
 
-<!-- FILL IN: APIs, services, databases the agent depends on. -->
-
 | Dependency | Purpose | Failure Mode |
-|------------|---------|--------------|
-| <!-- name --> | <!-- what it does --> | <!-- what happens if it's down --> |
+|------------|---------|-------------|
+| Google Gemini API | Lead discovery + enrichment | Set run status `failed`; surface error in UI |
+| PostgreSQL | Persistent lead + run storage | App fails to start; logged loudly |
 
 ## Deployment Model
 
-<!-- FILL IN: How does this run? (local script, cloud function, long-running service, etc.) -->
+Local web server. Run with `uv run python -m lead_gen_agent` from the repo root. Listens on port 8001. No cloud deployment in v0.1.

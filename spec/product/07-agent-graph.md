@@ -1,63 +1,96 @@
 # Agent Graph
 
-> **Boilerplate status:** Required when the project uses an agent framework (LangGraph, CrewAI, AutoGen, etc.). Filled in by the tech-designer sub-agent as part of the tech design stage.
->
-> If your project has no agent framework (e.g., it's a simple script or API), delete this file.
->
-> The spec-reviewer treats this file as a **CRITICAL BLOCKER** — the tech design will not be approved if this file is absent or incomplete when an agent framework is in use.
-
----
-
 ## State
-
-<!-- FILL IN: Define the agent's state type. Every field must be named and typed. -->
 
 ```python
 class AgentState(TypedDict):
     # Identity
-    run_id: int
-    # ... add all fields
+    run_id: str                         # UUID of the SearchRun record
+    criteria: SearchCriteria            # country, industry, size range
 
-    # Pipeline data (populated progressively by nodes)
-    # ...
+    # Pipeline data (populated progressively)
+    raw_companies: list[dict]           # [{name, domain, website}, ...]
+    leads: list[LeadCreate]             # enriched lead objects ready to save
 
     # Control
-    error: str | None   # set by any node on fatal failure
+    error: str | None                   # set by any node on fatal failure
 ```
 
 ---
 
 ## Nodes
 
-<!-- FILL IN: One section per node. -->
+### `search_node`
 
-### `node_[name]`
+**Reads from state:** `run_id`, `criteria`
 
-**Reads from state:** <!-- field names -->
-
-**Writes to state:** <!-- field names -->
+**Writes to state:** `raw_companies`, `error`
 
 **External calls:**
 
 | System | Operation | On Failure |
 |--------|-----------|------------|
-| <!-- system --> | <!-- what it calls --> | <!-- fatal (set error) or partial (log and continue) --> |
+| Gemini API (Search Grounding) | `generate_content` with search-grounded prompt | Fatal — set `error`, transition to `handle_error` |
 
-**Behaviour:** <!-- one paragraph describing what this node does -->
+**Behaviour:** Builds a structured prompt asking Gemini (with Google Search Grounding enabled) to return a JSON array of EU SMBs matching the criteria. Parses the response into `raw_companies`. If parsing fails or the API errors, sets `error` and stops.
+
+### `enrich_node`
+
+**Reads from state:** `run_id`, `raw_companies`
+
+**Writes to state:** `leads`, `error`
+
+**External calls:**
+
+| System | Operation | On Failure |
+|--------|-----------|------------|
+| Gemini API | `generate_content` per company (structured extraction) | Partial — log and skip that company; continue with others |
+
+**Behaviour:** For each entry in `raw_companies`, calls Gemini with a structured extraction prompt (tagged `<node:enrich>`) asking for: industry, headcount band, and a 2-sentence "why fit" summary. Accumulates results into `leads`.
+
+### `save_node`
+
+**Reads from state:** `run_id`, `leads`
+
+**Writes to state:** nothing (side-effectful)
+
+**External calls:**
+
+| System | Operation | On Failure |
+|--------|-----------|------------|
+| PostgreSQL | `upsert` leads; update `SearchRun.status` | Fatal — set `error` |
+
+**Behaviour:** Upserts each `Lead` (dedup on `domain`); updates the `SearchRun` record to `completed` with `lead_count` and `completed_at`. If a DB error occurs, marks run as `failed`.
+
+### `handle_error`
+
+**Reads from state:** `run_id`, `error`
+
+**Writes to state:** nothing (side-effectful)
+
+**Behaviour:** Updates the `SearchRun` record to `status = failed` and sets `error_message`. Always transitions to END.
 
 ---
 
 ## Edge Topology
 
-<!-- FILL IN: ASCII diagram of node flow. Show conditional edges explicitly. -->
-
 ```
 START
   │
   ▼
-node_a ──(error)──► node_handle_error ──► END
+search_node ──(error set)──► handle_error ──► END
   │
   ▼
+enrich_node ──(error set)──► handle_error ──► END
+  │
+  ▼
+save_node ──(error set)──► handle_error ──► END
+  │
+  ▼
+END
+```
+
+Routing rule: after each node, if `state["error"]` is not None, route to `handle_error`; otherwise continue to the next node.
 node_b
   │
   ▼

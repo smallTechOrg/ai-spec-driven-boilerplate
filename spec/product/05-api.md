@@ -1,41 +1,71 @@
 # API
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent. Delete this file if the agent has no external API surface (e.g., it's a pure CLI tool or background worker).
-
----
-
 ## API Style
 
-<!-- FILL IN: REST / GraphQL / CLI / webhook / none -->
+REST — server-rendered HTML pages (Jinja2) plus JSON endpoints for run status polling. No external API clients; all callers are the browser.
 
-## Endpoints / Commands
+## Endpoints
 
-<!-- FILL IN: One section per endpoint or command. -->
+### `GET /`
 
-### `<!-- METHOD /path or command name -->`
+**Purpose:** Render the main dashboard — list of leads with filter controls.
 
-**Purpose:** <!-- what this endpoint does -->
+**Response:** HTML page.
 
-**Request:**
-```json
-{
-  "<!-- field -->": "<!-- type and description -->"
-}
-```
+### `GET /health`
+
+**Purpose:** Health check for live-server smoke test.
 
 **Response:**
 ```json
-{
-  "<!-- field -->": "<!-- type and description -->"
-}
+{ "status": "ok" }
 ```
+
+### `GET /runs/new`
+
+**Purpose:** Render the new-search form.
+
+**Response:** HTML page.
+
+### `POST /runs`
+
+**Purpose:** Create and execute a new search run.
+
+**Request (form data):**
+| Field | Type | Required |
+|-------|------|----------|
+| country | str | yes |
+| industry | str | yes |
+| size_min | int | no |
+| size_max | int | no |
+
+**Response:** Redirect to `/runs/{id}` (303 See Other).
 
 **Error cases:**
 | Status | Condition |
 |--------|-----------|
-| 400 | <!-- bad input --> |
-| 500 | <!-- internal error --> |
+| 422 | Missing required field |
+| 500 | Pipeline run failed |
+
+### `GET /runs/{run_id}`
+
+**Purpose:** Show results page for a completed run.
+
+**Response:** HTML page with lead table and CSV export link.
+
+### `GET /leads/export.csv`
+
+**Purpose:** Download all current leads as a CSV file.
+
+**Response:** `text/csv` attachment.
+
+**Query params:**
+| Param | Description |
+|-------|-------------|
+| country | Filter by country |
+| industry | Filter by industry |
+| status | Filter by lead status |
 
 ## Authentication
 
-<!-- FILL IN: How are API callers authenticated? -->
+No authentication in v0.1. The app is local-only; no public exposure.

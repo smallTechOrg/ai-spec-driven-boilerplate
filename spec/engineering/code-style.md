@@ -17,27 +17,39 @@ These apply regardless of language or framework:
 
 ## Naming Conventions
 
-<!-- FILL IN: Filled in by tech-designer based on language choice. -->
+- Modules & files: snake_case (`search_node.py`). Package: `lead_gen_agent`.
+- Classes: PascalCase (`SearchTool`, `LeadRow`). Functions/vars: snake_case.
+- Env vars: `LEADGEN_*` (plus `GEMINI_API_KEY`, `PORT`).
+- DB rows: `*Row` (`RunRow`, `LeadRow`). Pydantic domain models: plain noun (`Run`, `Lead`).
 
 ## File Organization
 
-<!-- FILL IN: Filled in by tech-designer. How are files grouped — by layer, by feature, by type? -->
+Grouped by layer: `config/`, `db/`, `domain/`, `graph/`, `llm/`, `tools/`, `api/`. Templates under `api/templates/`; static assets under `api/static/`. Tests mirror the source tree under `tests/unit/` and `tests/integration/`.
 
 ## Error Handling Pattern
 
-<!-- FILL IN: Filled in by tech-designer. How are errors represented and propagated? -->
+- Graph nodes set `state["error"]` on failure; they never raise. `persist_node` consults `state["error"]` and marks the run `failed`.
+- Web routes catch no exceptions directly; unhandled errors render `error.html` via a global exception handler.
+- Tool calls (search/LLM) catch their own network errors, log, and degrade gracefully (empty list / default score).
 
 ## Logging Pattern
 
-<!-- FILL IN: Filled in by tech-designer. Structured vs. unstructured? What fields are always included? -->
+`structlog` with `log_level` from settings. Every major op emits one event: `search.started`, `search.completed`, `extract.completed`, `score.completed`, `persist.completed`, `run.failed`. Include `run_id` on every event.
 
 ## Testing Conventions
 
-<!-- FILL IN: Filled in by tech-designer. Unit test location, naming, runner. -->
+- Runner: `uv run pytest`. Config in `pyproject.toml` (`testpaths = ["tests"]`).
+- Unit tests mirror module path: `tests/unit/db/test_repository.py`.
+- Integration tests under `tests/integration/`; the golden-path UI smoke lives there.
+- Tests hit the real `lead_gen_agent_test` Postgres DB — never SQLite.
 
 ## What NOT to Do
 
-<!-- FILL IN: Anti-patterns specific to this tech stack. Filled in by tech-designer. -->
+- Don't call `google.genai` directly outside `llm/providers/`.
+- Don't build raw SQL strings — use SQLAlchemy.
+- Don't put business logic in templates.
+- Don't use the pre-1.0 Starlette `TemplateResponse` signature.
+- Don't keyword-match in the stub — branch on `<node:*>` tags only.
 
 ---
 

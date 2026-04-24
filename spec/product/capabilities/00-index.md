@@ -13,11 +13,12 @@ A capability is a single, discrete action or behavior the agent performs. Exampl
 
 ## Capabilities in This Project
 
-<!-- FILL IN: List capabilities here as they are defined. Each entry links to its spec file. -->
-
 | # | Capability | File |
 |---|-----------|------|
-| 1 | <!-- name --> | [01-name.md](01-name.md) |
+| 1 | Discover SMB candidates | [01-discover-candidates.md](01-discover-candidates.md) |
+| 2 | Extract firmographics | [02-extract-firmographics.md](02-extract-firmographics.md) |
+| 3 | Score data-maturity gap | [03-score-data-gap.md](03-score-data-gap.md) |
+| 4 | Export leads as CSV | [04-export-csv.md](04-export-csv.md) |
 
 ## How to Add a New Capability
 

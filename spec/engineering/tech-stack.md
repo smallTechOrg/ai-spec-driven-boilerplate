@@ -1,58 +1,64 @@
 # Tech Stack
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved. The user may override specific choices before the tech-designer is invoked.
-
----
-
 ## Language
 
-<!-- FILL IN: e.g., Python 3.12 / TypeScript 5 / Go 1.22 -->
+Python 3.12
 
-**Why:** <!-- reason for this choice -->
+**Why:** Matches the rest of the operator's toolchain, LangGraph/SQLAlchemy/pydantic all first-class.
 
 ## Agent Framework
 
-<!-- FILL IN: e.g., LangGraph / CrewAI / AutoGen / custom / none -->
+LangGraph
 
-**Why:** <!-- reason for this choice -->
+**Why:** Linear pipeline with explicit error short-circuit fits StateGraph cleanly; required by repo's 07-agent-graph.md rule.
 
 ## LLM Provider
 
-<!-- FILL IN: e.g., Anthropic Claude / OpenAI GPT / Google Gemini -->
+Google Gemini via `google-genai`. Provider selection: `auto` (real when `GEMINI_API_KEY` set, stub otherwise).
 
-**Model:** <!-- specific model, e.g., claude-sonnet-4-6 -->
+**Model:** `gemini-2.5-flash` (configurable via `LEADGEN_LLM_MODEL`).
 
-**Why:** <!-- reason -->
+**Why:** Cost-effective for short extract/score prompts; matches repo's LLM-model-name rule.
 
-## Backend Framework (if applicable)
+## Backend Framework
 
-<!-- FILL IN: e.g., FastAPI / Express / Django / none -->
+FastAPI (Starlette ≥1.0 — use the new `TemplateResponse(request, name, ctx)` signature).
 
-## Database (if applicable)
+## Database
 
-<!-- FILL IN: e.g., PostgreSQL / SQLite / Redis / none -->
+PostgreSQL via SQLAlchemy 2.0 sync + psycopg2. Alembic for migrations. Tests hit Postgres — never SQLite (per repo rule 5).
 
-**ORM/ODM:** <!-- e.g., SQLAlchemy 2.0 / Prisma / none -->
+**ORM:** SQLAlchemy 2.0 declarative (`Mapped[...]`).
 
-## Frontend (if applicable)
+## Frontend
 
-<!-- FILL IN: e.g., Next.js 15 / React / Vue / none -->
+Server-rendered Jinja2 templates. No client framework.
 
 ## Key Libraries
 
-<!-- FILL IN: List the important libraries and what each does. -->
-
 | Library | Version | Purpose |
 |---------|---------|---------|
-| <!-- name --> | <!-- version --> | <!-- purpose --> |
+| fastapi | ≥0.115 | Web framework |
+| jinja2 | ≥3.1 | Templates |
+| sqlalchemy | ≥2.0 | ORM |
+| psycopg2-binary | ≥2.9 | Postgres driver (main deps — never dev-only) |
+| alembic | ≥1.13 | Migrations |
+| langgraph | ≥0.2 | Agent orchestration |
+| google-genai | ≥0.3 | Gemini client |
+| pydantic-settings | ≥2.4 | Config with `extra="ignore"` |
+| httpx + beautifulsoup4 | current | DuckDuckGo HTML scraping |
+| structlog | ≥24 | Logs |
 
 ## What to Avoid
 
-<!-- FILL IN: Libraries, patterns, or approaches that are explicitly off-limits and why. -->
+- SQLite for any tests (rule 5)
+- `TemplateResponse("page.html", {"request": ...})` — the pre-1.0 signature; use new signature
+- Calling Gemini SDK directly from nodes — always go through `LLMClient`
+- Keyword-matching in stub LLM (rule 8) — branch on `<node:*>` tags only
 
 ## Dependency Management
 
-<!-- FILL IN: e.g., uv + pyproject.toml / npm / pnpm / go modules -->
+`uv` + `pyproject.toml`. All commands prefixed with `uv run`.
 
 ---
 

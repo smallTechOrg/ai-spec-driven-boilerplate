@@ -26,6 +26,8 @@ These rules are never optional, never skipped, and must survive context compress
 
 8. **Stub LLM outputs must be distinct per pipeline node and article-shaped.** Pipeline nodes that share a stub provider must inject unambiguous tags (e.g. `<node:plan>`, `<node:draft>`, `<node:title>`) into their prompts, and the stub must branch on those tags — never on prose keywords from the prompt body (keyword matching cross-contaminates: the word "outline" in a draft prompt must not cause the stub to emit outline bullets instead of a draft). Stub "draft" output must contain paragraphs/headings, not just bullets, so offline demos are credible.
 
+9. **Every commit must be pushed immediately.** `git commit` and `git push` are a single atomic action — never one without the other. Use `git commit -m "..." && git push origin <branch>` as a single command. A commit that is not pushed does not exist as far as the project is concerned. This is not optional and is not context-compression-safe — if you remember only this sentence: **commit then push, every time, no exceptions.**
+
 ---
 
 ## 1. Session Start Checklist
@@ -108,7 +110,7 @@ See `spec/engineering/phases.md` for the phase definitions and gates.
 ## 6. Git Discipline
 
 - Commit every logical unit of work — never let the working tree stay dirty for more than one logical change
-- Push after every commit on feature branches
+- **Push immediately after every commit** — treat `git commit -m "..." && git push origin <branch>` as a single indivisible command. Never leave a commit unpushed.
 - Commit message format: `phase-N: [what you did]` (e.g., `phase-1: add domain models`)
 - Never commit secrets (API keys, passwords, tokens)
 - Never force-push without user confirmation
@@ -116,8 +118,8 @@ See `spec/engineering/phases.md` for the phase definitions and gates.
 
 **Before every reply to the user:**
 1. Run `git status`
-2. If dirty: commit the changes
-3. Confirm the working tree is clean before replying
+2. If dirty: commit the changes with `git commit -m "..." && git push origin <branch>`
+3. Confirm the working tree is clean **and** the branch is pushed before replying
 
 ## 7. Test Before Claiming Done
 

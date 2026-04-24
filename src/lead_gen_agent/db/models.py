@@ -1,6 +1,7 @@
 """SQLAlchemy 2.0 declarative models."""
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -53,6 +54,7 @@ class LeadORM(Base):
     industry: Mapped[str | None] = mapped_column(String(200), nullable=True)
     headcount_estimate: Mapped[str | None] = mapped_column(String(50), nullable=True)
     why_fit: Mapped[str | None] = mapped_column(Text, nullable=True)
+    contacts_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="new")
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, default=_now
@@ -62,3 +64,13 @@ class LeadORM(Base):
         Index("ix_leads_domain", "domain", unique=True),
         Index("ix_leads_search_run_id", "search_run_id"),
     )
+
+    @property
+    def contacts(self) -> list[dict]:
+        """Deserialise contacts_json to a list for Pydantic model_validate."""
+        if self.contacts_json:
+            try:
+                return json.loads(self.contacts_json)
+            except Exception:
+                return []
+        return []

@@ -38,6 +38,7 @@ Represents one discovered company and its enrichment data.
 | industry | str | no | Industry / sector |
 | headcount_estimate | str | no | Headcount band (e.g. `10–50`) |
 | why_fit | str | no | 2-sentence AI-generated reason this company fits the pitch |
+| contacts_json | str (JSON) | no | JSON array of publicly-available business contacts: `[{name, title, email, phone, linkedin_url}]` |
 | status | str | yes | `new` \| `contacted` \| `rejected` |
 | created_at | datetime (UTC) | yes | When the lead was first stored |
 
@@ -53,4 +54,9 @@ One `SearchRun` has many `Lead` records (1:N). A `Lead` always belongs to the ru
 
 ## Sensitive Data
 
-v0.1 stores firmographic data only (company-level). No personal names, personal emails, or phone numbers are stored. GDPR Article 4 "personal data" does not apply to company-level firmographics. The `domain` field is a business identifier, not a personal identifier.
+v0.1 stores firmographic data plus publicly-available **business** contacts. The `contacts_json` field may contain names, titles, and public contact details of company representatives found via public sources (company website, LinkedIn public profile, press releases). This is within GDPR Recital 47 / legitimate-interest grounds for B2B prospecting, provided:
+- Only publicly-available information is stored (no inference or guessing)
+- Individuals may request erasure (delete the lead record)
+- No automated profiling beyond what the LLM returns from public sources
+
+The `domain` field remains the dedup key and is a business identifier, not a personal identifier.

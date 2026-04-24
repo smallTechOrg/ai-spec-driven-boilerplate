@@ -54,6 +54,7 @@
         <th>Industry</th>
         <th>Headcount</th>
         <th>Why they fit</th>
+        <th>Contacts</th>
         <th>Status</th>
         <th>Found</th>
       </tr>
@@ -70,6 +71,20 @@
         <td>{{ lead.industry or '—' }}</td>
         <td>{{ lead.headcount_estimate or '—' }}</td>
         <td><div class="why-fit">{{ lead.why_fit or '—' }}</div></td>
+        <td>
+          {% if lead.contacts %}
+          <ul style="list-style:none; padding:0; margin:0; font-size:0.82rem;">
+            {% for c in lead.contacts %}
+            <li style="margin-bottom:0.35rem;">
+              <strong>{{ c.name or '—' }}</strong>
+              {% if c.title %}<span style="color:#6c757d;"> · {{ c.title }}</span>{% endif %}
+              {% if c.email %}<br><a href="mailto:{{ c.email }}">{{ c.email }}</a>{% endif %}
+              {% if c.phone %}<br>{{ c.phone }}{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}—{% endif %}
+        </td>
         <td><span class="badge badge-{{ lead.status }}">{{ lead.status }}</span></td>
         <td style="white-space:nowrap; font-size:0.8rem; color:#6c757d;">
           {{ lead.created_at.strftime('%d %b %Y') if lead.created_at else '—' }}

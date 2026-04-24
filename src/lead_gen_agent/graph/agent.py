@@ -5,6 +5,7 @@ from langgraph.graph import END, START, StateGraph
 
 from lead_gen_agent.graph.edges import route_on_error
 from lead_gen_agent.graph.nodes import (
+    contact_node,
     enrich_node,
     handle_error,
     save_node,
@@ -18,6 +19,7 @@ def build_graph() -> StateGraph:
 
     g.add_node("search_node", search_node)
     g.add_node("enrich_node", enrich_node)
+    g.add_node("contact_node", contact_node)
     g.add_node("save_node", save_node)
     g.add_node("handle_error", handle_error)
 
@@ -30,6 +32,11 @@ def build_graph() -> StateGraph:
     )
     g.add_conditional_edges(
         "enrich_node",
+        route_on_error,
+        {"continue": "contact_node", "handle_error": "handle_error"},
+    )
+    g.add_conditional_edges(
+        "contact_node",
         route_on_error,
         {"continue": "save_node", "handle_error": "handle_error"},
     )

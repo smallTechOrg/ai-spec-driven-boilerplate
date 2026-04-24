@@ -22,16 +22,15 @@ Identifying SMBs that are big enough to benefit from data work but small enough 
 
 ## What This Agent Does NOT Do (Out of Scope)
 
-- Does not scrape or verify individual contact emails (no PII collection in v0.1)
-- Does not generate personalised outreach copy (Phase 3+)
-- Does not pull org charts or deep financial data (Phase 3+)
-- Does not integrate with a CRM or email sequencer (Phase 4+)
+- Does not generate personalised outreach copy (Phase 5)
+- Does not pull org charts or deep financial data (Phase 5)
+- Does not integrate with a CRM or email sequencer (Phase 5+)
 - Does not cover non-European markets
 
 ## Key Constraints
 
 - Gemini API rate limits apply (60 requests/minute free tier); the agent must not exceed this
-- All stored data must be firmographic only — no personal data — to stay GDPR-safe in v0.1
+- Contact data stored is **publicly discoverable business contacts only** (company website bios, LinkedIn public profiles, press releases). The LLM prompt must not ask the model to infer or guess personal contact details. This keeps the feature within GDPR legitimate-interest grounds for B2B prospecting.
 - Must run locally; no cloud deployment required in v0.1
 
 ## Phases of Development
@@ -40,6 +39,6 @@ Identifying SMBs that are big enough to benefit from data work but small enough 
 |-------|-------------|--------------|
 | 1 | Domain models + DB schema (Lead, SearchRun) + repository CRUD | `uv run pytest tests/unit/ -q` 100% green against PostgreSQL |
 | 2 | LangGraph pipeline (search → enrich nodes, stubbed) + FastAPI web UI + CSV export + README | `uv run pytest -q` + golden-path smoke test green; app starts and serves real pages |
-| 3 | Replace stubs with live Gemini + Google Search Grounding calls | End-to-end run produces real leads; gate: ≥ 5 leads stored per run |
-| 4 | Deep enrichment: org structure, financials, lines of business via Gemini | Each lead has a populated `enrichment` JSON blob |
+| 3 | Contact enrichment node (publicly-available contacts per lead) + SSE observability (live progress feed during runs) | Pipeline produces contacts per lead; run page streams live progress via SSE |
+| 4 | Replace stubs with live Gemini + Google Search Grounding calls | End-to-end run produces real leads + contacts; gate: ≥ 5 leads stored per run |
 | 5 | Outreach copy generation per lead | Each lead has AI-drafted intro paragraph |

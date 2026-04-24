@@ -1,8 +1,10 @@
 """All HTTP routes."""
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
+import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request, Response
@@ -15,6 +17,7 @@ from lead_gen_agent.config import get_settings
 from lead_gen_agent.db import create_db_session
 from lead_gen_agent.db.repository import LeadRepository, SearchRunRepository
 from lead_gen_agent.domain import SearchCriteria, SearchRunCreate
+from lead_gen_agent.graph.progress import get_queue, register_run
 from lead_gen_agent.graph.runner import run_agent
 
 templates = Jinja2Templates(
@@ -80,7 +83,7 @@ def new_run_form(request: Request):
 
 
 @router.post("/runs")
-def create_run(
+async def create_run(
     request: Request,
     country: Annotated[str, Form()],
     industry: Annotated[str, Form()],
@@ -101,14 +104,19 @@ def create_run(
         ))
         run_id = run.id
 
-    # Execute the pipeline synchronously
+    # Register progress queue before spawning background task so that the
+    # SSE endpoint can connect immediately after the redirect.
+    register_run(run_id)
+
     criteria = SearchCriteria(
         country=country,
         industry=industry,
         size_min=size_min_int,
         size_max=size_max_int,
     )
-    run_agent(run_id, criteria)
+
+    # Run pipeline in a thread so it doesn't block the event loop.
+    asyncio.create_task(asyncio.to_thread(run_agent, run_id, criteria))
 
     return RedirectResponse(url=f"/runs/{run_id}", status_code=303)
 
@@ -132,6 +140,37 @@ def run_results(request: Request, run_id: str):
 
 
 # ---------------------------------------------------------------------------
+# SSE — live progress stream for a running pipeline
+# ---------------------------------------------------------------------------
+
+@router.get("/runs/{run_id}/events")
+async def run_events(run_id: str):
+    """Server-Sent Events stream for live pipeline progress."""
+
+    async def generate():
+        q = get_queue(run_id)
+        if q is None:
+            # Run already finished or unknown — send done immediately
+            yield "event: done\ndata: {}\n\n"
+            return
+        while True:
+            msg = await q.get()
+            if msg is None:  # sentinel — pipeline finished
+                yield "event: done\ndata: {}\n\n"
+                break
+            yield f"data: {json.dumps(msg)}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
 # CSV export
 # ---------------------------------------------------------------------------
 
@@ -152,12 +191,20 @@ def export_csv(
     writer = csv.writer(output)
     writer.writerow([
         "company_name", "domain", "website", "country",
-        "industry", "headcount_estimate", "why_fit", "status", "created_at",
+        "industry", "headcount_estimate", "why_fit",
+        "contact_name", "contact_title", "contact_email", "contact_phone",
+        "status", "created_at",
     ])
     for lead in leads:
+        # Flatten first contact into CSV columns; remaining contacts omitted
+        first = lead.contacts[0] if lead.contacts else None
         writer.writerow([
             lead.company_name, lead.domain, lead.website, lead.country,
             lead.industry, lead.headcount_estimate, lead.why_fit,
+            first.name if first else "",
+            first.title if first else "",
+            first.email if first else "",
+            first.phone if first else "",
             lead.status, lead.created_at.isoformat() if lead.created_at else "",
         ])
 
@@ -167,3 +214,4 @@ def export_csv(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=leads.csv"},
     )
+

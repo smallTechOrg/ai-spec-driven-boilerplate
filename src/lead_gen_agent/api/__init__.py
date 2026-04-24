@@ -1,6 +1,7 @@
 """FastAPI application factory."""
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,12 +9,14 @@ from fastapi.staticfiles import StaticFiles
 
 from lead_gen_agent.api.routes import router
 from lead_gen_agent.db import init_db
+from lead_gen_agent.graph.progress import set_main_loop
 
 import os
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    set_main_loop(asyncio.get_event_loop())
     init_db()
     yield
 

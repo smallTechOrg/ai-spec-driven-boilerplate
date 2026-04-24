@@ -1,7 +1,8 @@
 """Stub LLM provider — returns deterministic offline responses.
 
-Each pipeline node injects a unique tag (<node:search>, <node:enrich>) into
-its prompt. The stub branches on those tags — never on prose keywords.
+Each pipeline node injects a unique tag (<node:search>, <node:enrich>,
+<node:contact>) into its prompt. The stub branches on those tags — never
+on prose keywords.
 """
 from __future__ import annotations
 
@@ -28,6 +29,23 @@ _STUB_ENRICH_RESPONSE = json.dumps({
     ),
 })
 
+_STUB_CONTACT_RESPONSE = json.dumps([
+    {
+        "name": "Anna Müller",
+        "title": "CEO",
+        "email": "a.mueller@example.com",
+        "phone": None,
+        "linkedin_url": "https://linkedin.com/in/stub-profile",
+    },
+    {
+        "name": "Thomas Bauer",
+        "title": "Head of Operations",
+        "email": None,
+        "phone": "+49 30 12345678",
+        "linkedin_url": None,
+    },
+])
+
 
 class StubLLMProvider(LLMProvider):
     def generate(self, prompt: str) -> str:
@@ -35,4 +53,6 @@ class StubLLMProvider(LLMProvider):
             return _STUB_SEARCH_RESPONSE
         if "<node:enrich>" in prompt:
             return _STUB_ENRICH_RESPONSE
+        if "<node:contact>" in prompt:
+            return _STUB_CONTACT_RESPONSE
         return '{"result": "stub response"}'

@@ -10,7 +10,7 @@ class AgentState(TypedDict):
 
     # Pipeline data (populated progressively)
     raw_companies: list[dict]           # [{name, domain, website}, ...]
-    leads: list[LeadCreate]             # enriched lead objects ready to save
+    leads: list[LeadCreate]             # enriched lead objects ready to save (contacts populated after contact_node)
 
     # Control
     error: str | None                   # set by any node on fatal failure
@@ -33,6 +33,20 @@ class AgentState(TypedDict):
 | Gemini API (Search Grounding) | `generate_content` with search-grounded prompt | Fatal — set `error`, transition to `handle_error` |
 
 **Behaviour:** Builds a structured prompt asking Gemini (with Google Search Grounding enabled) to return a JSON array of EU SMBs matching the criteria. Parses the response into `raw_companies`. If parsing fails or the API errors, sets `error` and stops.
+
+### `contact_node`
+
+**Reads from state:** `run_id`, `leads`
+
+**Writes to state:** `leads` (each LeadCreate gains a populated `contacts` list)
+
+**External calls:**
+
+| System | Operation | On Failure |
+|--------|-----------|------------|
+| Gemini API | `generate_content` per lead (public contact extraction) | Partial — log and skip; continue with empty contacts |
+
+**Behaviour:** For each lead in `leads`, calls Gemini with a `<node:contact>`-tagged prompt asking for up to 3 publicly-discoverable business contacts (decision-makers, data/tech leads). The prompt explicitly restricts results to public sources only (company website, LinkedIn public profiles, press releases). Returns each contact as `{name, title, email, phone, linkedin_url}` with nulls for unavailable fields. Emits a progress event per company. Partial failures are logged and skipped (empty contacts list for that lead).
 
 ### `enrich_node`
 
@@ -82,6 +96,9 @@ search_node ──(error set)──► handle_error ──► END
   │
   ▼
 enrich_node ──(error set)──► handle_error ──► END
+  │
+  ▼
+contact_node ──(error set)──► handle_error ──► END
   │
   ▼
 save_node ──(error set)──► handle_error ──► END

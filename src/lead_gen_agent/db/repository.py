@@ -1,6 +1,7 @@
 """Repository layer — all DB access goes through here."""
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -62,6 +63,9 @@ class LeadRepository:
             return 0
         inserted = 0
         for lead in leads:
+            contacts_raw = json.dumps(
+                [c.model_dump() for c in lead.contacts] if lead.contacts else []
+            )
             stmt = (
                 pg_insert(LeadORM)
                 .values(
@@ -72,6 +76,7 @@ class LeadRepository:
                     industry=lead.industry,
                     headcount_estimate=lead.headcount_estimate,
                     why_fit=lead.why_fit,
+                    contacts_json=contacts_raw,
                     status=lead.status,
                     search_run_id=lead.search_run_id,
                 )

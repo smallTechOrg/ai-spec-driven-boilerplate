@@ -12,11 +12,37 @@
     <div><strong>Country:</strong> {{ run.country }}</div>
     <div><strong>Industry:</strong> {{ run.industry }}</div>
     {% if run.size_min or run.size_max %}<div><strong>Headcount:</strong> {{ run.size_min or '—' }}–{{ run.size_max or '∞' }}</div>{% endif %}
-    <div><strong>Status:</strong> <span class="badge badge-{{ run.status }}">{{ run.status }}</span></div>
-    <div><strong>Leads found:</strong> {{ run.lead_count or 0 }}</div>
+    <div><strong>Status:</strong> <span class="badge badge-{{ run.status }}" id="status-badge">{{ run.status }}</span></div>
+    <div><strong>Leads found:</strong> <span id="lead-count">{{ run.lead_count or 0 }}</span></div>
     <div><strong>Started:</strong> {{ run.created_at.strftime('%d %b %Y %H:%M') if run.created_at else '—' }}</div>
   </div>
 </div>
+
+{% if run.status == 'running' %}
+<div class="card" id="progress-panel">
+  <h2 style="margin-bottom:0.75rem;">⏳ Pipeline running…</h2>
+  <div id="progress-log" style="font-family:monospace; font-size:0.84rem; line-height:1.6; max-height:280px; overflow-y:auto; background:#f8f9fa; border:1px solid #dee2e6; border-radius:6px; padding:0.75rem;"></div>
+</div>
+<script>
+  const es = new EventSource('/runs/{{ run.id }}/events');
+  const log = document.getElementById('progress-log');
+  es.onmessage = function(e) {
+    const msg = JSON.parse(e.data);
+    const line = document.createElement('div');
+    line.textContent = '[' + msg.step + '] ' + msg.message;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+  };
+  es.addEventListener('done', function() {
+    es.close();
+    window.location.reload();
+  });
+  es.onerror = function() {
+    es.close();
+    setTimeout(() => window.location.reload(), 2000);
+  };
+</script>
+{% endif %}
 
 {% if run.status == 'failed' %}
 <div class="alert-danger">
@@ -38,6 +64,7 @@
         <th>Industry</th>
         <th>Headcount</th>
         <th>Why they fit</th>
+        <th>Contacts</th>
         <th>Status</th>
       </tr>
     </thead>
@@ -53,6 +80,21 @@
         <td>{{ lead.industry or '—' }}</td>
         <td>{{ lead.headcount_estimate or '—' }}</td>
         <td><div class="why-fit">{{ lead.why_fit or '—' }}</div></td>
+        <td>
+          {% if lead.contacts %}
+          <ul style="list-style:none; padding:0; margin:0; font-size:0.82rem;">
+            {% for c in lead.contacts %}
+            <li style="margin-bottom:0.4rem;">
+              <strong>{{ c.name or '—' }}</strong>
+              {% if c.title %}<span style="color:#6c757d;"> · {{ c.title }}</span>{% endif %}
+              {% if c.email %}<br><a href="mailto:{{ c.email }}">{{ c.email }}</a>{% endif %}
+              {% if c.phone %}<br>{{ c.phone }}{% endif %}
+              {% if c.linkedin_url %}<br><a href="{{ c.linkedin_url }}" target="_blank" rel="noopener">LinkedIn</a>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}—{% endif %}
+        </td>
         <td><span class="badge badge-{{ lead.status }}">{{ lead.status }}</span></td>
       </tr>
       {% endfor %}

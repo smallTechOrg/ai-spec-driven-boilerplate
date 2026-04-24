@@ -40,6 +40,15 @@ class SearchRun(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class Contact(BaseModel):
+    """A publicly-discoverable business contact at a company."""
+    name: str | None = None
+    title: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    linkedin_url: str | None = None
+
+
 class LeadCreate(BaseModel):
     search_run_id: str
     company_name: str
@@ -49,6 +58,7 @@ class LeadCreate(BaseModel):
     industry: str | None = None
     headcount_estimate: str | None = None
     why_fit: str | None = None
+    contacts: list[Contact] = Field(default_factory=list)
     status: LeadStatus = Field(default="new")
 
 
@@ -62,6 +72,7 @@ class Lead(BaseModel):
     industry: str | None
     headcount_estimate: str | None
     why_fit: str | None
+    contacts: list[Contact] = Field(default_factory=list)
     status: LeadStatus
     created_at: datetime
 

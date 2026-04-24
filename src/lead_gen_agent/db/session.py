@@ -49,5 +49,24 @@ def create_db_session() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
+    from sqlalchemy import inspect
     from lead_gen_agent.db.models import Base
-    Base.metadata.create_all(bind=_get_engine())
+    engine = _get_engine()
+    Base.metadata.create_all(bind=engine)
+    # Schema sanity check: catch DBs left over from an older, incompatible build
+    # whose alembic_version sits on an unknown revision and silently no-ops upgrades.
+    inspector = inspect(engine)
+    for table in Base.metadata.sorted_tables:
+        if not inspector.has_table(table.name):
+            raise RuntimeError(
+                f"table '{table.name}' missing from database — run `uv run alembic upgrade head`."
+            )
+        actual = {c["name"] for c in inspector.get_columns(table.name)}
+        expected = {c.name for c in table.columns}
+        missing = expected - actual
+        if missing:
+            raise RuntimeError(
+                f"table '{table.name}' is missing columns {sorted(missing)} — this DB "
+                "was created by an incompatible prior build. Recreate it: "
+                f"`dropdb <db> && createdb <db> && uv run alembic upgrade head`."
+            )

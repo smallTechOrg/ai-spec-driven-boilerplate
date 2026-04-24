@@ -15,6 +15,11 @@ rm -rf src/ tests/ alembic/ pyproject.toml uv.lock .venv/
 rm -rf data/ images/ reports/sessions/
 mkdir -p data images reports/sessions
 
+# Postgres databases — stale schemas from prior builds cause silent column-mismatch bugs
+for db in lead_gen_agent lead_gen_agent_test; do
+  psql -d postgres -c "DROP DATABASE IF EXISTS $db WITH (FORCE);" >/dev/null 2>&1 || true
+done
+
 # Git state
 git checkout HEAD -- .env.example 2>/dev/null || true
 

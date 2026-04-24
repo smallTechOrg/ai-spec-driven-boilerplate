@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 RunStatus = Literal["running", "completed", "failed"]
@@ -47,6 +47,19 @@ class Contact(BaseModel):
     email: str | None = None
     phone: str | None = None
     linkedin_url: str | None = None
+
+    @field_validator("linkedin_url", mode="before")
+    @classmethod
+    def normalise_linkedin_url(cls, v: object) -> str | None:
+        if not v or not isinstance(v, str):
+            return None
+        v = v.strip()
+        if not v:
+            return None
+        if v.startswith("https://") or v.startswith("http://"):
+            return v
+        # bare domain or path — prepend https://
+        return f"https://{v}"
 
 
 class LeadCreate(BaseModel):

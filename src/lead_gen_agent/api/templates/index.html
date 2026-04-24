@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Home — Lead Gen Agent{% endblock %}
+{% block content %}
+<section>
+  <h2>Trigger a new run</h2>
+  <form method="post" action="/runs">
+    <label>Country
+      <select name="country" required>
+        {% for c in countries %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Industry
+      <input name="industry" type="text" required placeholder="e.g. Manufacturing">
+    </label>
+    <label>Size band
+      <select name="size_band" required>
+        {% for s in size_bands %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit">Run pipeline</button>
+  </form>
+</section>
+{% endblock %}

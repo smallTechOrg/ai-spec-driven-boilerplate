@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Runs — Lead Gen Agent{% endblock %}
+{% block content %}
+<h2>Runs</h2>
+{% if runs %}
+<table>
+  <thead><tr><th>Created</th><th>Filters</th><th>Status</th><th>Completed</th><th>Error</th></tr></thead>
+  <tbody>
+    {% for r in runs %}
+      <tr>
+        <td>{{ r.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td>{{ r.filters.get("country", "") }} · {{ r.filters.get("industry", "") }} · {{ r.filters.get("size_band", "") }}</td>
+        <td class="status-{{ r.status }}">{{ r.status }}</td>
+        <td>{% if r.completed_at %}{{ r.completed_at.strftime("%H:%M:%S") }}{% endif %}</td>
+        <td>{{ r.error_message or "" }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No runs yet. <a href="/">Trigger one</a>.</p>
+{% endif %}
+{% endblock %}

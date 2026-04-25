@@ -34,6 +34,14 @@ def test_pipeline_runs_end_to_end_in_stub_mode(db_session):
 
     suppliers = db_session.query(SupplierRow).filter_by(run_id=run_id).all()
     assert len(suppliers) >= 3
+    s0 = suppliers[0]
+    assert s0.google_rating is not None and 0 <= s0.google_rating <= 5
+    assert s0.google_review_count is not None
+    assert s0.feedback_summary and len(s0.feedback_summary) > 30
+    assert s0.delivery_reliability
+    assert s0.solvency_signal
+    assert s0.gst_registered is not None
+    assert s0.years_in_business is not None
 
     recs = (
         db_session.query(RecommendationRow)

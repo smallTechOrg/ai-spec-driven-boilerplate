@@ -62,11 +62,13 @@ def test_full_user_journey_form_submit_to_report():
     assert "completed" in body
     assert "red clay brick" in body
     assert "Bangalore" in body
-    assert "Recommendations" in body
-    # At least one ranked recommendation rendered
-    assert "#1" in body
-    # Score rendered
-    assert "/100" in body
+    # Tabular report
+    assert 'id="recs-table"' in body
+    assert "Reviews" in body
+    assert "Reliability" in body
+    assert "Solvency" in body
+    # At least one rated supplier rendered (★ glyph from rating cell)
+    assert "★" in body
     # Stub banner still on report page
     assert "Demo / stub mode" in body
 
@@ -95,8 +97,10 @@ def test_stub_llm_branches_on_node_tags_only():
     score_out = StubLLMProvider().complete(score_prompt)
 
     assert "price_indication" in enrich_out
+    assert "google_rating" in enrich_out
+    assert "feedback_summary" in enrich_out
     assert "rationale" in score_out
     assert "score" in score_out
-    # No cross-contamination: enrich output has no "score" field
+    # No cross-contamination: enrich output has no "rationale" field
     import json
-    assert all("score" not in item for item in json.loads(enrich_out))
+    assert all("rationale" not in item for item in json.loads(enrich_out))

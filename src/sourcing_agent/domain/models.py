@@ -36,6 +36,13 @@ class Supplier(BaseModel):
     lead_time: str | None = None
     source_url: str | None = None
     notes: str | None = None
+    google_rating: float | None = None
+    google_review_count: int | None = None
+    feedback_summary: str | None = None
+    delivery_reliability: str | None = None
+    years_in_business: int | None = None
+    solvency_signal: str | None = None
+    gst_registered: bool | None = None
 
 
 class Recommendation(BaseModel):

@@ -113,6 +113,13 @@ def run_report(request: Request, run_id: str) -> HTMLResponse:
                         "lead_time": sup.lead_time if sup else None,
                         "source_url": sup.source_url if sup else None,
                         "notes": sup.notes if sup else None,
+                        "google_rating": sup.google_rating if sup else None,
+                        "google_review_count": sup.google_review_count if sup else None,
+                        "feedback_summary": sup.feedback_summary if sup else None,
+                        "delivery_reliability": sup.delivery_reliability if sup else None,
+                        "years_in_business": sup.years_in_business if sup else None,
+                        "solvency_signal": sup.solvency_signal if sup else None,
+                        "gst_registered": sup.gst_registered if sup else None,
                     },
                 }
             )

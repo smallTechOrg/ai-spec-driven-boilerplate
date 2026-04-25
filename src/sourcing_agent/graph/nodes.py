@@ -6,6 +6,31 @@ from sourcing_agent.graph.state import AgentState
 from sourcing_agent.tools.enrich import enrich_suppliers
 from sourcing_agent.tools.research import research_suppliers
 from sourcing_agent.tools.score import score_suppliers
+from sourcing_agent.tools.signals import attach_signals_to_results
+
+
+def _to_float(v):
+    try:
+        return float(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_int(v):
+    try:
+        return int(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_bool(v):
+    if isinstance(v, bool):
+        return v
+    if v is None:
+        return None
+    if isinstance(v, str):
+        return v.strip().lower() in ("true", "yes", "1")
+    return bool(v)
 
 
 def research(state: AgentState) -> AgentState:
@@ -23,8 +48,11 @@ def research(state: AgentState) -> AgentState:
 def enrich(state: AgentState) -> AgentState:
     try:
         req = state["request"]
+        results_with_signals = attach_signals_to_results(
+            state.get("raw_results", []), req["location"]
+        )
         suppliers = enrich_suppliers(
-            raw_results=state.get("raw_results", []),
+            raw_results=results_with_signals,
             material=req["material"],
             location=req["location"],
         )
@@ -39,6 +67,13 @@ def enrich(state: AgentState) -> AgentState:
                     lead_time=s.get("lead_time"),
                     source_url=s.get("source_url"),
                     notes=s.get("notes"),
+                    google_rating=_to_float(s.get("google_rating")),
+                    google_review_count=_to_int(s.get("google_review_count")),
+                    feedback_summary=s.get("feedback_summary"),
+                    delivery_reliability=s.get("delivery_reliability"),
+                    years_in_business=_to_int(s.get("years_in_business")),
+                    solvency_signal=s.get("solvency_signal"),
+                    gst_registered=_to_bool(s.get("gst_registered")),
                 )
                 session.add(row)
                 session.flush()

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import ForeignKey, Integer, TIMESTAMP, Text
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, TIMESTAMP, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -78,6 +78,15 @@ class SupplierRow(Base):
     lead_time: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Dossier signals (Phase 3)
+    google_rating: Mapped[float | None] = mapped_column(Float, nullable=True)
+    google_review_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    feedback_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    delivery_reliability: Mapped[str | None] = mapped_column(Text, nullable=True)
+    years_in_business: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    solvency_signal: Mapped[str | None] = mapped_column(Text, nullable=True)
+    gst_registered: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     run: Mapped[RunRow] = relationship(back_populates="suppliers")
 

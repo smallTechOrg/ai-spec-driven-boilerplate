@@ -59,11 +59,24 @@ trade-offs made explicit.
 |-------|-------------|--------------|
 | 1 | Domain models, DB schema, Alembic migration, repository CRUD | `uv run pytest tests/unit` 100% pass against PostgreSQL; `uv run alembic current` non-blank |
 | 2 | Stubbed LangGraph loop end-to-end + web UI + README | `uv run pytest` 100% pass; golden-path UI smoke test green; live-server `/health` and `/` return 200 |
-| 3 (future) | Real Tavily + Gemini integration, scoring tuned | Manual eval on 3 real requests |
-| 4 (future) | Multi-material requests + supplier dedup | TBD |
+| 3 (future) | **Richer supplier dossier + tabular report + live run progress** (see capability spec) | Each supplier has reviews / feedback / delivery / solvency signals; report is a sortable table; user sees node-level progress while the run executes |
+| 4 (future) | Real Tavily + Gemini integration, scoring tuned on real data | Manual eval on 3 real requests |
+| 5 (future) | Multi-material requests + supplier dedup | TBD |
 
 ## Future Phases (deferred from v0.1)
 
+- **Phase 3 — supplier dossier + tabular report + live progress** (specced in
+  `spec/product/capabilities/03-supplier-dossier.md`):
+  - Enrich each supplier with: Google reviews (rating + count), aggregated
+    customer feedback summary, delivery reliability signal (on-time %, lead-time
+    variance), solvency / business-stability signal (years in business, GST /
+    registration status, credit signals where public).
+  - Report renders as a **sortable table** (one row per supplier, columns for
+    each signal + score) instead of stacked cards — easier to compare side by
+    side.
+  - During a run, the UI shows **node-level progress** (research → enrich →
+    score → finalize) via Server-Sent Events or short polling, so the user can
+    see what the agent is doing instead of staring at a spinner.
 - Multi-material concurrent sourcing.
 - Persistent supplier knowledge base + dedup across runs.
 - RFQ email drafting + response tracking.

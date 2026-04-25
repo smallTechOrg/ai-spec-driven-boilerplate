@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}New sourcing request &middot; Sourcing Agent{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0">New sourcing request</h2>
+  <form method="post" action="/requests">
+    <label for="material">Material *</label>
+    <input id="material" name="material" type="text" placeholder="e.g. red clay brick, OPC 53 cement" required>
+
+    <label for="quantity">Quantity *</label>
+    <input id="quantity" name="quantity" type="text" placeholder="e.g. 10000 units, 200 bags" required>
+
+    <label for="location">Location *</label>
+    <input id="location" name="location" type="text" placeholder="e.g. Bangalore, Mumbai" required>
+
+    <label for="budget">Budget</label>
+    <input id="budget" name="budget" type="text" placeholder="e.g. ₹70,000 total">
+
+    <label for="timeline">Timeline</label>
+    <input id="timeline" name="timeline" type="text" placeholder="e.g. delivery within 2 weeks">
+
+    <label for="criteria">Quality / preference criteria</label>
+    <textarea id="criteria" name="criteria" placeholder="e.g. ISI-marked, MOQ flexible, prefer same-state suppliers"></textarea>
+
+    <button type="submit">Find suppliers</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Sourcing report &middot; Sourcing Agent{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0">
+    Sourcing report
+    <span class="pill pill-{{ run.status }}">{{ run.status }}</span>
+  </h2>
+  <div class="rec-meta">
+    <strong>{{ run.request.material }}</strong> &middot;
+    {{ run.request.quantity }} &middot;
+    delivery in {{ run.request.location }}
+    {% if run.request.budget %} &middot; budget {{ run.request.budget }}{% endif %}
+    {% if run.request.timeline %} &middot; timeline {{ run.request.timeline }}{% endif %}
+  </div>
+  {% if run.request.criteria %}
+    <div class="rec-meta">Criteria: {{ run.request.criteria }}</div>
+  {% endif %}
+  <div class="rec-meta">Run ID: <code>{{ run.id }}</code></div>
+</div>
+
+{% if run.status == "failed" %}
+  <div class="error">
+    <strong>Run failed.</strong>
+    <div>{{ run.error_message }}</div>
+  </div>
+{% endif %}
+
+{% if run.recommendations %}
+  <h3>Recommendations</h3>
+  {% for item in run.recommendations %}
+    <div class="card rec">
+      <span class="score">{{ item.score }}/100</span>
+      <h3>#{{ item.rank }} &middot; {{ item.supplier.name }}</h3>
+      <div class="rec-meta">
+        {% if item.supplier.location %}{{ item.supplier.location }}{% endif %}
+        {% if item.supplier.price_indication %} &middot; {{ item.supplier.price_indication }}{% endif %}
+        {% if item.supplier.lead_time %} &middot; lead time {{ item.supplier.lead_time }}{% endif %}
+      </div>
+      <p class="rec-rationale">{{ item.rationale }}</p>
+      {% if item.supplier.notes %}
+        <p class="rec-rationale" style="color:#555"><em>{{ item.supplier.notes }}</em></p>
+      {% endif %}
+      {% if item.supplier.source_url %}
+        <div><a href="{{ item.supplier.source_url }}" target="_blank" rel="noopener">Source &rarr;</a></div>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% elif run.status == "completed" %}
+  <div class="card">No suppliers were found for this request.</div>
+{% endif %}
+{% endblock %}

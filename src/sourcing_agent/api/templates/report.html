@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Report — {{ project_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h1 class="mb-1">{{ project_name }}</h1>
+    {% if completed_at %}
+    <p class="text-muted small">Completed {{ completed_at.strftime('%Y-%m-%d %H:%M UTC') }}</p>
+    {% endif %}
+  </div>
+  <a href="/" class="btn btn-outline-secondary btn-sm">← New Project</a>
+</div>
+
+{% for mat in materials %}
+<div class="card mb-4">
+  <div class="card-header">
+    <strong>{{ mat.material_name }}</strong>
+    <span class="text-muted ms-2">{{ mat.quantity }} {{ mat.unit }}</span>
+  </div>
+  <div class="card-body p-0">
+    {% if mat.recommendations %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Rank</th>
+            <th>Supplier</th>
+            <th>Location</th>
+            <th>Price / Unit</th>
+            <th>Lead Time</th>
+            <th>Certifications</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rec in mat.recommendations %}
+          <tr {% if rec.rank == 1 %}class="table-success fw-semibold"{% endif %}>
+            <td>
+              {% if rec.rank == 1 %}⭐ 1{% else %}{{ rec.rank }}{% endif %}
+            </td>
+            <td>{{ rec.supplier_name }}</td>
+            <td>{{ rec.supplier_location }}</td>
+            <td>{{ rec.currency }} {{ "%.2f"|format(rec.price_per_unit) }}</td>
+            <td>{{ rec.lead_time_days }} days</td>
+            <td><small>{{ rec.certifications }}</small></td>
+            <td>
+              <span class="badge bg-{{ 'success' if rec.score >= 0.7 else ('warning text-dark' if rec.score >= 0.4 else 'secondary') }}">
+                {{ "%.2f"|format(rec.score) }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-3 text-muted">No supplier candidates found for this material.</div>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+<p class="text-muted small text-center mt-4">
+  ⚠ Prices and lead times are estimates. Always verify directly with suppliers before placing orders.
+</p>
+{% endblock %}

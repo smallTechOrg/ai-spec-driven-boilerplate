@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}New Sourcing Project{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <h1 class="mb-1">New Sourcing Project</h1>
+    <p class="text-muted mb-4">Enter your project details and materials list. The agent will discover and rank suppliers for you.</p>
+
+    {% if errors %}
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/runs" id="sourcingForm">
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="mb-3">
+            <label for="project_name" class="form-label fw-semibold">Project Name</label>
+            <input type="text" class="form-control" id="project_name" name="project_name"
+                   value="{{ project_name or '' }}" placeholder="e.g. Downtown Tower Block A" required maxlength="200">
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header fw-semibold">Materials List</div>
+        <div class="card-body">
+          <table class="table table-borderless mb-2" id="materialsTable">
+            <thead class="table-light">
+              <tr>
+                <th>Material Name</th>
+                <th style="width:120px">Quantity</th>
+                <th style="width:120px">Unit</th>
+                <th style="width:50px"></th>
+              </tr>
+            </thead>
+            <tbody id="materialRows">
+              <tr>
+                <td><input type="text" class="form-control" name="material_name[]" placeholder="e.g. Portland Cement" required></td>
+                <td><input type="number" class="form-control" name="quantity[]" placeholder="500" min="0.001" step="any" required></td>
+                <td><input type="text" class="form-control" name="unit[]" placeholder="bags" required></td>
+                <td><button type="button" class="btn btn-sm btn-outline-danger remove-row">✕</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="addRow">+ Add Material</button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary px-4">Start Sourcing →</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('addRow').addEventListener('click', function() {
+  const tbody = document.getElementById('materialRows');
+  const newRow = tbody.rows[0].cloneNode(true);
+  newRow.querySelectorAll('input').forEach(i => i.value = '');
+  tbody.appendChild(newRow);
+});
+document.getElementById('materialRows').addEventListener('click', function(e) {
+  if (e.target.classList.contains('remove-row')) {
+    const rows = document.querySelectorAll('#materialRows tr');
+    if (rows.length > 1) e.target.closest('tr').remove();
+  }
+});
+</script>
+{% endblock %}

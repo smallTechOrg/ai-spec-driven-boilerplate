@@ -1,50 +1,40 @@
 # Architecture
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved.
-
----
-
 ## System Overview
 
-<!-- FILL IN: One paragraph describing the system at a high level. Who/what interacts with it? -->
+The Sourcing Agent is a single Python service composed of:
+1. **FastAPI web layer** — serves the web UI (Jinja2 templates) and a JSON API
+2. **LangGraph agent** — a directed graph that runs the sourcing pipeline (intake → research → rank → report)
+3. **PostgreSQL database** — persists projects, material line items, sourcing runs, supplier candidates, and recommendations
+4. **LLM provider layer** — wraps Google Gemini; falls back to a stub when no API key is set
 
-## Component Map
+## Components
 
-<!-- FILL IN: List the major components and what each does. -->
-
-```
-[Component A]
-    ↓
-[Component B]   ←→   [External Service]
-    ↓
-[Component C]
-```
-
-## Layers
-
-<!-- FILL IN: Describe the layers of the system (e.g., API → Agent Loop → Tools → Storage). -->
-
-| Layer | Responsibility |
-|-------|----------------|
-| <!-- layer --> | <!-- responsibility --> |
+| Component | Technology | Role |
+|-----------|-----------|------|
+| Web server | FastAPI + Uvicorn | Serve UI + JSON API |
+| UI templates | Jinja2 | Project form, run status, report view |
+| Agent graph | LangGraph | Orchestrate sourcing pipeline nodes |
+| LLM provider | Google Gemini / Stub | Research and rank suppliers |
+| Database | PostgreSQL + SQLAlchemy + Alembic | Persist all state |
+| Config | Pydantic Settings | Environment variable management |
 
 ## Data Flow
 
-<!-- FILL IN: Walk through the main data flow from trigger to output. -->
+```
+User → Web Form → FastAPI → SourcingAgent.run()
+                                 ↓
+                         [LangGraph Graph]
+                         intake_node → research_node(per material) → rank_node → report_node
+                                 ↓
+                         PostgreSQL (run + recommendations saved)
+                                 ↓
+                         FastAPI → Jinja2 → Report Page → User
+```
 
-1. Trigger: <!-- how does the agent start? (cron, webhook, user input, etc.) -->
-2. <!-- step 2 -->
-3. <!-- step 3 -->
-4. Output: <!-- what does the agent produce? -->
+## Key Design Decisions
 
-## External Dependencies
-
-<!-- FILL IN: APIs, services, databases the agent depends on. -->
-
-| Dependency | Purpose | Failure Mode |
-|------------|---------|--------------|
-| <!-- name --> | <!-- what it does --> | <!-- what happens if it's down --> |
-
-## Deployment Model
-
-<!-- FILL IN: How does this run? (local script, cloud function, long-running service, etc.) -->
+- All agent state flows through a typed `AgentState` TypedDict (LangGraph standard)
+- LLM provider is selected at startup: `GEMINI_API_KEY` set → real provider; unset → stub
+- Each sourcing run is atomic: one `SourcingRun` row, with child `SupplierRecommendation` rows
+- The web UI polls `/api/runs/{run_id}/status` until run completes, then redirects to report

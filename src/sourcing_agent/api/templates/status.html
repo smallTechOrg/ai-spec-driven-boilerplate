@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Run Status — {{ project_name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6 text-center">
+    <h1 class="mb-1">{{ project_name }}</h1>
+    <p class="text-muted small">Run ID: {{ run_id }}</p>
+
+    <div id="statusCard" class="card mt-4 mb-4">
+      <div class="card-body py-5">
+        {% if run_status == "completed" %}
+          <div class="fs-1">✅</div>
+          <h4 class="mt-3 text-success">Sourcing Complete</h4>
+          <a href="/runs/{{ run_id }}/report" class="btn btn-success mt-3 px-4">View Recommendations →</a>
+        {% elif run_status == "failed" %}
+          <div class="fs-1">❌</div>
+          <h4 class="mt-3 text-danger">Run Failed</h4>
+          <p class="text-muted">Please try again or contact support.</p>
+          <a href="/" class="btn btn-outline-secondary mt-2">← New Project</a>
+        {% else %}
+          <div class="spinner-border text-primary mb-3" role="status"></div>
+          <h4 id="statusLabel">
+            {% if run_status == "pending" %}Queued…{% else %}Researching suppliers…{% endif %}
+          </h4>
+          <p class="text-muted small">This usually takes 10–30 seconds in stub mode.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <a href="/" class="text-muted small">← Start a new project</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if run_status not in ["completed", "failed"] %}
+<script>
+(function poll() {
+  fetch('/api/runs/{{ run_id }}/status')
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'completed') {
+        window.location.href = '/runs/{{ run_id }}/report';
+      } else if (data.status === 'failed') {
+        window.location.reload();
+      } else {
+        setTimeout(poll, 3000);
+      }
+    })
+    .catch(() => setTimeout(poll, 5000));
+})();
+</script>
+{% endif %}
+{% endblock %}

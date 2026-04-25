@@ -1,50 +1,61 @@
 # Architecture
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved.
-
----
-
 ## System Overview
 
-<!-- FILL IN: One paragraph describing the system at a high level. Who/what interacts with it? -->
+A single-process Python web app. The user submits a sourcing request via an HTML
+form; FastAPI persists a `Run` row, then invokes a LangGraph state machine that
+walks `research → enrich → score → finalize`. Each node reads/writes the run's
+state and persists intermediate artifacts (suppliers, recommendations) to
+PostgreSQL. When the graph terminates the user is redirected to a report page
+that renders the ranked recommendations from the DB.
 
 ## Component Map
 
-<!-- FILL IN: List the major components and what each does. -->
-
 ```
-[Component A]
-    ↓
-[Component B]   ←→   [External Service]
-    ↓
-[Component C]
+[Browser]
+   │ POST /requests (form)
+   ▼
+[FastAPI app]  ──►  [LangGraph runner]
+   │                    │
+   │                    ├─► research node  ──►  [Search provider: Tavily | stub]
+   │                    ├─► enrich node    ──►  [LLM provider: Gemini | stub]
+   │                    ├─► score node     ──►  [LLM provider: Gemini | stub]
+   │                    └─► finalize node
+   │                    │
+   ▼                    ▼
+[Jinja2 templates]   [PostgreSQL: runs, sourcing_requests, suppliers, recommendations]
 ```
 
 ## Layers
 
-<!-- FILL IN: Describe the layers of the system (e.g., API → Agent Loop → Tools → Storage). -->
-
 | Layer | Responsibility |
 |-------|----------------|
-| <!-- layer --> | <!-- responsibility --> |
+| `api/` | FastAPI routes — form handling, server-rendered HTML responses |
+| `graph/` | LangGraph state machine, nodes, edges, runner |
+| `tools/` | Pure functions wrapping search + LLM (research, enrich, score) |
+| `llm/` | Gemini provider + stub provider behind a common interface |
+| `search/` | Tavily provider + stub provider behind a common interface |
+| `db/` | SQLAlchemy models, session factory, init |
+| `domain/` | Pydantic models used at module boundaries |
+| `config/` | Pydantic Settings — env-driven, with `resolved_*` properties |
+| `prompts/` | Markdown prompt templates loaded at runtime |
 
-## Data Flow
+## Request Flow
 
-<!-- FILL IN: Walk through the main data flow from trigger to output. -->
+1. `GET /` — renders the new sourcing request form.
+2. `POST /requests` — validates input, creates `SourcingRequest` + `Run` rows,
+   invokes `run_agent(request_id)` synchronously (v0.1).
+3. The runner executes the graph. Stub mode returns canned data; real mode
+   calls Tavily then Gemini.
+4. Suppliers + recommendations are written; run status flips to `completed`
+   (or `failed` with `error_message`).
+5. User is redirected to `GET /runs/{run_id}` which renders the report.
 
-1. Trigger: <!-- how does the agent start? (cron, webhook, user input, etc.) -->
-2. <!-- step 2 -->
-3. <!-- step 3 -->
-4. Output: <!-- what does the agent produce? -->
+## Stub vs. Real Resolution
 
-## External Dependencies
-
-<!-- FILL IN: APIs, services, databases the agent depends on. -->
-
-| Dependency | Purpose | Failure Mode |
-|------------|---------|--------------|
-| <!-- name --> | <!-- what it does --> | <!-- what happens if it's down --> |
-
-## Deployment Model
-
-<!-- FILL IN: How does this run? (local script, cloud function, long-running service, etc.) -->
+`Settings.resolved_llm_provider` and `Settings.resolved_search_provider` are
+the single source of truth. Each is computed from `provider` (`auto | gemini |
+stub` / `auto | tavily | stub`) and the corresponding API key env var. The
+template context always carries `llm_provider` and `search_provider`; the
+base layout shows a yellow stub-mode banner whenever either resolves to
+`stub`.

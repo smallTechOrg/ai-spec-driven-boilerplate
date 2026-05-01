@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Lead Gen Agent{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  {% if llm_provider == "stub" %}
+    <div class="stub-banner" role="alert">
+      Stub LLM — offline demo output, not real AI. Set <code>GEMINI_API_KEY</code> for real results.
+    </div>
+  {% endif %}
+  <header>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/runs">Runs</a>
+      <a href="/leads">Leads</a>
+      <a href="/leads.csv">Download CSV</a>
+    </nav>
+    <h1>Lead Gen Agent</h1>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

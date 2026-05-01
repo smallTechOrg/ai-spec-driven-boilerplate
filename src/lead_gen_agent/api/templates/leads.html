@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Leads — Lead Gen Agent{% endblock %}
+{% block content %}
+<h2>Leads</h2>
+<form method="get" action="/leads" class="filters">
+  <label>Country
+    <select name="country">
+      <option value="">— any —</option>
+      {% for c in countries %}<option value="{{ c }}" {% if filters.country == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Industry <input name="industry" value="{{ filters.industry }}"></label>
+  <label>Size band
+    <select name="size_band">
+      <option value="">— any —</option>
+      {% for s in size_bands %}<option value="{{ s }}" {% if filters.size_band == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Min score <input name="min_score" type="number" min="0" max="100" value="{{ filters.min_score }}"></label>
+  <button type="submit">Filter</button>
+</form>
+
+{% if leads %}
+<p><a href="/leads.csv?country={{ filters.country }}&industry={{ filters.industry }}&size_band={{ filters.size_band }}&min_score={{ filters.min_score }}">Download filtered CSV</a></p>
+<table>
+  <thead><tr><th>Score</th><th>Name</th><th>Country</th><th>Industry</th><th>Size</th><th>City</th><th>Rationale</th></tr></thead>
+  <tbody>
+    {% for l in leads %}
+      <tr>
+        <td><strong>{{ l.score }}</strong></td>
+        <td>{% if l.website %}<a href="{{ l.website }}" target="_blank" rel="noopener">{{ l.name }}</a>{% else %}{{ l.name }}{% endif %}</td>
+        <td>{{ l.country }}</td>
+        <td>{{ l.industry }}</td>
+        <td>{{ l.size_band }}</td>
+        <td>{{ l.hq_city or "" }}</td>
+        <td>{{ l.rationale or "" }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No leads match these filters.</p>
+{% endif %}
+{% endblock %}

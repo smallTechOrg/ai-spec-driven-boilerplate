@@ -1,178 +1,89 @@
-# AI Agent Boilerplate — Spec-Driven, Zero-Shot to Working Agent
+# Lead Gen Agent
 
-This is a boilerplate for building AI agents spec-first. Give it a one-line idea. Walk away with a working, tested, phased agent.
+> **All commands run from the repo root** (`/Users/sai/Workspace/Code/ai-spec-driven-boilerplate`). Every shell block below assumes that working directory.
 
----
+Discovers small-to-medium European businesses likely lacking an in-house data function, scores them as prospects, and surfaces the ranked list with CSV export.
 
-## What This Is
-
-A starting point for anyone who wants to build an AI agent without writing boilerplate from scratch. The repo ships with:
-
-- A structured **spec template** covering product vision, architecture, capabilities, data model, API, and UI
-- An **agent-builder** sub-agent that orchestrates the full build lifecycle
-- Sub-agents for spec writing, reviewing, tech design, planning, and auditing
-- Engineering rules baked into the spec so every AI coding session is consistent
-- Phase-gated implementation — minimal working thing first, then iterative expansion
+Pipeline: `search → extract → score → persist` (LangGraph). Stub LLM by default; swap in Gemini by setting `GEMINI_API_KEY`.
 
 ---
 
-## How to Use This
+## Prerequisites
 
-### Step 1 — Clone and configure
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/)
+- PostgreSQL 14+ running locally
+- Two databases created (you can use any user/password — adjust `.env` accordingly):
 
 ```bash
-git clone https://github.com/smallTechOrg/ai-spec-driven-boilerplate.git my-agent
-cd my-agent
+# working dir: repo root
+createdb lead_gen_agent
+createdb lead_gen_agent_test
+```
+
+## Setup
+
+```bash
+# working dir: repo root
 cp .env.example .env
+# Edit .env so LEADGEN_DATABASE_URL points at your lead_gen_agent DB.
+
+uv sync
+uv run alembic upgrade head
+uv run alembic current   # must print a revision hash, not blank
 ```
 
-### Step 2 — Open in Claude Code (or any AI coding assistant)
+## Run the app
 
 ```bash
-claude
+# working dir: repo root
+uv run python -m lead_gen_agent
+# serves on http://localhost:8001
 ```
 
-### Step 3 — Kick off the agent builder with your idea
+Open http://localhost:8001, pick a country / industry / size band, and trigger a run. Results appear on `/leads`. CSV export at `/leads.csv`.
 
-```
-/build I want an agent that monitors my Shopify store for low-inventory products and automatically drafts restock emails to suppliers
-```
+Without `GEMINI_API_KEY` set, the app runs in **stub mode** and every page shows a visible stub banner. Set `GEMINI_API_KEY` in `.env` and restart to use real Gemini.
 
-Or just describe your idea naturally — the agent-builder will take it from there.
+## Test
 
----
+Point `LEADGEN_DATABASE_URL` at the `_test` database, then:
 
-## What Happens Next (Fully Automated)
-
-The **agent-builder** orchestrates this sequence:
-
-```
-Your idea
-    ↓
-[spec-writer]     → Asks clarifying questions → Drafts product spec
-    ↓
-[spec-reviewer]   → Checks coherence, flags gaps → Requests revisions
-    ↓
-[spec-writer]     → Iterates until spec is complete
-    ↓
-[tech-designer]   → Proposes tech stack, architecture, data model
-    ↓
-You approve the spec & tech design
-    ↓
-[planner]         → Breaks work into phases (minimal → complete)
-    ↓
-[plan-reviewer]   → Validates plan against spec
-    ↓
-Phase 1: Build the minimal working agent (core loop, no polish)
-    ↓
-[qa-auditor]      → Tests phase 1
-    ↓
-Phase 2, 3, ... : Iterate and expand
-    ↓
-[drift-auditor]   → Ensures code matches spec throughout
-    ↓
-Hand-off to you
+```bash
+# working dir: repo root
+LEADGEN_DATABASE_URL=postgresql+psycopg2://sai@localhost:5432/lead_gen_agent_test uv run pytest
 ```
 
-**Nothing is skipped.** If a phase fails QA, it stays in that phase until it passes.
+Tests hit real PostgreSQL (never SQLite, per repo rule 5). No `GEMINI_API_KEY` required — stub mode.
 
----
+## Health check
 
-## Development Phases (Default Model)
-
-| Phase | What Gets Built |
-|-------|-----------------|
-| 1 | Domain models + data layer |
-| 2 | Core agent loop (no integrations, stubbed tools) |
-| 3 | First real integration (the "happy path" end-to-end) |
-| 4 | Error handling, retries, resilience |
-| 5 | Remaining integrations |
-| 6 | API / CLI surface |
-| 7 | Basic UI (if needed) |
-| 8 | Integration tests |
-| 9 | Observability + logging |
-| 10 | Polish, documentation, hand-off |
-
-Each phase ends with a commit and passes QA before the next phase begins.
-
----
-
-## Repo Layout
-
-```
-.claude/
-  agents/           ← Sub-agents (agent-builder, spec-writer, etc.)
-  commands/         ← Slash commands (/build, /spec-check, /plan)
-.github/
-  copilot-instructions.md  ← Global Copilot instructions (mandatory spec reads)
-  agents/           ← Copilot agent mode definitions (drift-auditor, planner, etc.)
-  prompts/          ← Slash-style Copilot prompts (/plan, /challenge, /spec-check)
-  instructions/     ← Scoped auto-applied rules (code-style, secret-hygiene, etc.)
-spec/
-  product/          ← What your agent does (fill this in or let spec-writer do it)
-  engineering/      ← How AI agents should write code for this project (immutable rules)
-    workflows/      ← Step-by-step procedures for each agent/workflow type
-reports/
-  sessions/         ← Auto-generated session logs from every AI coding session
-CLAUDE.md           ← Entry point for Claude Code
-AGENTS.md           ← Entry point for OpenAI Codex / GitHub Copilot
-.env.example        ← Environment variable template
+```bash
+# working dir: repo root
+curl http://localhost:8001/health
+# {"status":"ok"}
 ```
 
----
+## Project layout
 
-## Manually Editing the Spec
+- `src/lead_gen_agent/` — the agent package
+  - `config/` — pydantic-settings (prefix `LEADGEN_`, `extra="ignore"`)
+  - `db/` — SQLAlchemy models + session + repository
+  - `domain/` — Pydantic models (`Filters`, `Candidate`, `Lead`, `Run`)
+  - `graph/` — LangGraph state, nodes, agent, runner
+  - `llm/` — `LLMClient` + Gemini + Stub providers
+  - `tools/search.py` — `SearchTool` protocol + DuckDuckGo + Stub
+  - `api/` — FastAPI routes, Jinja templates, static assets
+- `tests/unit/` — unit tests (CRUD, config)
+- `tests/integration/` — pipeline end-to-end + golden-path UI smoke
+- `alembic/` — migrations
+- `spec/` — product + engineering spec (read `CLAUDE.md` first)
+- `reports/sessions/` — per-session reports (see `reports/implementation-plan.md` for roadmap)
 
-If you prefer to write the spec yourself before involving AI:
+## Phase status
 
-1. Open `spec/product/01-vision.md` and fill in the placeholders
-2. Work through each file in `spec/product/` in order
-3. Once the spec is complete, run `/plan` to jump straight to the planning phase
+- **Phase 1** — domain models + Postgres schema: DONE
+- **Phase 2** — stubbed agent loop + FastAPI/Jinja UI + CSV export: DONE
+- **Phase 3+** — real Gemini + DuckDuckGo integration, resilience, enrichment, outreach: NOT STARTED
 
----
-
-## Rules That AI Agents Follow
-
-Every AI session in this repo follows the rules in `spec/engineering/ai-agents.md`:
-
-- Read the full spec before writing any code
-- Open a session report at `reports/sessions/`
-- Commit every logical unit of work (never accumulate uncommitted changes)
-- One phase at a time — no skipping
-- Write tests before marking a phase complete
-- Update this README whenever the project layout changes
-
----
-
-## FAQ
-
-**Can I use this without Claude Code?**
-Yes. `AGENTS.md` has the same entry point for OpenAI Codex and GitHub Copilot. The sub-agents are plain markdown files.
-
-**What if my agent needs a database?**
-The spec template includes a data model section. The tech-designer sub-agent will recommend the right database for your use case.
-
-**What if I already have a tech stack in mind?**
-Tell the agent-builder upfront: `/build [idea] — use Python + FastAPI + PostgreSQL`. It will skip the tech design Q&A for those decisions.
-
-**What if something breaks?**
-Each phase is resilient by design. The QA auditor will catch failures before the next phase starts. You can always re-run a phase.
-
----
-
-## Test-Branch Workflow
-
-The recommended way to iterate on this boilerplate:
-
-1. Keep `main` as the clean boilerplate — only spec, engineering rules, and agent config.
-2. For each build attempt, create a numbered test branch: `test-1`, `test-2`, etc.
-3. Give the agent-builder a single-line prompt on the test branch. Let it build.
-4. Review and test the result on that branch.
-5. **Never merge the generated application code back to main.** Test branches are disposable.
-6. If a run surfaces a boilerplate improvement (a clearer spec template, a missing rule), cherry-pick or manually apply that fix to `main`.
-
----
-
-## Contributing
-
-This is a boilerplate, not a framework. Improvements to the spec templates, engineering rules, agent definitions, or workflow specs belong on `main`. Generated application code does not.
+See `reports/implementation-plan.md`.

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Voices</h1>
+<p><a href="/voices/new">+ new voice</a></p>
+{% for v in voices %}
+  <div class="card"><strong>{{ v.name }}</strong><br/><span class="muted">{{ v.description }}</span></div>
+{% else %}
+  <p class="muted">No voices yet.</p>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>New article</h1>
+{% if not writers %}
+  <p class="error">Create a writer first. <a href="/writers/new">Create writer</a></p>
+{% else %}
+<form method="post" action="/articles">
+  <label>Writer
+    <select name="writer_id" required>
+      {% for w in writers %}<option value="{{ w.id }}">{{ w.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Topic<input type="text" name="topic" required /></label>
+  <label>Notes (optional)<textarea name="notes"></textarea></label>
+  <button type="submit">Generate article</button>
+  <p class="muted">Generation is synchronous — this may take up to a minute with a real provider.</p>
+</form>
+{% endif %}
+{% endblock %}

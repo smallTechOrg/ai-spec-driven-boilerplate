@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Articles</h1>
+<p><a href="/articles/new">+ new article</a></p>
+{% for a in articles %}
+  <div class="card"><a href="/articles/{{ a.id }}"><strong>{{ a.title }}</strong></a><br/>
+  <span class="muted">{{ a.topic }} — {{ a.created_at.strftime('%Y-%m-%d %H:%M') }}</span></div>
+{% else %}
+  <p class="muted">No articles yet.</p>
+{% endfor %}
+{% endblock %}

@@ -1,3 +1,134 @@
+# Food Tracker
+
+Upload a food photo in your browser and get an instant calorie + macro breakdown. Powered by Google Gemini Vision.
+
+> **All commands run from the repo root** (`ai-spec-driven-boilerplate/`).
+
+---
+
+## Quick Start
+
+### 1. Install dependencies
+
+```sh
+uv sync --extra dev
+```
+
+### 2. Create your `.env` file
+
+```sh
+cp .env.example .env
+```
+
+Edit `.env` and set at minimum:
+
+```
+FOOD_TRACKER_DATABASE_URL=postgresql://localhost/food_tracker
+FOOD_TRACKER_GEMINI_API_KEY=<your Google Gemini API key>
+```
+
+Leave `FOOD_TRACKER_GEMINI_API_KEY` blank to run in **stub/demo mode** — every analysis returns hardcoded data and a visible warning banner. No API key needed for testing.
+
+### 3. Create the databases
+
+```sh
+createdb food_tracker
+createdb food_tracker_test
+```
+
+### 4. Run migrations
+
+```sh
+uv run alembic upgrade head
+uv run alembic current
+```
+
+The second command should print the revision ID (e.g. `ba88f74aeae7 (head)`). Blank output = silent failure — check your `FOOD_TRACKER_DATABASE_URL`.
+
+### 5. Start the server
+
+```sh
+uv run python -m food_tracker
+```
+
+Open [http://localhost:8001](http://localhost:8001).
+
+---
+
+## Usage
+
+1. Go to [http://localhost:8001](http://localhost:8001)
+2. Select a JPEG, PNG, or HEIC food photo (max 10 MB)
+3. Click **Analyse**
+4. See food name, calories, protein, carbs, and fat
+
+---
+
+## Running Tests
+
+```sh
+TEST_DATABASE_URL=postgresql://localhost/food_tracker_test \
+FOOD_TRACKER_DATABASE_URL=postgresql://localhost/food_tracker_test \
+uv run pytest tests/ -v
+```
+
+All 15 tests pass. No API key needed.
+
+### Live Gemini test (optional — requires your API key)
+
+```sh
+FOOD_TRACKER_GEMINI_API_KEY=<your-key> \
+FOOD_TRACKER_DATABASE_URL=postgresql://localhost/food_tracker_test \
+uv run pytest tests/integration/test_gemini_live.py -v
+```
+
+---
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `FOOD_TRACKER_DATABASE_URL` | Yes | — | PostgreSQL connection string |
+| `FOOD_TRACKER_GEMINI_API_KEY` | No | — | Gemini key. Absent = stub/demo mode |
+| `FOOD_TRACKER_LLM_MODEL` | No | `gemini-2.0-flash` | Gemini model name |
+| `FOOD_TRACKER_PORT` | No | `8001` | HTTP port |
+| `TEST_DATABASE_URL` | No | `postgresql://localhost/food_tracker_test` | Used by pytest |
+
+---
+
+## Project Structure
+
+```
+src/food_tracker/
+  api/          FastAPI routes + app factory
+  config/       Settings (Pydantic BaseSettings)
+  db/           SQLAlchemy models + session
+  domain/       Pydantic domain models
+  graph/        Pipeline state, nodes, runner
+  llm/          LLM provider abstraction (Gemini + Stub)
+  observability/ Structured logging
+  templates/    Jinja2 HTML templates
+tests/
+  unit/         No DB, no network
+  integration/  Real PostgreSQL, stub LLM (or live Gemini)
+alembic/        DB migrations
+spec/           Product + engineering spec
+reports/        Session reports + implementation plan
+```
+
+---
+
+## Deferred / Future
+
+- Micronutrient breakdown (vitamins, minerals, sodium)
+- Daily totals dashboard and history
+- User authentication
+- Barcode / label scanning
+
+---
+
+---
+
 # AI Agent Boilerplate — Spec-Driven, Zero-Shot to Working Agent
 
 This is a boilerplate for building AI agents spec-first. Give it a one-line idea. Walk away with a working, tested, phased agent.

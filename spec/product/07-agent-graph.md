@@ -1,14 +1,76 @@
 # Agent Graph
 
-> **Boilerplate status:** Required when the project uses an agent framework (LangGraph, CrewAI, AutoGen, etc.). Filled in by the tech-designer sub-agent as part of the tech design stage.
->
-> If your project has no agent framework (e.g., it's a simple script or API), delete this file.
->
-> The spec-reviewer treats this file as a **CRITICAL BLOCKER** — the tech design will not be approved if this file is absent or incomplete when an agent framework is in use.
+> **Note:** Food Tracker uses a simple linear pipeline, not a framework like LangGraph or CrewAI. There is no `StateGraph`. This file documents the pipeline state and node sequence in the same format for reference.
+
+## State
+
+```python
+class FoodState(TypedDict):
+    # Identity
+    run_id: int                   # FoodLog.id assigned after DB insert
+
+    # Input
+    image_bytes: bytes            # Raw bytes of the uploaded photo
+    image_filename: str           # Original filename (for logging)
+
+    # Analysis output (populated by node_analyse_food)
+    food_name: str | None
+    calories_kcal: float | None
+    protein_g: float | None
+    carbs_g: float | None
+    fat_g: float | None
+    provider: str                 # "gemini" or "stub"
+
+    # Control
+    error: str | None             # Set by any node on fatal failure
+```
+
+## Nodes
+
+### `node_analyse_food`
+
+**Reads from state:** `image_bytes`, `image_filename`
+
+**Writes to state:** `food_name`, `calories_kcal`, `protein_g`, `carbs_g`, `fat_g`, `provider`
+
+**External calls:**
+
+| System | Operation | On Failure |
+|--------|-----------|------------|
+| LLMClient (Gemini or Stub) | Upload image bytes + prompt, parse JSON response | Set `error`, abort pipeline |
+
+**Behaviour:** Sends the image bytes and a structured prompt to the LLM provider. Parses the returned JSON into the four nutrition fields. If parsing fails, sets `error` and stops.
 
 ---
 
-## State
+### `node_save_log`
+
+**Reads from state:** `food_name`, `calories_kcal`, `protein_g`, `carbs_g`, `fat_g`, `provider`, `image_filename`
+
+**Writes to state:** `run_id`
+
+**External calls:**
+
+| System | Operation | On Failure |
+|--------|-----------|------------|
+| PostgreSQL | INSERT INTO food_logs | Set `error`, return HTTP 500 |
+
+**Behaviour:** Writes one `FoodLog` row to PostgreSQL. Sets `run_id` to the new row's PK.
+
+## Pipeline Topology
+
+```
+START
+  |
+  v
+node_analyse_food --(error)--> END (error state)
+  |
+  v
+node_save_log ------(error)--> END (error state)
+  |
+  v
+ END (success)
+```
 
 <!-- FILL IN: Define the agent's state type. Every field must be named and typed. -->
 

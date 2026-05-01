@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <form action="/analyze" method="post" enctype="multipart/form-data">
+    <div style="margin-bottom:1rem;">
+      <label for="photo" style="display:block;font-weight:600;margin-bottom:.5rem;">
+        Upload a food photo
+      </label>
+      <input
+        type="file"
+        id="photo"
+        name="photo"
+        accept="image/jpeg,image/png,image/heic"
+        required
+        style="width:100%;padding:.5rem;border:1px solid #d1d5db;border-radius:4px;"
+      >
+      <p style="margin-top:.5rem;font-size:.85rem;color:#6b7280;">
+        Supported formats: JPEG, PNG, HEIC. Max 10 MB.
+      </p>
+    </div>
+    <button
+      type="submit"
+      style="background:#2563eb;color:#fff;border:none;border-radius:6px;
+             padding:.6rem 1.4rem;font-size:1rem;cursor:pointer;width:100%;"
+    >
+      Analyse
+    </button>
+  </form>
+</div>
+{% endblock %}

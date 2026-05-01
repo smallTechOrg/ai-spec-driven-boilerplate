@@ -1,50 +1,50 @@
 # Architecture
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved.
-
----
-
 ## System Overview
 
-<!-- FILL IN: One paragraph describing the system at a high level. Who/what interacts with it? -->
+Food Tracker is a single-process FastAPI application. A user uploads a food photo through a browser form. The server passes the image bytes through a three-step linear pipeline: receive → analyse → save. The analysis step calls Google Gemini Vision (or a local stub in offline mode) and returns structured nutrition data. Results are rendered back to the browser on the same page, and every result is saved to a local PostgreSQL database.
 
 ## Component Map
 
-<!-- FILL IN: List the major components and what each does. -->
-
 ```
-[Component A]
-    ↓
-[Component B]   ←→   [External Service]
-    ↓
-[Component C]
+[Browser — upload form]
+        ↓  multipart/form-data POST
+[FastAPI router  /analyze]
+        ↓
+[Pipeline runner]
+        ↓                      ↓
+[node_analyse_food]     [node_save_log]
+        ↓                      ↓
+[LLMClient]           [PostgreSQL via SQLAlchemy]
+        ↓
+[Gemini Vision API]  (or StubProvider in demo mode)
 ```
 
 ## Layers
 
-<!-- FILL IN: Describe the layers of the system (e.g., API → Agent Loop → Tools → Storage). -->
-
 | Layer | Responsibility |
-|-------|----------------|
-| <!-- layer --> | <!-- responsibility --> |
+|-------|---------------|
+| HTTP (FastAPI routers) | Accept multipart upload, return rendered HTML response |
+| Pipeline (graph/runner.py) | Orchestrate node execution, carry state across steps |
+| LLM (llm/) | Abstract Gemini Vision calls behind a provider interface |
+| Domain (domain/) | Pydantic models for FoodLog, NutritionResult |
+| DB (db/) | SQLAlchemy models, Alembic migrations, session management |
+| Config (config/) | Pydantic BaseSettings, env var validation at startup |
 
 ## Data Flow
 
-<!-- FILL IN: Walk through the main data flow from trigger to output. -->
-
-1. Trigger: <!-- how does the agent start? (cron, webhook, user input, etc.) -->
-2. <!-- step 2 -->
-3. <!-- step 3 -->
-4. Output: <!-- what does the agent produce? -->
+1. **Trigger:** User submits a food photo via `POST /analyze`
+2. `node_analyse_food` passes image bytes to the LLM provider and parses the JSON response into a `NutritionResult`
+3. `node_save_log` writes a `FoodLog` row to PostgreSQL
+4. **Output:** FastAPI renders the result page with food name, calories, and macros
 
 ## External Dependencies
 
-<!-- FILL IN: APIs, services, databases the agent depends on. -->
-
 | Dependency | Purpose | Failure Mode |
 |------------|---------|--------------|
-| <!-- name --> | <!-- what it does --> | <!-- what happens if it's down --> |
+| Google Gemini Vision API | Identify food and estimate nutrition from the photo | Return HTTP 503 to the user; do not save a partial record |
+| PostgreSQL | Persist every analysis result | Return HTTP 500; log the error; do not silently discard |
 
 ## Deployment Model
 
-<!-- FILL IN: How does this run? (local script, cloud function, long-running service, etc.) -->
+Runs as a local long-running FastAPI service (`uv run python -m food_tracker`) on port 8001. No containerisation required for v0.1.

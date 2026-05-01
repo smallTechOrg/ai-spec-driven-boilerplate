@@ -1,178 +1,129 @@
-# AI Agent Boilerplate — Spec-Driven, Zero-Shot to Working Agent
+# Sourcing Agent
 
-This is a boilerplate for building AI agents spec-first. Give it a one-line idea. Walk away with a working, tested, phased agent.
+> **All commands run from the repo root.**
 
----
+An AI agent that helps real-estate / construction project teams source raw
+materials (bricks, cement, steel, sand, etc.). Submit a sourcing request via a
+web form — the agent researches suppliers, normalizes their offerings, scores
+them against your criteria, and renders a ranked recommendation report.
 
-## What This Is
-
-A starting point for anyone who wants to build an AI agent without writing boilerplate from scratch. The repo ships with:
-
-- A structured **spec template** covering product vision, architecture, capabilities, data model, API, and UI
-- An **agent-builder** sub-agent that orchestrates the full build lifecycle
-- Sub-agents for spec writing, reviewing, tech design, planning, and auditing
-- Engineering rules baked into the spec so every AI coding session is consistent
-- Phase-gated implementation — minimal working thing first, then iterative expansion
+The agent runs fully offline in **stub mode** (no API keys required) — the UI
+shows a clear banner when stubs are active. Set the API keys to use real
+providers; no other flag flip is needed.
 
 ---
 
-## How to Use This
+## Stack
 
-### Step 1 — Clone and configure
+- Python 3.12 + [uv](https://docs.astral.sh/uv/)
+- FastAPI + Jinja2 (server-rendered HTML)
+- LangGraph (research → enrich → score → finalize)
+- PostgreSQL (SQLAlchemy 2.0 + Alembic, psycopg2 driver)
+- LLM: **Gemini** via `google-genai` (stub fallback when no key)
+- Search: **Tavily** via `tavily-python` (stub fallback when no key)
+
+---
+
+## Prerequisites
+
+- Python 3.12+, `uv` installed
+- PostgreSQL 14+ running locally
+- Two databases created (one for the app, one for tests):
 
 ```bash
-git clone https://github.com/smallTechOrg/ai-spec-driven-boilerplate.git my-agent
-cd my-agent
+createdb sourcing
+createdb sourcing_test
+```
+
+---
+
+## Setup
+
+All commands below run from the **repo root**.
+
+```bash
+# 1. Install dependencies (app + dev)
+uv sync --extra dev
+
+# 2. Copy env template and edit if needed
 cp .env.example .env
+
+# 3. Apply database migrations
+uv run alembic upgrade head
+
+# 4. Verify migrations applied (must print a revision hash, not blank)
+uv run alembic current
 ```
 
-### Step 2 — Open in Claude Code (or any AI coding assistant)
+If `alembic current` prints nothing, the migration did not apply — fix
+`SOURCING_DATABASE_URL` in `.env` and try again.
+
+---
+
+## Run the app
 
 ```bash
-claude
+uv run python -m sourcing_agent
 ```
 
-### Step 3 — Kick off the agent builder with your idea
+Open <http://127.0.0.1:8000>. The form page lets you submit a sourcing
+request; you will be redirected to the ranked report at `/runs/<run_id>`.
 
-```
-/build I want an agent that monitors my Shopify store for low-inventory products and automatically drafts restock emails to suppliers
+Use **stub mode** (no keys) for an offline demo — every page shows a yellow
+"Demo / stub mode" banner. To switch to real providers, set both:
+
+```env
+SOURCING_GEMINI_API_KEY=...
+SOURCING_TAVILY_API_KEY=...
 ```
 
-Or just describe your idea naturally — the agent-builder will take it from there.
+The banner disappears automatically once both keys are set.
 
 ---
 
-## What Happens Next (Fully Automated)
+## Run the tests
 
-The **agent-builder** orchestrates this sequence:
-
-```
-Your idea
-    ↓
-[spec-writer]     → Asks clarifying questions → Drafts product spec
-    ↓
-[spec-reviewer]   → Checks coherence, flags gaps → Requests revisions
-    ↓
-[spec-writer]     → Iterates until spec is complete
-    ↓
-[tech-designer]   → Proposes tech stack, architecture, data model
-    ↓
-You approve the spec & tech design
-    ↓
-[planner]         → Breaks work into phases (minimal → complete)
-    ↓
-[plan-reviewer]   → Validates plan against spec
-    ↓
-Phase 1: Build the minimal working agent (core loop, no polish)
-    ↓
-[qa-auditor]      → Tests phase 1
-    ↓
-Phase 2, 3, ... : Iterate and expand
-    ↓
-[drift-auditor]   → Ensures code matches spec throughout
-    ↓
-Hand-off to you
+```bash
+# Tests use SOURCING_TEST_DATABASE_URL (defaults to sourcing_test on localhost).
+uv run pytest -v
 ```
 
-**Nothing is skipped.** If a phase fails QA, it stays in that phase until it passes.
+Expected: **10 passed**.
+
+The suite includes a golden-path UI smoke test that walks the full user
+journey (form → submit → report → recent-runs list) and asserts response
+content, not just status codes.
 
 ---
 
-## Development Phases (Default Model)
-
-| Phase | What Gets Built |
-|-------|-----------------|
-| 1 | Domain models + data layer |
-| 2 | Core agent loop (no integrations, stubbed tools) |
-| 3 | First real integration (the "happy path" end-to-end) |
-| 4 | Error handling, retries, resilience |
-| 5 | Remaining integrations |
-| 6 | API / CLI surface |
-| 7 | Basic UI (if needed) |
-| 8 | Integration tests |
-| 9 | Observability + logging |
-| 10 | Polish, documentation, hand-off |
-
-Each phase ends with a commit and passes QA before the next phase begins.
-
----
-
-## Repo Layout
+## Project layout
 
 ```
-.claude/
-  agents/           ← Sub-agents (agent-builder, spec-writer, etc.)
-  commands/         ← Slash commands (/build, /spec-check, /plan)
-.github/
-  copilot-instructions.md  ← Global Copilot instructions (mandatory spec reads)
-  agents/           ← Copilot agent mode definitions (drift-auditor, planner, etc.)
-  prompts/          ← Slash-style Copilot prompts (/plan, /challenge, /spec-check)
-  instructions/     ← Scoped auto-applied rules (code-style, secret-hygiene, etc.)
-spec/
-  product/          ← What your agent does (fill this in or let spec-writer do it)
-  engineering/      ← How AI agents should write code for this project (immutable rules)
-    workflows/      ← Step-by-step procedures for each agent/workflow type
-reports/
-  sessions/         ← Auto-generated session logs from every AI coding session
-CLAUDE.md           ← Entry point for Claude Code
-AGENTS.md           ← Entry point for OpenAI Codex / GitHub Copilot
-.env.example        ← Environment variable template
+src/sourcing_agent/
+├── api/         — FastAPI routes + Jinja templates wiring
+├── config/      — Pydantic Settings (env-driven; provider=auto resolution)
+├── db/          — SQLAlchemy 2.0 models, session factory
+├── domain/      — Pydantic models used at module boundaries
+├── graph/       — LangGraph state machine (state, nodes, edges, runner)
+├── llm/         — Gemini provider + stub provider
+├── search/      — Tavily provider + stub provider
+├── prompts/     — .md prompt templates loaded at runtime
+├── templates/   — base.html, form.html, report.html, runs.html
+└── tools/       — research / enrich / score (pure functions over providers)
+
+tests/
+├── unit/        — config, db models
+└── integration/ — end-to-end pipeline + golden-path UI smoke
 ```
 
 ---
 
-## Manually Editing the Spec
+## What's deferred (Future Phases)
 
-If you prefer to write the spec yourself before involving AI:
+- Multi-material concurrent sourcing per request
+- Persistent supplier knowledge base + dedup across runs
+- RFQ email drafting + response tracking
+- Scheduled re-sourcing (price/availability watch)
+- Auth + multi-org
 
-1. Open `spec/product/01-vision.md` and fill in the placeholders
-2. Work through each file in `spec/product/` in order
-3. Once the spec is complete, run `/plan` to jump straight to the planning phase
-
----
-
-## Rules That AI Agents Follow
-
-Every AI session in this repo follows the rules in `spec/engineering/ai-agents.md`:
-
-- Read the full spec before writing any code
-- Open a session report at `reports/sessions/`
-- Commit every logical unit of work (never accumulate uncommitted changes)
-- One phase at a time — no skipping
-- Write tests before marking a phase complete
-- Update this README whenever the project layout changes
-
----
-
-## FAQ
-
-**Can I use this without Claude Code?**
-Yes. `AGENTS.md` has the same entry point for OpenAI Codex and GitHub Copilot. The sub-agents are plain markdown files.
-
-**What if my agent needs a database?**
-The spec template includes a data model section. The tech-designer sub-agent will recommend the right database for your use case.
-
-**What if I already have a tech stack in mind?**
-Tell the agent-builder upfront: `/build [idea] — use Python + FastAPI + PostgreSQL`. It will skip the tech design Q&A for those decisions.
-
-**What if something breaks?**
-Each phase is resilient by design. The QA auditor will catch failures before the next phase starts. You can always re-run a phase.
-
----
-
-## Test-Branch Workflow
-
-The recommended way to iterate on this boilerplate:
-
-1. Keep `main` as the clean boilerplate — only spec, engineering rules, and agent config.
-2. For each build attempt, create a numbered test branch: `test-1`, `test-2`, etc.
-3. Give the agent-builder a single-line prompt on the test branch. Let it build.
-4. Review and test the result on that branch.
-5. **Never merge the generated application code back to main.** Test branches are disposable.
-6. If a run surfaces a boilerplate improvement (a clearer spec template, a missing rule), cherry-pick or manually apply that fix to `main`.
-
----
-
-## Contributing
-
-This is a boilerplate, not a framework. Improvements to the spec templates, engineering rules, agent definitions, or workflow specs belong on `main`. Generated application code does not.
+See `spec/product/01-vision.md` for the full v0.1 scope and out-of-scope list.

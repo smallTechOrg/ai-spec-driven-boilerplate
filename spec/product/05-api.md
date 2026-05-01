@@ -1,41 +1,28 @@
-# API
+# API / HTTP Surface
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent. Delete this file if the agent has no external API surface (e.g., it's a pure CLI tool or background worker).
+The app is server-rendered HTML. There are no JSON APIs in v0.1.
 
----
+## Routes
 
-## API Style
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/` | Render new sourcing request form |
+| POST | `/requests` | Create request + run, invoke agent, redirect to `/runs/{id}` |
+| GET | `/runs/{run_id}` | Render report (ranked recommendations + supplier details) |
+| GET | `/runs` | List recent runs (most recent first) |
+| GET | `/health` | Liveness probe — JSON `{"status": "ok"}` |
 
-<!-- FILL IN: REST / GraphQL / CLI / webhook / none -->
+## Form fields (POST /requests)
 
-## Endpoints / Commands
+- `material` (required, str)
+- `quantity` (required, str)
+- `location` (required, str)
+- `budget` (optional, str)
+- `timeline` (optional, str)
+- `criteria` (optional, str)
 
-<!-- FILL IN: One section per endpoint or command. -->
+## Error rendering
 
-### `<!-- METHOD /path or command name -->`
-
-**Purpose:** <!-- what this endpoint does -->
-
-**Request:**
-```json
-{
-  "<!-- field -->": "<!-- type and description -->"
-}
-```
-
-**Response:**
-```json
-{
-  "<!-- field -->": "<!-- type and description -->"
-}
-```
-
-**Error cases:**
-| Status | Condition |
-|--------|-----------|
-| 400 | <!-- bad input --> |
-| 500 | <!-- internal error --> |
-
-## Authentication
-
-<!-- FILL IN: How are API callers authenticated? -->
+Any node raising in the graph sets `run.status = "failed"` and
+`run.error_message`. The report page renders the error inline (red panel),
+not a 500.

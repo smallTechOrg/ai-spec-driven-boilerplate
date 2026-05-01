@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}Sourcing report &middot; Sourcing Agent{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-top:0">
+    Sourcing report
+    <span class="pill pill-{{ run.status }}">{{ run.status }}</span>
+  </h2>
+  <div class="rec-meta">
+    <strong>{{ run.request.material }}</strong> &middot;
+    {{ run.request.quantity }} &middot;
+    delivery in {{ run.request.location }}
+    {% if run.request.budget %} &middot; budget {{ run.request.budget }}{% endif %}
+    {% if run.request.timeline %} &middot; timeline {{ run.request.timeline }}{% endif %}
+  </div>
+  {% if run.request.criteria %}
+    <div class="rec-meta">Criteria: {{ run.request.criteria }}</div>
+  {% endif %}
+  <div class="rec-meta">Run ID: <code>{{ run.id }}</code></div>
+</div>
+
+{% if run.status == "failed" %}
+  <div class="error">
+    <strong>Run failed.</strong>
+    <div>{{ run.error_message }}</div>
+  </div>
+{% endif %}
+
+{% if run.recommendations %}
+<div class="card" style="padding:0; overflow:hidden;">
+  <table class="dossier" id="recs-table">
+    <thead>
+      <tr>
+        <th class="num" data-sort="num">#</th>
+        <th data-sort="text">Supplier</th>
+        <th data-sort="text">Location</th>
+        <th data-sort="text">Price</th>
+        <th data-sort="text">Lead time</th>
+        <th class="num" data-sort="num">Reviews</th>
+        <th data-sort="text">Reliability</th>
+        <th data-sort="text">Solvency</th>
+        <th data-sort="text">GST</th>
+        <th class="num" data-sort="num">Years</th>
+        <th class="num" data-sort="num" data-default-sort="desc">Score</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in run.recommendations %}
+      {% set s = item.supplier %}
+      <tr class="row-summary" data-target="d-{{ loop.index }}">
+        <td class="num">{{ item.rank }}</td>
+        <td><strong>{{ s.name }}</strong></td>
+        <td>{{ s.location or "—" }}</td>
+        <td>{{ s.price_indication or "—" }}</td>
+        <td>{{ s.lead_time or "—" }}</td>
+        <td class="num">
+          {% if s.google_rating is not none %}
+            <span class="rating">{{ "%.1f"|format(s.google_rating) }}★</span>
+            <span class="muted">({{ s.google_review_count or 0 }})</span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if s.delivery_reliability %}
+            {% set rel = s.delivery_reliability.split(' (')[0] %}
+            <span class="badge badge-{{ rel }}">{{ rel }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if s.solvency_signal %}
+            {% set sol = s.solvency_signal.split(' (')[0] %}
+            <span class="badge badge-{{ sol }}">{{ sol }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if s.gst_registered is not none %}
+            {% if s.gst_registered %}<span class="badge badge-stable">yes</span>{% else %}<span class="badge badge-weak">no</span>{% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td class="num">{{ s.years_in_business if s.years_in_business is not none else "—" }}</td>
+        <td class="num"><strong class="score-cell">{{ item.score }}</strong></td>
+        <td><button class="link-btn" type="button" data-toggle="d-{{ loop.index }}">details ▾</button></td>
+      </tr>
+      <tr class="row-detail" id="d-{{ loop.index }}" hidden>
+        <td colspan="12">
+          <div class="detail-grid">
+            <div>
+              <h4>Why this rank</h4>
+              <p>{{ item.rationale }}</p>
+            </div>
+            {% if s.feedback_summary %}
+            <div>
+              <h4>Customer feedback</h4>
+              <p>{{ s.feedback_summary }}</p>
+            </div>
+            {% endif %}
+            {% if s.delivery_reliability %}
+            <div>
+              <h4>Delivery reliability</h4>
+              <p>{{ s.delivery_reliability }}</p>
+            </div>
+            {% endif %}
+            {% if s.solvency_signal %}
+            <div>
+              <h4>Solvency</h4>
+              <p>{{ s.solvency_signal }}</p>
+            </div>
+            {% endif %}
+            {% if s.notes %}
+            <div>
+              <h4>Notes</h4>
+              <p>{{ s.notes }}</p>
+            </div>
+            {% endif %}
+            {% if s.source_url %}
+            <div>
+              <h4>Source</h4>
+              <p><a href="{{ s.source_url }}" target="_blank" rel="noopener">{{ s.source_url }}</a></p>
+            </div>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<style>
+  table.dossier { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.dossier thead th {
+    background: #f0f2f5; text-align: left; padding: 10px 12px;
+    border-bottom: 1px solid #d8dde4; font-weight: 600; cursor: pointer;
+    white-space: nowrap; user-select: none;
+  }
+  table.dossier thead th.num { text-align: right; }
+  table.dossier thead th[aria-sort="asc"]::after  { content: " ▲"; color: #0a66c2; }
+  table.dossier thead th[aria-sort="desc"]::after { content: " ▼"; color: #0a66c2; }
+  table.dossier tbody td { padding: 10px 12px; border-bottom: 1px solid #eef0f3; vertical-align: middle; }
+  table.dossier tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.dossier tbody tr.row-summary:hover { background: #fafbfc; }
+  table.dossier tbody tr.row-detail td { background: #fafbfc; }
+  .rating { color: #b88500; font-weight: 600; }
+  .muted  { color: #888; font-size: 12px; }
+  .score-cell { color: #0a66c2; font-size: 15px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; text-transform: capitalize; }
+  .badge-high, .badge-stable { background: #ddf4dd; color: #1a6c1a; }
+  .badge-mixed, .badge-unclear { background: #fff3cd; color: #8a6500; }
+  .badge-low, .badge-weak { background: #ffd9d9; color: #a0231a; }
+  .link-btn { background: none; border: none; color: #0a66c2; cursor: pointer; font-size: 13px; padding: 0; }
+  .link-btn:hover { text-decoration: underline; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 28px; padding: 8px 4px 14px; }
+  .detail-grid h4 { margin: 6px 0 4px; font-size: 13px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+  .detail-grid p { margin: 0; line-height: 1.5; font-size: 13.5px; }
+  @media (max-width: 700px) { .detail-grid { grid-template-columns: 1fr; } }
+</style>
+
+<script>
+(function () {
+  const table = document.getElementById('recs-table');
+  if (!table) return;
+
+  // Expand/collapse details
+  table.addEventListener('click', function (ev) {
+    const btn = ev.target.closest('[data-toggle]');
+    if (!btn) return;
+    const row = document.getElementById(btn.dataset.toggle);
+    if (!row) return;
+    const showing = !row.hasAttribute('hidden');
+    if (showing) { row.setAttribute('hidden', ''); btn.textContent = 'details ▾'; }
+    else         { row.removeAttribute('hidden');  btn.textContent = 'details ▴'; }
+  });
+
+  // Click-to-sort headers
+  const headers = table.tHead.rows[0].cells;
+  const tbody = table.tBodies[0];
+  function summaryRows() {
+    return Array.from(tbody.querySelectorAll('tr.row-summary'));
+  }
+  function detailRowFor(summary) {
+    const id = summary.dataset.target;
+    return id ? document.getElementById(id) : null;
+  }
+  function cellValue(tr, idx, type) {
+    const txt = tr.cells[idx].innerText.trim();
+    if (type === 'num') {
+      const n = parseFloat(txt.replace(/[^\d.\-]/g, ''));
+      return isNaN(n) ? -Infinity : n;
+    }
+    return txt.toLowerCase();
+  }
+  Array.from(headers).forEach((th, idx) => {
+    if (!th.dataset.sort) return;
+    th.addEventListener('click', () => {
+      const type = th.dataset.sort;
+      const cur = th.getAttribute('aria-sort');
+      const dir = cur === 'asc' ? 'desc' : 'asc';
+      Array.from(headers).forEach(h => h.removeAttribute('aria-sort'));
+      th.setAttribute('aria-sort', dir);
+
+      const rows = summaryRows().map(r => ({ summary: r, detail: detailRowFor(r) }));
+      rows.sort((a, b) => {
+        const av = cellValue(a.summary, idx, type);
+        const bv = cellValue(b.summary, idx, type);
+        if (av < bv) return dir === 'asc' ? -1 : 1;
+        if (av > bv) return dir === 'asc' ? 1 : -1;
+        return 0;
+      });
+      rows.forEach(({ summary, detail }) => {
+        tbody.appendChild(summary);
+        if (detail) tbody.appendChild(detail);
+      });
+    });
+  });
+
+  // Default sort: Score desc
+  const def = Array.from(headers).find(h => h.dataset.defaultSort === 'desc');
+  if (def) def.click();
+})();
+</script>
+{% elif run.status == "completed" %}
+  <div class="card">No suppliers were found for this request.</div>
+{% endif %}
+{% endblock %}

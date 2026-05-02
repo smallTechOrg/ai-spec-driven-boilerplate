@@ -1,43 +1,43 @@
 # Vision
 
-> **Boilerplate status:** This file contains placeholders. The spec-writer sub-agent will fill these in based on your idea. Run `/build [your idea]` to start, or fill in the placeholders manually.
-
----
-
 ## What This Agent Does
 
-<!-- FILL IN: One paragraph describing what this agent does, who uses it, and what problem it solves. -->
+The UP Police AI Workshop is a learning progress tracker and self-assessment tool for Uttar Pradesh Police staff. Officers self-register with their name and badge number, complete a 20-question self-assessment across four capability areas (AI Tools, Cybersecurity, Communication & Data Analytics, CCTV & Surveillance AI), and receive an auto-generated personalised 30-day learning plan with daily tasks and resource links. Officers track their progress through the plan marking days as Done, In Progress, or Not Started.
 
 ## Who Uses It
 
-<!-- FILL IN: Primary user(s). What is their role? What are they trying to accomplish? -->
+Uttar Pradesh Police officers and staff at all levels. Users may have little to no prior AI experience. They want structured, self-paced learning that builds practical AI literacy relevant to their work.
 
 ## Core Problem Being Solved
 
-<!-- FILL IN: What manual or broken process does this agent replace or improve? -->
+UP Police staff need to build AI literacy quickly and practically. There is no structured, accessible, self-paced learning path calibrated to individual skill levels. This tool replaces ad-hoc training by providing a personalised, trackable 30-day plan based on each officer's self-assessed starting point.
 
 ## Success Criteria
 
-<!-- FILL IN: How do we know the agent is working? List 3-5 measurable outcomes. -->
-
-- [ ] <!-- criterion 1 -->
-- [ ] <!-- criterion 2 -->
-- [ ] <!-- criterion 3 -->
+- [ ] An officer can self-register in under 1 minute with no password required
+- [ ] The 20-question assessment completes in under 5 minutes and generates a personalised plan instantly
+- [ ] The 30-day plan contains appropriate-level tasks for each of 4 capability areas
+- [ ] Progress can be tracked day by day with a visual progress bar
+- [ ] The app works entirely offline-capable (no external CSS/JS CDN dependencies)
 
 ## What This Agent Does NOT Do (Out of Scope)
 
-<!-- FILL IN: Explicit exclusions prevent scope creep. List things the agent will never do. -->
+- No LLM or AI calls in v0.1 — plan generation is rule-based
+- No password authentication — badge number is the identifier
+- No admin dashboard or reporting in v0.1
+- No email notifications or reminders
+- No multi-language support in v0.1
 
 ## Key Constraints
 
-<!-- FILL IN: Hard limits — budget, latency, compliance, API rate limits, etc. -->
+- Port 8001 (hard-coded)
+- Cookie-based sessions only (no JWT, no OAuth)
+- PostgreSQL only (no SQLite, no in-memory DB)
+- Self-contained: no external CSS/JS frameworks (works offline)
 
 ## Phases of Development
 
-<!-- FILL IN: High-level phases. The planner sub-agent will refine these into a detailed plan. -->
-
 | Phase | Description | Success Gate |
 |-------|-------------|--------------|
-| 1 | <!-- minimal working thing --> | <!-- test that proves it works --> |
-| 2 | <!-- next increment --> | <!-- test --> |
-| ... | | |
+| 1 | Domain models, database schema, plan generation logic | All unit tests pass; alembic upgrade head succeeds |
+| 2 | Web UI (FastAPI + Jinja2), full golden-path integration test, live server responding | All integration tests pass; curl /health and / return 200 |

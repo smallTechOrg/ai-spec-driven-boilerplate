@@ -18,7 +18,9 @@ Everything before code is collapsed into two steps: one intake round, one approv
 
 After intake and initial approval, **proceed autonomously** through all workflow phases (spec, tech design, planning, scaffold, build, QA) without pausing for user confirmation between phases.
 
-- All user-facing questions **must use dynamic question UI** (e.g., Copilot's `askQuestions`, Claude's UI tools). Never ask via plain chat unless no UI tool exists.
+- All user-facing questions **must use dynamic question UI**. Never ask via plain chat.
+  - **Claude Code:** call `ToolSearch` with `query: "select:AskUserQuestion"` to load the tool schema, then call `AskUserQuestion`. Do this before firing the intake round — if the tool is not loaded, the intake cannot begin.
+  - **Copilot:** use `askQuestions`.
 - Only pause if a **true blocker** is encountered (missing required API key, ambiguous spec, build gate failure that cannot be self-resolved) or the user **explicitly requests** a pause.
 - Never narrate "I will now do X" and wait. Just do X.
 
@@ -42,7 +44,8 @@ After intake and initial approval, **proceed autonomously** through all workflow
 When the user gives you an idea:
 
 1. Acknowledge in one sentence.
-2. Fire **one round** using dynamic question UI (Copilot `askQuestions` / Claude UI) — 4 questions. Do not do multiple rounds. The four questions are always:
+2. **Load the question UI tool first** — in Claude Code, call `ToolSearch` with `query: "select:AskUserQuestion"` before proceeding. Do not skip this step.
+3. Fire **one round** using `AskUserQuestion` (Claude Code) or `askQuestions` (Copilot) — 4 questions. Do not do multiple rounds. The four questions are always:
 
    **Q1 — MVP scope**
    "What's the absolute minimum this needs to do for you to call it working?"
@@ -111,7 +114,7 @@ Present everything to the user in **one message**:
 - Phase 2: [description] — gate: [specific pytest command]
 ```
 
-Ask one question via dynamic question UI:
+Ask one question via `AskUserQuestion` (Claude Code) or `askQuestions` (Copilot):
 > "Does this look right? I'll start building immediately after you confirm."
 > Options: **Start building** / **Adjust scope** / **Change the stack** / **Show me the full spec first**
 

@@ -84,7 +84,7 @@ function renderHeader(currentPage) {
   if (officer) {
     nav.innerHTML = `
       <span>${officer.name}</span>
-      <a href="/" onclick="logout(event)">Log out</a>
+      <a href="index.html" onclick="logout(event)">Log out</a>
     `;
   }
 }
@@ -94,7 +94,7 @@ function logout(e) {
   localStorage.removeItem(LS_OFFICER);
   localStorage.removeItem(LS_ASSESSMENT);
   localStorage.removeItem(LS_PLAN);
-  window.location.href = '/';
+  window.location.href = 'index.html';
 }
 
 // ─── Page: index ─────────────────────────────────────────────────────────────
@@ -148,25 +148,15 @@ function initIndex() {
 
 // ─── Page: assessment ────────────────────────────────────────────────────────
 
-async function initAssessment() {
+function initAssessment() {
   renderHeader();
   const officer = getOfficer();
-  if (!officer) { window.location.href = '/'; return; }
-
-  let appData;
-  try {
-    const res = await fetch('data/data.json');
-    appData = await res.json();
-  } catch {
-    document.getElementById('assessment-container').innerHTML =
-      '<p class="alert alert-info">Could not load assessment data. Make sure you are running via a local server.</p>';
-    return;
-  }
+  if (!officer) { window.location.href = 'index.html'; return; }
 
   document.getElementById('officer-name-display').textContent = officer.name;
 
   const container = document.getElementById('assessment-container');
-  const sections = appData.sections;
+  const sections = APP_DATA.sections;
 
   sections.forEach((section, sIdx) => {
     const sectionDiv = document.createElement('div');
@@ -207,8 +197,7 @@ async function initAssessment() {
     const scores = {};
     for (const [k, v] of fd.entries()) scores[k] = parseFloat(v);
 
-    // Validate all 20 answered
-    const allIds = sections.flatMap(s => s.questions.map(q => q.id));
+    const allIds = APP_DATA.sections.flatMap(s => s.questions.map(q => q.id));
     if (allIds.some(id => !scores[id])) {
       alert('Please rate all questions before submitting.');
       return;
@@ -228,26 +217,16 @@ async function initAssessment() {
 
 // ─── Page: plan ──────────────────────────────────────────────────────────────
 
-async function initPlan() {
+function initPlan() {
   renderHeader();
   const officer = getOfficer();
   const assessment = getAssessment();
   let plan = getPlan();
 
-  if (!officer) { window.location.href = '/'; return; }
+  if (!officer) { window.location.href = 'index.html'; return; }
   if (!assessment || !plan) { window.location.href = 'assessment.html'; return; }
 
-  let appData;
-  try {
-    const res = await fetch('data/data.json');
-    appData = await res.json();
-  } catch {
-    document.getElementById('plan-container').innerHTML =
-      '<p class="alert alert-info">Could not load task data. Make sure you are running via a local server.</p>';
-    return;
-  }
-
-  const tasks = appData.tasks;
+  const tasks = APP_DATA.tasks;
 
   // Officer info
   document.getElementById('plan-officer-name').textContent = officer.name;
@@ -264,7 +243,7 @@ async function initPlan() {
 
   // Score badges
   const badgesEl = document.getElementById('score-badges');
-  const sections = appData.sections;
+  const sections = APP_DATA.sections;
   sections.forEach(s => {
     const avg = assessment.averages[s.id];
     const levelCode = getLevelCode(avg);

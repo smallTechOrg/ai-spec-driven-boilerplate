@@ -6,17 +6,21 @@ AI Learn-to-Learn progress tracker for Uttar Pradesh Police staff.
 
 ## How to Run
 
-The app fetches `data/data.json`, so it must be served over HTTP (not opened as `file://`).
+Just open `index.html` in any browser — no server, no install.
 
-**Python (no install needed):**
-
-```bash
-python3 -m http.server 8001
+```
+double-click index.html
 ```
 
-Then open: http://localhost:8001
+## Updating Content
 
-Any static file server works — nginx, VS Code Live Server, etc.
+`data/data.json` is the source of truth. After editing it, regenerate `js/data.js`:
+
+```bash
+node scripts/build-data.js
+```
+
+Then refresh the browser.
 
 ## What It Does
 
@@ -28,12 +32,14 @@ Any static file server works — nginx, VS Code Live Server, etc.
 ## Files
 
 ```
-index.html          Landing page + registration
-assessment.html     20-question self-assessment
-plan.html           30-day plan dashboard
-css/style.css       Styles
-js/app.js           All app logic + localStorage handling
-data/data.json      Questions + 60 tasks (edit to customise content)
+index.html              Landing page + registration
+assessment.html         20-question self-assessment
+plan.html               30-day plan dashboard
+css/style.css           Styles
+js/data.js              Questions + tasks (generated — do not edit)
+js/app.js               All app logic + localStorage handling
+data/data.json          Source of truth — edit this, then run build script
+scripts/build-data.js   Converts data.json → js/data.js (requires Node.js)
 ```
 
 ## Customising Content

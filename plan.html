@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My 30-Day Plan — UP Police AI Workshop</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <div class="header-brand">
+      <span class="logo">🛡️</span>
+      <div>
+        <h1>UP Police AI Workshop</h1>
+        <p>Uttar Pradesh Police × smallTech.in</p>
+      </div>
+    </div>
+    <div class="header-user" id="header-nav"></div>
+  </header>
+
+  <main>
+    <div class="steps">
+      <div class="step done">1. Register</div>
+      <div class="step done">2. Self Assessment</div>
+      <div class="step active">3. 30-Day Plan</div>
+    </div>
+
+    <!-- Officer info -->
+    <div class="card" style="padding: 20px 28px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <div>
+          <div style="font-size:20px; font-weight:800;" id="plan-officer-name"></div>
+          <div style="font-size:13px; color:var(--text-muted);">Badge: <span id="plan-badge"></span></div>
+        </div>
+        <a href="assessment.html" class="btn btn-outline btn-sm">Retake Assessment</a>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="card">
+      <div class="progress-wrap">
+        <div class="progress-label">
+          <strong>Overall Progress</strong>
+          <span><span id="progress-done">0</span> / <span id="progress-total">30</span> days</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progress-bar" style="width:0%"></div>
+        </div>
+        <p style="font-size:12px; color:var(--text-muted); margin-top:6px;" id="progress-label"></p>
+      </div>
+
+      <div class="score-badges" id="score-badges"></div>
+    </div>
+
+    <!-- Today's task -->
+    <div class="card" style="border-left: 4px solid var(--navy);">
+      <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:12px;">TODAY'S TASK</div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px; flex-wrap:wrap;">
+        <span style="font-weight:700; font-size:13px; color:var(--navy);" id="today-day"></span>
+        <span id="today-area" style="font-size:13px;"></span>
+        <span class="level-pill" id="today-level" style="font-size:11px;"></span>
+        <span class="time-chip" id="today-time" style="margin-left:auto;"></span>
+      </div>
+      <p style="font-size:15px; font-weight:600; margin-bottom:4px;" id="today-task"></p>
+      <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;" id="today-resource"></p>
+      <button id="today-mark-done" class="btn btn-navy btn-sm">Mark as Done ✅</button>
+    </div>
+
+    <!-- Full plan table -->
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div style="padding:20px 24px 16px; border-bottom:1px solid var(--border);">
+        <h3 style="font-size:16px; font-weight:700;">Full 30-Day Plan</h3>
+        <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Update each day's status using the dropdown. Changes save instantly.</p>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="plan-table">
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Focus Area</th>
+              <th>Level</th>
+              <th>Task</th>
+              <th>Time</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="plan-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/app.js"></script>
+  <script>initPlan();</script>
+</body>
+</html>

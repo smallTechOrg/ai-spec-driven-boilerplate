@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Self Assessment — UP Police AI Workshop</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <div class="header-brand">
+      <span class="logo">🛡️</span>
+      <div>
+        <h1>UP Police AI Workshop</h1>
+        <p>Uttar Pradesh Police × smallTech.in</p>
+      </div>
+    </div>
+    <div class="header-user" id="header-nav"></div>
+  </header>
+
+  <main>
+    <div class="page-title">
+      <h2>Self Assessment</h2>
+      <p>Rate yourself honestly — this generates your personalised 30-Day Plan. Logged in as: <strong id="officer-name-display"></strong></p>
+    </div>
+
+    <div class="steps">
+      <div class="step done">1. Register</div>
+      <div class="step active">2. Self Assessment</div>
+      <div class="step">3. 30-Day Plan</div>
+    </div>
+
+    <div class="alert alert-info">
+      Rate yourself <strong>1–5</strong> for each statement. <strong>1</strong> = No experience &nbsp;·&nbsp; <strong>3</strong> = Some experience &nbsp;·&nbsp; <strong>5</strong> = Confident / Expert. Be honest — your plan adapts to your level.
+    </div>
+
+    <form id="assessment-form">
+      <div id="assessment-container"></div>
+
+      <div class="card" style="text-align:center; padding: 24px;">
+        <p style="font-size:14px; color:var(--text-muted); margin-bottom:16px;">All 20 questions answered? Your 30-Day Plan will be generated immediately.</p>
+        <button type="submit" class="btn btn-primary" style="font-size:16px; padding:13px 32px;">
+          Generate My 30-Day Plan →
+        </button>
+      </div>
+    </form>
+  </main>
+
+  <script src="js/app.js"></script>
+  <script>initAssessment();</script>
+</body>
+</html>

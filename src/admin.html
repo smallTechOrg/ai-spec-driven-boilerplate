@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Curriculum Admin — UP Police AI Workshop</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Admin-specific styles */
+    .setup-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+    }
+    .setup-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+    .setup-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+
+    .file-pick-row { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; flex-wrap: wrap; }
+    .file-status { font-size: 13px; color: var(--text-muted); }
+    .file-status.ok { color: var(--green); font-weight: 600; }
+
+    .setup-done { border-color: var(--green); background: var(--green-bg); }
+    .setup-done h3::after { content: ' — files loaded'; color: var(--green); font-weight: 400; font-size: 13px; }
+
+    /* Main tabs */
+    .main-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 24px; }
+    .main-tab-btn {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.15s;
+    }
+    .main-tab-btn.active { color: var(--navy); border-bottom-color: var(--navy); }
+    .main-tab-btn:hover { color: var(--navy); }
+
+    /* Area / level nav */
+    .sub-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .tab-btn {
+      padding: 7px 14px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.12s;
+    }
+    .tab-btn:hover { border-color: var(--navy); color: var(--navy); }
+    .tab-btn.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+    /* Admin fields */
+    .admin-section-card { margin-bottom: 16px; }
+    .admin-field-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .admin-field-row-short { align-items: center; }
+    .admin-field-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      width: 80px;
+      flex-shrink: 0;
+    }
+    .admin-input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: 14px;
+      background: #fff;
+      transition: border-color 0.15s;
+    }
+    .admin-input:focus { outline: none; border-color: var(--navy); }
+    .admin-input-short { flex: 0 0 80px; }
+
+    /* Task cards */
+    .admin-task-card { padding: 16px 20px; margin-bottom: 12px; }
+    .admin-task-num {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .task-key {
+      background: var(--grey-bg);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-muted);
+    }
+    .admin-tasks-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      color: var(--navy);
+    }
+
+    /* Save bar */
+    #save-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--navy);
+      color: #fff;
+      padding: 14px 28px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      z-index: 200;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.2);
+    }
+    #save-bar p { font-size: 13px; opacity: 0.7; margin: 0; }
+    #save-confirm {
+      display: none;
+      color: #a5d6a7;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    #error-bar {
+      display: none;
+      background: #fdecea;
+      border-left: 4px solid #c62828;
+      color: #c62828;
+      padding: 12px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    /* Bottom padding so save bar doesn't cover content */
+    main { padding-bottom: 80px; }
+
+    .browser-note {
+      background: #fff8e1;
+      border-left: 4px solid #f9a825;
+      padding: 12px 16px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #6d4c00;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-brand">
+      <img src="images/up-police-logo.png" alt="Uttar Pradesh Police" class="logo-up">
+      <div class="header-divider"></div>
+      <div>
+        <h1>AI Workshop</h1>
+        <p>Curriculum Admin</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <img src="images/smalltech-white-logo.png" alt="smallTech" class="logo-smalltech">
+      <span class="logo-smalltech-label">smallTech</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-title">
+      <h2>Curriculum Editor</h2>
+      <p>Edit questions and tasks. Changes save directly to <code>data.json</code> and <code>data.js</code>.</p>
+    </div>
+
+    <div class="browser-note">
+      ⚠️ Requires <strong>Chrome or Edge</strong> — the File System Access API is not supported in Firefox or Safari.
+    </div>
+
+    <div id="error-bar"></div>
+
+    <!-- Step 1: Open files -->
+    <div class="setup-card" id="setup-section">
+      <h3>Step 1 — Open files</h3>
+      <p>Select both files from your <code>src/</code> folder. You'll need write permission for each.</p>
+
+      <div class="file-pick-row">
+        <button class="btn btn-navy btn-sm" onclick="openJsonFile()">📂 Open data.json</button>
+        <span class="file-status" id="json-status">—</span>
+      </div>
+      <div class="file-pick-row">
+        <button class="btn btn-navy btn-sm" onclick="openJsFile()">📂 Open data.js</button>
+        <span class="file-status" id="js-status">—</span>
+      </div>
+    </div>
+
+    <!-- Editor (shown after both files loaded) -->
+    <div id="editor-section" style="display:none">
+
+      <!-- Main tabs -->
+      <div class="main-tabs">
+        <button class="main-tab-btn" data-tab="questions" onclick="switchTab('questions')">🎯 Questions</button>
+        <button class="main-tab-btn" data-tab="tasks" onclick="switchTab('tasks')">📅 Tasks</button>
+      </div>
+
+      <!-- Questions tab -->
+      <div id="tab-questions">
+        <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">
+          Edit the 20 assessment question texts. Do not change the meaning — scoring logic is based on the same 1–5 scale.
+        </p>
+        <div id="questions-editor"></div>
+      </div>
+
+      <!-- Tasks tab -->
+      <div id="tab-tasks" style="display:none">
+        <p style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">
+          Select an area and level to edit the 5 tasks for that combination. All 60 tasks are editable.
+        </p>
+
+        <div style="margin-bottom:8px; font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.4px;">Focus Area</div>
+        <div class="sub-nav" id="area-nav"></div>
+
+        <div style="margin-bottom:8px; font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.4px;">Level</div>
+        <div class="sub-nav" id="level-nav"></div>
+
+        <div id="tasks-editor"></div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Sticky save bar -->
+  <div id="save-bar">
+    <p>Saves to both <code>data.json</code> and <code>data.js</code> — refresh the app to see changes.</p>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <span id="save-confirm">✅ Saved successfully</span>
+      <button class="btn btn-primary" onclick="saveFiles()">💾 Save Changes</button>
+    </div>
+  </div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>

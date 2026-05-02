@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}UP Police AI Workshop — AI Learn-to-Learn{% endblock %}
+
+{% block extra_style %}
+<style>
+    .hero {
+        text-align: center;
+        padding: 4rem 2rem;
+    }
+    .hero h1 {
+        font-size: 2.2rem;
+        color: #1a2a4a;
+        margin-bottom: 0.5rem;
+        line-height: 1.3;
+    }
+    .hero .subtitle {
+        font-size: 1.1rem;
+        color: #636e72;
+        margin-bottom: 2rem;
+    }
+    .hero .tagline {
+        font-size: 0.95rem;
+        color: #95a5a6;
+        margin-bottom: 2.5rem;
+    }
+    .hero-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.2rem;
+        margin-top: 3rem;
+    }
+    .feature-card {
+        background: #fff;
+        border-radius: 10px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+    .feature-card .icon { font-size: 2rem; margin-bottom: 0.6rem; }
+    .feature-card h3 { font-size: 1rem; color: #1a2a4a; margin-bottom: 0.4rem; }
+    .feature-card p { font-size: 0.88rem; color: #636e72; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <div class="hero-icon">🚔</div>
+    <h1>UP Police AI Workshop</h1>
+    <p class="subtitle">AI Learn-to-Learn</p>
+    <p class="tagline">Uttar Pradesh Police &times; smallTech.in</p>
+
+    <a href="/register" class="btn btn-primary" style="font-size: 1.1rem; padding: 0.9rem 2.5rem;">
+        Start / Continue Learning &rarr;
+    </a>
+</div>
+
+<div class="feature-grid">
+    <div class="feature-card">
+        <div class="icon">📋</div>
+        <h3>Self-Assessment</h3>
+        <p>20 questions across 4 areas to measure your current AI literacy level</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">📅</div>
+        <h3>30-Day Plan</h3>
+        <p>Personalised daily tasks matched to your skill level — Beginner, Intermediate, or Advanced</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">📊</div>
+        <h3>Progress Tracking</h3>
+        <p>Mark each day as Done, In Progress, or Not Started and watch your progress grow</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">🔐</div>
+        <h3>Simple Login</h3>
+        <p>No password needed — just your name and badge number to get started</p>
+    </div>
+</div>
+{% endblock %}

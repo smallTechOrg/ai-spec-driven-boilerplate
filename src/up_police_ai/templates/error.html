@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Error — UP Police AI Workshop{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 500px; margin: 3rem auto; text-align: center;">
+    <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+    <h2 style="color: #c0392b; margin-bottom: 0.5rem;">Something went wrong</h2>
+    <p style="color: #636e72; margin-bottom: 1.5rem;">
+        {% if detail %}{{ detail }}{% else %}An unexpected error occurred. Please try again.{% endif %}
+    </p>
+    <a href="/" class="btn btn-primary">← Back to Home</a>
+</div>
+{% endblock %}

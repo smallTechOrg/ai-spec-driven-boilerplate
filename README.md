@@ -6,15 +6,15 @@ AI Learn-to-Learn progress tracker for Uttar Pradesh Police staff.
 
 ## How to Run
 
-Just open `index.html` in any browser — no server, no install.
+Just open `src/index.html` in any browser — no server, no install.
 
 ```
-double-click index.html
+double-click src/index.html
 ```
 
 ## Updating Content
 
-`data/data.json` is the source of truth. After editing it, regenerate `js/data.js`:
+`src/data/data.json` is the source of truth. After editing it, regenerate `src/js/data.js`:
 
 ```bash
 node scripts/build-data.js
@@ -32,19 +32,21 @@ Then refresh the browser.
 ## Files
 
 ```
-index.html              Landing page + registration
-assessment.html         20-question self-assessment
-plan.html               30-day plan dashboard
-css/style.css           Styles
-js/data.js              Questions + tasks (generated — do not edit)
-js/app.js               All app logic + localStorage handling
-data/data.json          Source of truth — edit this, then run build script
-scripts/build-data.js   Converts data.json → js/data.js (requires Node.js)
+src/
+├── index.html          Landing page + registration
+├── assessment.html     20-question self-assessment
+├── plan.html           30-day plan dashboard
+├── css/style.css       Styles
+├── js/data.js          Questions + tasks (generated — do not edit directly)
+├── js/app.js           All app logic + localStorage handling
+└── data/data.json      Source of truth — edit this, then run build script
+scripts/
+└── build-data.js       Converts src/data/data.json → src/js/data.js (requires Node.js)
 ```
 
 ## Customising Content
 
-Edit `data/data.json` to change questions or tasks. Task keys follow the format:
+Edit `src/data/data.json` to change questions or tasks. Task keys follow the format:
 `{area}_{level}_{index}` — e.g. `A_B_0` = AI Tools · Beginner · task 0.
 
 ## Skill Areas & Levels

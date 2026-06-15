@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ dataset.filename }} — Data Analysis Agent{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ dataset.filename }}</h1>
+  {% if dataset.row_count is not none %}
+  <p class="meta">{{ dataset.row_count }} rows</p>
+  {% endif %}
+  {% if dataset.column_names %}
+  <p style="margin-top:0.75rem;margin-bottom:0.5rem;font-weight:500;">Columns</p>
+  <div style="margin-bottom:1rem;">
+    {% for col in dataset.column_names %}
+    <span class="tag">{{ col }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Ask a question</h2>
+  <form action="/datasets/{{ dataset.id }}/query" method="post">
+    <textarea name="question" placeholder="e.g. What is the average sales per region?" required></textarea>
+    <button type="submit" class="btn">Ask</button>
+  </form>
+</div>
+
+<p><a href="/datasets/{{ dataset.id }}/history">View query history</a></p>
+{% endblock %}

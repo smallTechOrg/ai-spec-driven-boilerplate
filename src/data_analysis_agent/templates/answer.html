@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Answer — Data Analysis Agent{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin-bottom:0.4rem;">Question</h2>
+  <p style="font-style:italic;color:#333;">{{ query_record.question }}</p>
+</div>
+
+<div class="card">
+  <h2 style="margin-bottom:0.75rem;">Answer</h2>
+  <pre>{{ query_record.answer }}</pre>
+</div>
+
+<p>
+  <a href="/datasets/{{ dataset.id }}">&larr; Ask another question</a>
+  &nbsp;&middot;&nbsp;
+  <a href="/datasets/{{ dataset.id }}/history">View history</a>
+</p>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}History — {{ dataset.filename }} — Data Analysis Agent{% endblock %}
+{% block content %}
+<h1 style="margin-bottom:1.25rem;">Query History — {{ dataset.filename }}</h1>
+
+{% if records %}
+{% for rec in records %}
+<div class="card">
+  <p style="font-weight:500;margin-bottom:0.3rem;">{{ rec.question }}</p>
+  {% if rec.answer %}
+  <pre style="margin-top:0.5rem;">{{ rec.answer }}</pre>
+  {% elif rec.status == "failed" %}
+  <p style="color:#c00;">Error: {{ rec.error_message }}</p>
+  {% else %}
+  <p style="color:#999;">Pending…</p>
+  {% endif %}
+  <p class="meta" style="margin-top:0.5rem;">{{ rec.created_at }}</p>
+</div>
+{% endfor %}
+{% else %}
+<div class="card">
+  <p>No queries yet.</p>
+</div>
+{% endif %}
+
+<p><a href="/datasets/{{ dataset.id }}">&larr; Ask a question</a></p>
+{% endblock %}

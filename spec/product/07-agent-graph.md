@@ -1,67 +1,111 @@
 # Agent Graph
 
-> **Boilerplate status:** Required when the project uses an agent framework (LangGraph, CrewAI, AutoGen, etc.). Filled in by the tech-designer sub-agent as part of the tech design stage.
->
-> If your project has no agent framework (e.g., it's a simple script or API), delete this file.
->
-> The spec-reviewer treats this file as a **CRITICAL BLOCKER** — the tech design will not be approved if this file is absent or incomplete when an agent framework is in use.
-
----
-
 ## State
 
-<!-- FILL IN: Define the agent's state type. Every field must be named and typed. -->
-
 ```python
-class AgentState(TypedDict):
+class AgentState(TypedDict, total=False):
     # Identity
-    run_id: int
-    # ... add all fields
+    run_id: str
+    query_record_id: str
+    dataset_id: str
 
-    # Pipeline data (populated progressively by nodes)
-    # ...
+    # Pipeline data
+    question: str
+    csv_path: str
+    column_names: list[str]
+    row_count: int
+    data_sample: str        # first 5 rows as CSV string, for context
+    answer: str             # populated by analyze node
 
     # Control
-    error: str | None   # set by any node on fatal failure
+    error: str | None
 ```
 
 ---
 
 ## Nodes
 
-<!-- FILL IN: One section per node. -->
+### `load_data`
 
-### `node_[name]`
+**Reads from state:** `csv_path`, `dataset_id`
 
-**Reads from state:** <!-- field names -->
-
-**Writes to state:** <!-- field names -->
+**Writes to state:** `column_names`, `row_count`, `data_sample`
 
 **External calls:**
 
 | System | Operation | On Failure |
 |--------|-----------|------------|
-| <!-- system --> | <!-- what it calls --> | <!-- fatal (set error) or partial (log and continue) --> |
+| Local filesystem | Read CSV with pandas | Fatal — set `error`, route to `handle_error` |
 
-**Behaviour:** <!-- one paragraph describing what this node does -->
+**Behaviour:** Reads the CSV file from disk using pandas. Extracts column names, row count, and the first 5 rows as a CSV string for LLM context. Writes these to state.
+
+---
+
+### `analyze`
+
+**Reads from state:** `question`, `column_names`, `data_sample`, `run_id`
+
+**Writes to state:** `answer`
+
+**External calls:**
+
+| System | Operation | On Failure |
+|--------|-----------|------------|
+| Google Gemini (or stub) | Chat completion with schema + question | Fatal — set `error`, route to `handle_error` |
+
+**Behaviour:** Constructs a prompt containing the column names, a sample of the data, and the user's question. Sends to Gemini (or stub). Writes the plain-text answer to state.
+
+Stub tag injected into prompt: `<node:analyze>`
+
+---
+
+### `finalize`
+
+**Reads from state:** `run_id`, `query_record_id`, `answer`
+
+**Writes to state:** _(none — side-effects only)_
+
+**External calls:**
+
+| System | Operation | On Failure |
+|--------|-----------|------------|
+| SQLite | Update QueryRecord status=completed, write answer | Fatal — set `error` |
+| SQLite | Update AgentRun status=completed | Fatal — set `error` |
+
+**Behaviour:** Persists the answer to the QueryRecord. Updates AgentRun to `completed`.
+
+---
+
+### `handle_error`
+
+**Reads from state:** `error`, `run_id`, `query_record_id`
+
+**Writes to state:** _(none — side-effects only)_
+
+**External calls:**
+
+| System | Operation | On Failure |
+|--------|-----------|------------|
+| SQLite | Update QueryRecord status=failed, error_message | Best-effort |
+| SQLite | Update AgentRun status=failed, error_message | Best-effort |
+
+**Behaviour:** Persists failure state to the database. Logs error with run_id context. Terminates graph.
 
 ---
 
 ## Edge Topology
 
-<!-- FILL IN: ASCII diagram of node flow. Show conditional edges explicitly. -->
-
 ```
 START
   │
   ▼
-node_a ──(error)──► node_handle_error ──► END
+load_data ──(error)──► handle_error ──► END
   │
   ▼
-node_b
+analyze ──(error)──► handle_error
   │
   ▼
-node_finalize
+finalize ──(error)──► handle_error
   │
   ▼
 END
@@ -69,50 +113,24 @@ END
 
 ---
 
-## Error Handler Node (`node_handle_error`)
-
-<!-- FILL IN: What happens when a fatal error occurs. -->
-
-- Reads: `state.error`, `state.run_id`
-- Updates DB: run status → "failed", error_message, completed_at
-- Logs error with run_id context
-- Terminates graph
-
----
-
-## Finalize Node (`node_finalize`)
-
-<!-- FILL IN: How a successful run is closed out. -->
-
-- Reads: `state.run_id`, `state.completed_*`, `state.failed_*`
-- Updates DB: run status → "completed", posts_completed count, completed_at
-- Logs run summary
-
----
-
-## Graph Assembly (`agent/graph.py`)
-
-<!-- FILL IN: Pseudocode showing how nodes and edges are wired. Must be ≤ 60 lines in the real file. -->
+## Graph Assembly
 
 ```python
 graph = StateGraph(AgentState)
 
-graph.add_node("node_a", node_a)
-graph.add_node("node_b", node_b)
-graph.add_node("finalize", node_finalize)
-graph.add_node("handle_error", node_handle_error)
+graph.add_node("load_data", load_data)
+graph.add_node("analyze", analyze)
+graph.add_node("finalize", finalize)
+graph.add_node("handle_error", handle_error)
 
-graph.set_entry_point("node_a")
+graph.set_entry_point("load_data")
 
-# Conditional edges after nodes that can produce fatal errors
-graph.add_conditional_edges(
-    "node_a",
-    lambda s: "handle_error" if s.get("error") else "node_b",
-)
-
-# Unconditional edges
-graph.add_edge("node_b", "finalize")
-graph.add_edge("finalize", END)
+graph.add_conditional_edges("load_data", after_load_data,
+    {"analyze": "analyze", "handle_error": "handle_error"})
+graph.add_conditional_edges("analyze", after_analyze,
+    {"finalize": "finalize", "handle_error": "handle_error"})
+graph.add_conditional_edges("finalize", after_finalize,
+    {"end": END, "handle_error": "handle_error"})
 graph.add_edge("handle_error", END)
 
 compiled_graph = graph.compile()
@@ -122,8 +140,5 @@ compiled_graph = graph.compile()
 
 ## Concurrency Model
 
-<!-- FILL IN: How concurrent runs are handled. -->
-
-- **One run at a time** (enforced at API layer — returns 409 if a run is already active)
-- OR: **Parallel nodes** within a single run (describe which nodes run in parallel and why)
-- **Checkpointing:** <!-- none / SqliteSaver / PostgresSaver — and when it's needed -->
+- One query runs at a time per user request (HTTP request per query, synchronous).
+- No checkpointing in v0.1.

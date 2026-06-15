@@ -1,58 +1,67 @@
 # Tech Stack
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved. The user may override specific choices before the tech-designer is invoked.
-
----
-
 ## Language
 
-<!-- FILL IN: e.g., Python 3.12 / TypeScript 5 / Go 1.22 -->
+**Python 3.12**
 
-**Why:** <!-- reason for this choice -->
+**Why:** User-specified. Best ecosystem for data manipulation (pandas) and AI/LLM libraries.
 
 ## Agent Framework
 
-<!-- FILL IN: e.g., LangGraph / CrewAI / AutoGen / custom / none -->
+**LangGraph 0.2+**
 
-**Why:** <!-- reason for this choice -->
+**Why:** Structured state machine for the CSV-parse → analyze → finalize pipeline. Makes error routing explicit.
 
 ## LLM Provider
 
-<!-- FILL IN: e.g., Anthropic Claude / OpenAI GPT / Google Gemini -->
+**Google Gemini via `google-genai` SDK**
 
-**Model:** <!-- specific model, e.g., claude-sonnet-4-6 -->
+**Model:** `gemini-2.5-flash`
 
-**Why:** <!-- reason -->
+**Why:** User has a Gemini API key. `gemini-2.5-flash` is the current recommended default for Gemini as of 2026.
 
-## Backend Framework (if applicable)
+## Backend Framework
 
-<!-- FILL IN: e.g., FastAPI / Express / Django / none -->
+**FastAPI 0.115+** with **uvicorn** and **Jinja2** templates
 
-## Database (if applicable)
+## Database
 
-<!-- FILL IN: e.g., PostgreSQL / SQLite / Redis / none -->
+**SQLite** via **SQLAlchemy 2.0** (sync, declarative Mapped types)
 
-**ORM/ODM:** <!-- e.g., SQLAlchemy 2.0 / Prisma / none -->
+**ORM/ODM:** SQLAlchemy 2.0 + Alembic for migrations
 
-## Frontend (if applicable)
+## Frontend
 
-<!-- FILL IN: e.g., Next.js 15 / React / Vue / none -->
+**Jinja2 templates** served by FastAPI. Minimal inline CSS. No JS framework in v0.1.
+
+React/Vite frontend deferred to Phase 4.
 
 ## Key Libraries
 
-<!-- FILL IN: List the important libraries and what each does. -->
-
 | Library | Version | Purpose |
 |---------|---------|---------|
-| <!-- name --> | <!-- version --> | <!-- purpose --> |
+| fastapi | ≥0.115 | HTTP framework |
+| uvicorn | ≥0.29 | ASGI server |
+| jinja2 | ≥3.1 | HTML templates |
+| python-multipart | ≥0.0.9 | File upload parsing |
+| sqlalchemy | ≥2.0 | ORM + SQLite driver |
+| alembic | ≥1.13 | Schema migrations |
+| pydantic-settings | ≥2.2 | Settings from env |
+| langgraph | ≥0.2 | Agent graph |
+| google-genai | ≥1.0 | Gemini SDK |
+| pandas | ≥2.2 | CSV parsing and analysis |
+| structlog | ≥24 | Structured logging |
 
 ## What to Avoid
 
-<!-- FILL IN: Libraries, patterns, or approaches that are explicitly off-limits and why. -->
+- PostgreSQL — user chose SQLite; do not introduce psycopg2
+- Async SQLAlchemy — use sync engine; simpler with SQLite
+- OpenAI SDK — Gemini only
+- `alembic revision --autogenerate` before `script.py.mako` exists — it will fail
 
 ## Dependency Management
 
-<!-- FILL IN: e.g., uv + pyproject.toml / npm / pnpm / go modules -->
+**uv** + `pyproject.toml`. All commands in docs use `uv run` prefix.
 
 ---
 
@@ -62,60 +71,20 @@
 
 All generated projects **must** use **port 8001** as the default development port (not 8000).
 
-Reason: Port 8000 is commonly occupied by other local services (other FastAPI apps, Django, http.server, etc.). Using 8001 avoids startup failures with no code change needed.
-
 - `__main__.py` must hard-code `port=8001` (not 8000) unless overridden by an env var
 - README must reference `http://localhost:8001`
-- `.env.example` should include `PORT=8001` if the port is configurable
 
 ### LLM Model Name Rule
 
-**Always use a current, verified model name — never a deprecated or guessed one.**
+**Always use a current, verified model name.**
 
-- For Google Gemini: use **`gemini-2.0-flash`** as the default (not `gemini-1.5-flash` — deprecated and removed from the API).
-- Model names change. Before hardcoding any model identifier, verify it exists by calling the provider's `ListModels` API or checking current documentation.
-- The model name must be configurable via an env var (e.g. `APPNAME_LLM_MODEL`) so it can be changed without a code deployment.
-- A 404 NOT_FOUND error from the LLM API almost always means the model name is wrong — check the name first before debugging anything else.
-
-Current safe defaults (as of 2026):
-
-| Provider | Default model | Notes |
-|----------|---------------|-------|
-| Google Gemini | `gemini-2.5-flash` | `gemini-2.0-flash` and `gemini-1.5-flash` unavailable for new users |
-| OpenAI | `gpt-4o-mini` | |
-| Anthropic | `claude-3-5-haiku-latest` | |
+- Gemini default: `gemini-2.5-flash`
+- Configurable via `DATAANALYSIS_LLM_MODEL` env var
 
 ### DB Driver Rule
 
-The database driver (e.g. `psycopg2-binary` for PostgreSQL, `asyncpg` for async PostgreSQL) **must be declared in the main `[project.dependencies]` block**, never in `[dependency-groups.dev]` or equivalent dev-only groups.
-
-Reason: Alembic migrations run at deploy/setup time, not just in tests. If the driver is dev-only, `alembic upgrade head` fails in any environment that didn't install dev deps.
+SQLite driver (`sqlite3`) is part of the Python standard library — no extra package needed. `aiosqlite` is NOT used (sync only).
 
 ### Test Environment Rule
 
-**Tests must use the same database driver as production.** If the production DB is PostgreSQL, tests run against PostgreSQL — not SQLite.
-
-- Tests that pass on SQLite but were never run against PostgreSQL are **not a passing gate**.
-- The test database must be set up automatically. Use `conftest.py` to create and tear down the test database. No manual steps.
-- The test database URL is provided via environment variable (e.g. `TEST_DATABASE_URL` or reuse the app's `DATABASE_URL` pointing at a `_test` database). The `conftest.py` session fixture creates all tables before tests run and drops them after.
-- A `.env.test` file (gitignored) or CI environment variable provides the test DB URL. The README must document this.
-
-Example `conftest.py` pattern for PostgreSQL + SQLAlchemy (sync):
-
-```python
-import pytest
-from sqlalchemy import create_engine, text
-from yourapp.db.models import Base
-from yourapp.config.settings import get_settings
-
-@pytest.fixture(scope="session", autouse=True)
-def _setup_test_db():
-    settings = get_settings()
-    engine = create_engine(settings.database_url)
-    Base.metadata.create_all(engine)
-    yield
-    Base.metadata.drop_all(engine)
-    engine.dispose()
-```
-
-The `DATABASE_URL` in `.env` (or `.env.test`) must point at a real PostgreSQL test database before running tests.
+Tests use SQLite (same as production). `conftest.py` creates a fresh in-memory or tmp-path database for each test session.

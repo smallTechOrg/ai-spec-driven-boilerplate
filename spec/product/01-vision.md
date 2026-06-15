@@ -1,43 +1,45 @@
 # Vision
 
-> **Boilerplate status:** This file contains placeholders. The spec-writer sub-agent will fill these in based on your idea. Run `/build [your idea]` to start, or fill in the placeholders manually.
-
----
-
 ## What This Agent Does
 
-<!-- FILL IN: One paragraph describing what this agent does, who uses it, and what problem it solves. -->
+A web-based data analysis agent that lets users upload a CSV file and ask questions about their data in plain English. The agent uses a LangGraph pipeline backed by Google Gemini to understand the data structure and answer natural language questions with accurate, plain-text responses. Results and query history are stored locally in SQLite.
 
 ## Who Uses It
 
-<!-- FILL IN: Primary user(s). What is their role? What are they trying to accomplish? -->
+Data analysts, business users, and developers who have tabular data in CSV format and want quick answers without writing SQL or Python. They upload a file, type a question, and get an answer immediately.
 
 ## Core Problem Being Solved
 
-<!-- FILL IN: What manual or broken process does this agent replace or improve? -->
+Querying and exploring CSV data typically requires coding skills (pandas, SQL) or expensive BI tools. This agent removes that barrier: any user can ask "What is the average revenue by region?" and get an answer instantly, without touching a terminal.
 
 ## Success Criteria
 
-<!-- FILL IN: How do we know the agent is working? List 3-5 measurable outcomes. -->
+- [ ] User can upload a CSV file via a web form and see it accepted
+- [ ] User can type a natural language question and receive a plain-text answer grounded in the data
+- [ ] Each query is stored in SQLite with the question, answer, and timestamp
+- [ ] The agent runs fully offline (stub mode) without an API key for development
+- [ ] The app starts with a single command and the UI is accessible at http://localhost:8001
 
-- [ ] <!-- criterion 1 -->
-- [ ] <!-- criterion 2 -->
-- [ ] <!-- criterion 3 -->
+## What This Agent Does NOT Do (Out of Scope for v0.1)
 
-## What This Agent Does NOT Do (Out of Scope)
-
-<!-- FILL IN: Explicit exclusions prevent scope creep. List things the agent will never do. -->
+- Charts, visualizations, or dashboards (deferred to Phase 3)
+- AI-written insight summaries (deferred to Phase 3)
+- React/Vite frontend — v0.1 uses Jinja2 templates (React promoted in Phase 4)
+- User authentication or multi-user support
+- Multi-file or multi-dataset sessions
 
 ## Key Constraints
 
-<!-- FILL IN: Hard limits — budget, latency, compliance, API rate limits, etc. -->
+- Gemini API key is optional — app must run in stub mode without it
+- SQLite only — no PostgreSQL required
+- All commands run from the repo root with `uv run` prefix
 
 ## Phases of Development
 
-<!-- FILL IN: High-level phases. The planner sub-agent will refine these into a detailed plan. -->
-
 | Phase | Description | Success Gate |
 |-------|-------------|--------------|
-| 1 | <!-- minimal working thing --> | <!-- test that proves it works --> |
-| 2 | <!-- next increment --> | <!-- test --> |
-| ... | | |
+| 1 | Domain models + SQLite schema (Dataset, Query) | `uv run pytest tests/unit/` 100% |
+| 2 | Stubbed LangGraph pipeline + FastAPI UI end-to-end | `uv run pytest` + live curl at `/health` |
+| 3 | Real Gemini integration replacing stub | Real answers returned for a sample CSV |
+| 4 | Charts and visualizations | Bar/line/pie charts rendered in browser |
+| 5 | AI-written insights | Auto-generated summary paragraph per upload |

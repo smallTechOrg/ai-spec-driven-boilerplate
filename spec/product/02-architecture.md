@@ -1,50 +1,52 @@
 # Architecture
 
-> **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved.
-
----
-
 ## System Overview
 
-<!-- FILL IN: One paragraph describing the system at a high level. Who/what interacts with it? -->
+The data analysis agent is a single-process FastAPI application. Users interact via a browser UI (Jinja2 templates). Uploaded CSVs are stored on disk; metadata and query history live in SQLite. Each natural language query triggers a LangGraph pipeline that sends the data schema + user question to Google Gemini, receives a plain-text answer, and persists the result.
 
 ## Component Map
 
-<!-- FILL IN: List the major components and what each does. -->
-
 ```
-[Component A]
+Browser (HTML form)
+    ↓ POST /upload
+FastAPI (uvicorn)
     ↓
-[Component B]   ←→   [External Service]
+LangGraph Pipeline
+    ├── load_data node    (parse CSV with pandas)
+    ├── analyze node      (send schema + question to Gemini)
+    └── finalize node     (persist QueryRecord to SQLite)
     ↓
-[Component C]
+SQLite (via SQLAlchemy 2.0)
 ```
 
 ## Layers
 
-<!-- FILL IN: Describe the layers of the system (e.g., API → Agent Loop → Tools → Storage). -->
-
 | Layer | Responsibility |
 |-------|----------------|
-| <!-- layer --> | <!-- responsibility --> |
+| API (FastAPI) | HTTP routing, file upload, form handling, template rendering |
+| Graph (LangGraph) | Agent pipeline: parse → analyze → finalize |
+| LLM (google-genai) | Gemini API calls; falls back to stub when key not set |
+| Domain | Pydantic models for Dataset and QueryRecord |
+| DB (SQLAlchemy + SQLite) | Persistence of datasets and query history |
+| Templates (Jinja2) | Server-rendered HTML: upload form, results page, history |
 
 ## Data Flow
 
-<!-- FILL IN: Walk through the main data flow from trigger to output. -->
-
-1. Trigger: <!-- how does the agent start? (cron, webhook, user input, etc.) -->
-2. <!-- step 2 -->
-3. <!-- step 3 -->
-4. Output: <!-- what does the agent produce? -->
+1. Trigger: User uploads a CSV file via browser form (POST /upload)
+2. FastAPI saves the file, creates a `Dataset` DB record
+3. User types a natural language question (POST /query)
+4. LangGraph pipeline: `load_data` → `analyze` (Gemini/stub) → `finalize`
+5. `finalize` writes a `QueryRecord` to SQLite with question, answer, timestamp
+6. FastAPI renders the answer page with the result and a link back to ask another question
 
 ## External Dependencies
 
-<!-- FILL IN: APIs, services, databases the agent depends on. -->
-
 | Dependency | Purpose | Failure Mode |
 |------------|---------|--------------|
-| <!-- name --> | <!-- what it does --> | <!-- what happens if it's down --> |
+| Google Gemini API | NL reasoning over CSV schema | Falls back to stub — answer marked as "(stub mode)" |
+| SQLite | Store datasets and query history | App fails to start if DB file is unwritable |
+| Local filesystem | Store uploaded CSV files | Upload fails with user-visible error |
 
 ## Deployment Model
 
-<!-- FILL IN: How does this run? (local script, cloud function, long-running service, etc.) -->
+Local single-user service. Runs with `uv run python -m data_analysis_agent` on port 8001. No container required for v0.1.

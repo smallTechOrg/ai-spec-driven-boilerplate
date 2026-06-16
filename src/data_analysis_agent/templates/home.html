@@ -1,13 +1,42 @@
 {% extends "base.html" %}
-{% block title %}Upload CSV — Data Analysis Agent{% endblock %}
+{% block title %}DataAnalyst AI — Ask questions about your data{% endblock %}
 {% block content %}
-<div class="card">
-  <h1>Data Analysis Agent</h1>
-  <p style="margin-bottom: 1.25rem; color: #555;">Upload a CSV file and ask questions about your data in plain English.</p>
-  <form action="/upload" method="post" enctype="multipart/form-data">
-    <label for="file" style="display:block;margin-bottom:0.4rem;font-weight:500;">Choose a CSV file</label>
-    <input type="file" id="file" name="file" accept=".csv" required>
-    <button type="submit" class="btn">Upload &amp; Analyse</button>
+
+<div style="text-align:center; padding: 2.5rem 0 1.5rem;">
+  <div style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;background:var(--brand-light);border-radius:16px;margin-bottom:1.25rem;">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
+    </svg>
+  </div>
+  <h1 style="margin-bottom:0.5rem;">Ask questions about your data</h1>
+  <p class="muted" style="max-width:420px;margin:0 auto;">Upload a CSV file and get instant answers in plain English — no SQL or code required.</p>
+</div>
+
+<div class="card" style="max-width:520px;margin:0 auto;">
+  <form action="/upload" method="post" enctype="multipart/form-data" id="upload-form">
+    <label class="upload-zone" for="csv-input">
+      <input type="file" id="csv-input" name="file" accept=".csv" required onchange="this.closest('form').querySelector('.selected-name').style.display='block'; this.closest('form').querySelector('.selected-name').textContent='📎 '+this.files[0].name;">
+      <div class="upload-icon">📂</div>
+      <div style="font-weight:600;font-size:0.95rem;">Click to choose a CSV file</div>
+      <div class="hint">or drag and drop — .csv files only</div>
+      <div class="selected-name"></div>
+    </label>
+    <button type="submit" class="btn" style="width:100%;justify-content:center;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Upload &amp; Start Analysing
+    </button>
   </form>
+</div>
+
+<div style="display:flex;justify-content:center;gap:2rem;margin-top:2.5rem;flex-wrap:wrap;">
+  {% for feat in [("💬", "Natural language Q&A", "Ask anything — totals, averages, comparisons"),
+                  ("⚡", "Instant answers", "Powered by Gemini via OpenRouter"),
+                  ("📋", "Query history", "Every question and answer saved")] %}
+  <div style="text-align:center;max-width:160px;">
+    <div style="font-size:1.5rem;margin-bottom:0.35rem;">{{ feat[0] }}</div>
+    <div style="font-weight:600;font-size:0.85rem;margin-bottom:0.2rem;">{{ feat[1] }}</div>
+    <div class="muted" style="font-size:0.8rem;">{{ feat[2] }}</div>
+  </div>
+  {% endfor %}
 </div>
 {% endblock %}

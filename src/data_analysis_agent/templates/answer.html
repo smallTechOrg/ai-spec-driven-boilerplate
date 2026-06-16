@@ -1,56 +1,67 @@
 {% extends "base.html" %}
-{% block title %}Answer — Data Analysis Agent{% endblock %}
+{% block title %}Answer — DataAnalyst AI{% endblock %}
 {% block content %}
-<div class="card">
-  <h2 style="margin-bottom:0.4rem;">Question</h2>
-  <p style="font-style:italic;color:#333;">{{ query_record.question }}</p>
+
+<div class="breadcrumb">
+  <a href="/">Home</a>
+  <span>/</span>
+  <a href="/datasets/{{ dataset.id }}">{{ dataset.filename }}</a>
+  <span>/</span>
+  <span>Answer</span>
 </div>
 
 <div class="card">
-  <h2 style="margin-bottom:0.75rem;">Answer</h2>
-  <pre>{{ query_record.answer }}</pre>
+  <p class="label">Your question</p>
+  <p style="font-size:1.05rem;font-weight:500;color:var(--text-soft);margin-top:0.15rem;">{{ query_record.question }}</p>
 </div>
 
-{% if query_record.total_tokens is not none %}
-<div class="card" style="padding:1rem 1.5rem;">
-  <h2 style="margin-bottom:0.75rem;font-size:1rem;">Usage</h2>
-  <table style="border-collapse:collapse;width:100%;font-size:0.9rem;">
-    <tr>
-      <td style="padding:0.25rem 0.5rem 0.25rem 0;color:#555;width:55%;">Input tokens</td>
-      <td style="padding:0.25rem 0;font-variant-numeric:tabular-nums;">{{ query_record.input_tokens | default(0) }}</td>
-    </tr>
-    <tr>
-      <td style="padding:0.25rem 0.5rem 0.25rem 0;color:#555;">Output tokens</td>
-      <td style="padding:0.25rem 0;font-variant-numeric:tabular-nums;">{{ query_record.output_tokens | default(0) }}</td>
-    </tr>
-    <tr style="border-top:1px solid #eee;">
-      <td style="padding:0.35rem 0.5rem 0.25rem 0;color:#555;font-weight:500;">Total tokens</td>
-      <td style="padding:0.35rem 0 0.25rem;font-weight:500;font-variant-numeric:tabular-nums;">{{ query_record.total_tokens | default(0) }}</td>
-    </tr>
-    <tr>
-      <td style="padding:0.25rem 0.5rem 0.25rem 0;color:#555;">API requests</td>
-      <td style="padding:0.25rem 0;">{{ query_record.api_request_count | default(0) }}</td>
-    </tr>
+<div class="card">
+  <p class="label">Answer</p>
+  <div class="answer-body" style="margin-top:0.4rem;">{{ query_record.answer }}</div>
+
+  {% if query_record.total_tokens is not none %}
+  <hr>
+  <p class="label" style="margin-bottom:0.5rem;">Usage</p>
+  <div class="stats-row">
+    <div class="stat-pill">
+      <span class="dot"></span>
+      <span>Input</span>
+      <strong>{{ query_record.input_tokens | default(0) }} tok</strong>
+    </div>
+    <div class="stat-pill">
+      <span class="dot" style="background:var(--success);"></span>
+      <span>Output</span>
+      <strong>{{ query_record.output_tokens | default(0) }} tok</strong>
+    </div>
+    <div class="stat-pill">
+      <span class="dot" style="background:#f59e0b;"></span>
+      <span>Total</span>
+      <strong>{{ query_record.total_tokens | default(0) }} tok</strong>
+    </div>
+    <div class="stat-pill">
+      <span>API calls</span>
+      <strong>{{ query_record.api_request_count | default(1) }}</strong>
+    </div>
     {% if query_record.estimated_cost_usd is not none %}
-    <tr style="border-top:1px solid #eee;">
-      <td style="padding:0.35rem 0.5rem 0.25rem 0;color:#555;font-weight:500;">Est. cost</td>
-      <td style="padding:0.35rem 0 0.25rem;font-weight:500;">
-        {% if query_record.estimated_cost_usd == 0.0 %}
-          $0.000000 <span style="color:#888;font-size:0.8rem;">(stub)</span>
-        {% else %}
-          ${{ "%.6f" | format(query_record.estimated_cost_usd) }}
-          <span style="color:#888;font-size:0.8rem;">approx.</span>
-        {% endif %}
-      </td>
-    </tr>
+    <div class="stat-pill">
+      <span>Est. cost</span>
+      {% if query_record.estimated_cost_usd == 0.0 %}
+      <strong>$0.00 <span style="font-weight:400;color:var(--muted);">(stub)</span></strong>
+      {% else %}
+      <strong>${{ "%.6f" | format(query_record.estimated_cost_usd) }}</strong>
+      <span style="color:var(--muted);font-size:0.75rem;">approx.</span>
+      {% endif %}
+    </div>
     {% endif %}
-  </table>
+  </div>
+  {% endif %}
 </div>
-{% endif %}
 
-<p>
-  <a href="/datasets/{{ dataset.id }}">&larr; Ask another question</a>
-  &nbsp;&middot;&nbsp;
-  <a href="/datasets/{{ dataset.id }}/history">View history</a>
-</p>
+<div class="actions">
+  <a href="/datasets/{{ dataset.id }}" class="btn">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    Ask another question
+  </a>
+  <a href="/datasets/{{ dataset.id }}/history" class="btn btn-ghost">View history</a>
+</div>
 {% endblock %}

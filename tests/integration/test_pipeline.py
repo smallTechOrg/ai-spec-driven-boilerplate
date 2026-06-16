@@ -1,4 +1,4 @@
-"""Integration test: stubbed pipeline runs end-to-end with no Gemini key."""
+"""Integration test: stubbed pipeline runs end-to-end with no OpenRouter key."""
 import csv
 import os
 
@@ -13,7 +13,7 @@ from data_analysis_agent.db.models import Base, DatasetRow, QueryRecordRow, Agen
 @pytest.fixture(autouse=True)
 def _stub_env(monkeypatch):
     monkeypatch.setenv("DATAANALYSIS_DATABASE_URL", "sqlite:///stub_test.db")
-    monkeypatch.delenv("DATAANALYSIS_GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("DATAANALYSIS_OPENROUTER_API_KEY", raising=False)
 
 
 @pytest.fixture(autouse=True)

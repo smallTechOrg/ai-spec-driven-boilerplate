@@ -12,9 +12,9 @@ dependencies = [
     "alembic>=1.13",
     "pydantic-settings>=2.2",
     "langgraph>=0.2",
-    "google-genai>=1.0",
     "pandas>=2.2",
     "structlog>=24",
+    "openai>=2.41.1",
 ]
 
 [project.optional-dependencies]

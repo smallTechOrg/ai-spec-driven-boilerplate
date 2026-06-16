@@ -5,10 +5,10 @@ def create_llm_provider() -> LLMProvider:
     from data_analysis_agent.config.settings import get_settings
     settings = get_settings()
 
-    if settings.resolved_llm_provider == "gemini":
-        from data_analysis_agent.llm.providers.gemini import GeminiLLMProvider
-        return GeminiLLMProvider(
-            api_key=settings.gemini_api_key.split("#")[0].strip(),
+    if settings.resolved_llm_provider == "openrouter":
+        from data_analysis_agent.llm.providers.openrouter import OpenRouterLLMProvider
+        return OpenRouterLLMProvider(
+            api_key=settings.openrouter_api_key.split("#")[0].strip(),
             model=settings.llm_model,
         )
 

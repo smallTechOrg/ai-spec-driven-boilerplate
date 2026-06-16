@@ -12,15 +12,15 @@ class Settings(BaseSettings):
     )
 
     database_url: str = Field(default="sqlite:///data_analysis.db")
-    gemini_api_key: str = Field(default="")
-    llm_model: str = Field(default="gemini-2.5-flash")
+    openrouter_api_key: str = Field(default="")
+    llm_model: str = Field(default="google/gemini-2.5-flash")
     log_level: str = Field(default="INFO")
     upload_dir: str = Field(default="uploads")
 
     @property
     def resolved_llm_provider(self) -> str:
-        key = self.gemini_api_key.split("#")[0].strip()
-        return "gemini" if key else "stub"
+        key = self.openrouter_api_key.split("#")[0].strip()
+        return "openrouter" if key else "stub"
 
 
 _settings: Settings | None = None

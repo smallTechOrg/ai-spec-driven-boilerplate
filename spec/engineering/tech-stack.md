@@ -1,12 +1,18 @@
 # Tech Stack
 
 > **Boilerplate status:** Filled in by the tech-designer sub-agent after the product spec is approved. The user may override specific choices before the tech-designer is invoked.
+>
+> **Recommended defaults** (override any of these if the project calls for something different):
+> - **Backend language:** Python 3.12+ (agent logic, data processing, API server)
+> - **Frontend/tooling language:** Node.js 20+ (UI, build tooling, CLI scripts)
+> - **Database:** SQLite (zero-ops, file-based, ships with Python — upgrade to PostgreSQL only when multi-user concurrency requires it)
 
 ---
 
 ## Language
 
 <!-- FILL IN: e.g., Python 3.12 / TypeScript 5 / Go 1.22 -->
+<!-- Recommended: Python 3.12 for backend agent logic; Node.js 20 for any frontend/tooling layer -->
 
 **Why:** <!-- reason for this choice -->
 
@@ -27,16 +33,20 @@
 ## Backend Framework (if applicable)
 
 <!-- FILL IN: e.g., FastAPI / Express / Django / none -->
+<!-- Recommended: FastAPI (Python) for agent APIs -->
 
 ## Database (if applicable)
 
-<!-- FILL IN: e.g., PostgreSQL / SQLite / Redis / none -->
+<!-- FILL IN: e.g., SQLite / PostgreSQL / Redis / none -->
+<!-- Recommended: SQLite — file-based, zero configuration, built into Python's stdlib. Sufficient for single-user and low-concurrency workloads. Upgrade to PostgreSQL only when multi-user writes or full-text search require it. -->
 
 **ORM/ODM:** <!-- e.g., SQLAlchemy 2.0 / Prisma / none -->
+<!-- Recommended: SQLAlchemy 2.0 (Python) — works with both SQLite and PostgreSQL, so upgrades are migration-only -->
 
 ## Frontend (if applicable)
 
 <!-- FILL IN: e.g., Next.js 15 / React / Vue / none -->
+<!-- Recommended: Node.js 20 + a lightweight framework (e.g. Vite + React) for any browser UI -->
 
 ## Key Libraries
 
@@ -53,6 +63,7 @@
 ## Dependency Management
 
 <!-- FILL IN: e.g., uv + pyproject.toml / npm / pnpm / go modules -->
+<!-- Recommended: uv + pyproject.toml (Python); npm or pnpm (Node.js) -->
 
 ---
 

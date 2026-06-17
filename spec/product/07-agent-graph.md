@@ -1,5 +1,17 @@
 # Agent Graph
 
+> **Mandatory pre-coding checklist** — answer all six questions before writing any node code.
+> If any are missing, raise a blocker. (See `spec/engineering/ai-agents.md` Section 10.)
+>
+> 1. **Action type:** What does the LLM generate? → SQL `SELECT` query
+> 2. **Termination signal:** How does the LLM say it's done? → Response starts with `FINAL ANSWER:`
+> 3. **Recoverable vs fatal errors:** SQL execution errors → feed back to LLM. Non-SELECT SQL, LLM failures → fatal.
+> 4. **Max iterations default:** `10` (configurable via `DATAANALYSIS_MAX_AGENT_ITERATIONS`)
+> 5. **In-session data store:** In-memory SQLite connection per `run_id`, stored in module-level `_db_cache` dict, cleaned up by both `finalize` and `handle_error`.
+> 6. **State fields for history:** `action_history: list[dict]`, `iteration_count: int`, `llm_response: str`
+
+---
+
 ## State
 
 ```python

@@ -26,16 +26,18 @@ These rules are never optional, never skipped, and must survive context compress
 
 8. **Stub LLM outputs must be distinct per pipeline node and article-shaped.** Pipeline nodes that share a stub provider must inject unambiguous tags (e.g. `<node:plan>`, `<node:draft>`, `<node:title>`) into their prompts, and the stub must branch on those tags — never on prose keywords from the prompt body (keyword matching cross-contaminates: the word "outline" in a draft prompt must not cause the stub to emit outline bullets instead of a draft). Stub "draft" output must contain paragraphs/headings, not just bullets, so offline demos are credible.
 
-9. **Every commit must be pushed immediately.** `git commit` and `git push` are a single atomic action — never one without the other. Use `git commit -m "..." && git push origin <branch>` as a single command. A commit that is not pushed does not exist as far as the project is concerned. This is not optional and is not context-compression-safe — if you remember only this sentence: **commit then push, every time, no exceptions.**
+9. **Data-access agents must use a ReAct loop — never a "sample and guess" pipeline.** If the agent's job is to answer questions about external data (CSV files, databases, APIs, file systems), it must generate executable actions (SQL, API calls, file reads), run them against the **full** data, and feed results back to the LLM iteratively until the LLM signals a final answer. A pipeline that passes a sample of data to the LLM and expects a single-shot answer will produce wrong results at scale and must be redesigned before Phase 2 is marked complete. The correct pattern — load → plan action → execute action → observe result → loop until done — must be specced in `07-agent-graph.md` before any code is written. See Section 10 of this file for the full pattern.
 
-10. **`main` is boilerplate-only. Never commit application code to `main`.** All application code lives on a named feature branch and reaches `main` only via a reviewed pull request. This rule has no exceptions:
+10. **Every commit must be pushed immediately.** `git commit` and `git push` are a single atomic action — never one without the other. Use `git commit -m "..." && git push origin <branch>` as a single command. A commit that is not pushed does not exist as far as the project is concerned. This is not optional and is not context-compression-safe — if you remember only this sentence: **commit then push, every time, no exceptions.**
+
+11. **`main` is boilerplate-only. Never commit application code to `main`.** All application code lives on a named feature branch and reaches `main` only via a reviewed pull request. This rule has no exceptions:
     - Before writing any application code, create a feature branch: `git checkout -b feature/<slug>-v0.1`
     - All phase commits go to the feature branch, never to `main`
     - Spec/engineering/boilerplate improvements (no app code) are the only commits that may go directly to `main`
     - When the build is complete, open a PR from the feature branch into `main` — do not merge locally
     - If you find yourself on `main` while writing application code, stop immediately, create the feature branch, and continue there
 
-11. **A PR must exist before the first feature-branch commit, and every push must go to that PR.** After creating the feature branch and pushing the first commit, immediately open a PR: `gh pr create --base main --head feature/<slug>-v0.1`. Every subsequent `git push` automatically updates the same PR — no extra step needed — but the PR must be open. Pushing commits without an open PR is equivalent to committing without pushing: the work is invisible and unreviable. This is not optional and survives context compression.
+12. **A PR must exist before the first feature-branch commit, and every push must go to that PR.** After creating the feature branch and pushing the first commit, immediately open a PR: `gh pr create --base main --head feature/<slug>-v0.1`. Every subsequent `git push` automatically updates the same PR — no extra step needed — but the PR must be open. Pushing commits without an open PR is equivalent to committing without pushing: the work is invisible and unreviable. This is not optional and survives context compression.
 
 ---
 
@@ -155,7 +157,139 @@ Build what the spec says, nothing more.
 - No premature abstractions
 - If you spot a future improvement, add it to `reports/sessions/[current].md` under "Future improvements" and keep moving
 
-## 10. When Stuck
+## 10. Agent Loop Design Patterns
+
+### When to use a ReAct loop
+
+Use a ReAct (Reason + Act) loop whenever the agent needs to interact with external data to answer a question. This covers:
+
+- Data analysis over CSV / database tables
+- Web search agents that need to look up facts
+- File system agents that browse or read files
+- API agents that call external services
+
+**Never** design a single-shot pipeline for these cases ("pass a sample to the LLM and return whatever it says"). Single-shot answers are wrong for any dataset larger than the sample, and cannot self-correct.
+
+### The canonical ReAct loop shape
+
+```
+START
+  │
+  ▼
+load_data          ← load full data into queryable form (in-memory SQLite, index, etc.)
+  │
+  ▼
+plan_action ◄───────────────────────────────────┐
+  │                                             │
+  ├──(error / LLM failure) → handle_error       │
+  │                                             │
+  ├──(FINAL ANSWER signal) → finalize → END     │
+  │                                             │
+  └──(action returned) → execute_action ────────┘
+                              │
+                              ├──(hard error: non-recoverable) → handle_error
+                              │
+                              └──(SQL/API error: feed back to LLM for self-correction)
+```
+
+### Termination protocol (mandatory)
+
+The LLM must have an unambiguous way to signal it is done. Define this in the spec before writing code:
+
+```
+FINAL ANSWER: <the complete answer text here>
+```
+
+The `plan_action` node checks if the LLM response starts with `FINAL ANSWER:` (case-insensitive). If yes, strip the prefix and route to `finalize`. If no, treat the response as the next action to execute and loop.
+
+This is not optional — without a termination signal, the loop runs until max iterations.
+
+### Max iterations guard (mandatory)
+
+Every ReAct loop must have a configurable ceiling:
+
+```python
+max_agent_iterations: int = Field(default=10)
+```
+
+After `execute_action` increments `iteration_count`, check:
+```python
+if iteration_count >= max_iterations:
+    return {**state, "error": f"Max iterations ({max_iterations}) reached"}
+```
+
+Route to `handle_error`. Never let a loop run unboundedly.
+
+### Self-correction on action errors
+
+When an action fails (e.g. SQL syntax error, API 4xx, file not found), **do not immediately fail the pipeline**. Instead:
+
+1. Append the failed action and its error message to `action_history` in state, flagged as `is_error: True`
+2. Increment `iteration_count`
+3. Route back to `plan_action`
+
+The prompt for the next `plan_action` call shows the error inline:
+
+```
+[2] SQL: SELECT MIN(x) FROM data GROUP BY region
+    Error: misuse of aggregate function MIN()
+    → This query failed. Please write a corrected SQL query.
+```
+
+The LLM sees the error and writes a corrected action. Only fail the pipeline if:
+- The action is structurally invalid (e.g. a non-SELECT SQL when only reads are allowed)
+- Max iterations is reached
+- The LLM call itself fails (network error, 5xx)
+
+### In-memory data cache pattern
+
+When the agent loads data at the start of a run (CSV → SQLite, documents → vector index, etc.), the connection or index object is not serializable and cannot live in `AgentState`. Use a module-level dict keyed by `run_id`:
+
+```python
+_db_cache: dict[str, sqlite3.Connection] = {}
+
+def _cleanup_db(run_id: str) -> None:
+    conn = _db_cache.pop(run_id, None)
+    if conn:
+        conn.close()
+```
+
+- `load_data` creates the resource and stores it: `_db_cache[state["run_id"]] = conn`
+- `execute_action` reads it: `conn = _db_cache.get(run_id)`
+- `finalize` and `handle_error` both call `_cleanup_db(run_id)` in a `finally` block
+
+This guarantees the resource is cleaned up whether the pipeline succeeds or fails.
+
+### Action history in AgentState
+
+The running log of actions and their results must live in state so the full context is available to the LLM on every `plan_action` call:
+
+```python
+class AgentState(TypedDict, total=False):
+    ...
+    action_history: list[dict]  # [{"action": str, "result": str, "is_error": bool}]
+    iteration_count: int
+    llm_response: str           # raw last LLM output — router inspects this for FINAL ANSWER
+```
+
+Persist `action_history` to the database as JSON so it can be displayed in the UI (the "Agent reasoning" trace).
+
+### What to spec in 07-agent-graph.md before writing code
+
+Before writing any node code, `07-agent-graph.md` must answer:
+
+1. What action type does the LLM generate? (SQL, HTTP request, file path, etc.)
+2. What is the exact FINAL ANSWER signal string?
+3. What constitutes a recoverable action error vs a fatal error?
+4. What is the max iterations default?
+5. How is the in-session data store created and cleaned up?
+6. What fields does `AgentState` carry for history and iteration count?
+
+If any of these are missing from the spec, raise a blocker before Phase 2 starts.
+
+---
+
+## 12. When Stuck
 
 If requirements are unclear:
 1. Stop
@@ -167,7 +301,7 @@ If the spec is ambiguous:
 2. Propose an interpretation
 3. Wait for confirmation before implementing
 
-## 11. Closing a Session
+## 13. Closing a Session
 
 Before ending a session:
 - [ ] Working tree is clean (all changes committed and pushed)

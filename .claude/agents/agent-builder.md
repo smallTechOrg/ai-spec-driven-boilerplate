@@ -52,7 +52,7 @@ When the user gives you an idea:
    Options: [narrow core loop only] / [the full feature set you described] / [something in between — I'll describe]
 
    **Q2 — Stack**
-   "Any tech preferences?" Cover: language (Python / TypeScript / Go / no preference), database (PostgreSQL / SQLite / no DB needed / no preference), hosting (local / VPS / cloud function / no preference). If they say "no preference", propose defaults and include in Stage 3 summary.
+   "Any tech preferences?" Recommend the default stack first — **Python (backend/agent) + Node.js frontend + SQLite** — then offer alternatives as overrides: language (Python / TypeScript / Go / no preference), database (SQLite / PostgreSQL / no DB needed / no preference), hosting (local / VPS / cloud function / no preference). Frontend is always Node.js, never Python. If they say "no preference", use the default stack and include it in the Stage 3 summary.
 
    **Q3 — Output / trigger**
    How does the agent get invoked and what does it produce? (webhook / schedule / CLI / API call — and returns JSON / writes to DB / sends email / etc.)
@@ -62,7 +62,7 @@ When the user gives you an idea:
 
 3. After answers: synthesize into a one-paragraph brief. Proceed immediately to Stage 2.
 
-**If the user says "just build it":** use narrow MVP scope, Python + PostgreSQL as defaults, include in Stage 3 summary for one-shot confirmation.
+**If the user says "just build it":** use narrow MVP scope and the default stack (Python + Node.js + SQLite), include in Stage 3 summary for one-shot confirmation.
 
 ---
 
@@ -202,8 +202,8 @@ For each phase beyond Phase 2:
 
 ## Stack Decisions Belong to the User
 
-- **Database** — always captured at intake. Default if no preference: PostgreSQL for production-bound, SQLite for local/single-user.
-- **Language** — always captured at intake.
+- **Database** — always captured at intake. Default if no preference: SQLite.
+- **Language** — always captured at intake. Default if no preference: Python backend. Frontend is always Node.js, never Python.
 - **Hosting** — always captured at intake if it affects architecture.
 
 ---

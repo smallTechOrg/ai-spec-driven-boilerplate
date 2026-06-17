@@ -69,6 +69,18 @@
 
 ## Permanent Rules (apply to all projects, not filled in by tech-designer)
 
+### Recommended Default Stack
+
+When the user states no preference, the **recommended default stack** is:
+
+- **Backend / agent:** Python 3.12+
+- **Frontend:** Node.js (TypeScript / Next.js)
+- **Database:** SQLite
+
+This is the stack the intake question (`agent-builder` Q2) recommends first. The user may override any part of it by choosing another option — their stated preference is always binding (see `.claude/agents/tech-designer.md` § "User Preferences Are Binding").
+
+**The frontend is always Node.js, never Python.** Any UI/web surface is built in Node.js (TypeScript/Next.js) regardless of the backend language. There is no Python frontend option. Python is for the backend/agent only.
+
 ### Default Dev Port
 
 All generated projects **must** use **port 8001** as the default development port (not 8000).

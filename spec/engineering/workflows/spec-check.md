@@ -20,6 +20,12 @@ per the rule in [`../spec-driven.md`](../spec-driven.md). Report findings as a p
 
 6. **Check CLI/API surface.** Compare endpoints/commands in spec against registered routes/commands. Flag missing or extra.
 
+7. **Check spec brevity.** The spec must state each fact once and stay brief. Flag:
+   - The same rule/detail duplicated across files — keep it in one canonical place and link from the others.
+   - Verbose restatement, hedging, or examples that add no new constraint.
+   - A fact that belongs in code, not the spec.
+   Prefer a one-line pointer (`see <file> § <section>`) over repeating content.
+
 ## Report format
 
 Output a single markdown table plus a short summary.

@@ -37,10 +37,13 @@ Which language fits the project best? Consider:
 - Ecosystem for the required integrations
 - Deployment target (cloud function vs. long-running service vs. CLI)
 
-Default preferences (override if there's a good reason):
-- Python 3.12+ for agent-heavy, data-heavy, or ML-adjacent work
-- TypeScript for UI-heavy or API-heavy work
-- Go for high-throughput or CLI tools
+**Default stack (recommend unless the user stated otherwise):**
+- **Python 3.12+ for the backend/agent** — agent logic, data work, APIs, CLIs.
+- **Node.js (TypeScript) for any frontend.** The frontend is **always Node.js, never Python** — there is no Python frontend option. Any UI/web surface uses Node.js even when the backend is Python.
+
+Override only if the user explicitly chose a different stack:
+- TypeScript everywhere (backend + frontend) if the user asked for it
+- Go for high-throughput or CLI tools if the user asked for it
 
 ### 2. Agent Framework
 
@@ -74,14 +77,14 @@ Options:
 - **Redis** — caching, queues, or ephemeral state (usually alongside a primary DB)
 - **None** — stateless agent, everything in LLM context or returned directly
 
-**Default recommendation when no preference is stated:** PostgreSQL for anything that will run in production or be shared; SQLite only for tools that are explicitly local/single-user and the user has confirmed that.
+**Default recommendation when no preference is stated:** SQLite. It is the default datastore for the recommended stack. Recommend PostgreSQL instead only when the spec clearly requires it (multi-tenancy, concurrent writers, production scale that SQLite cannot serve) — and flag that as the open question for the user to confirm.
 
 ### 5. API / CLI / UI
 
 Does the spec require:
 - A REST API? → recommend FastAPI (Python) or Express (TypeScript)
 - A CLI? → recommend Click (Python) or Commander (TypeScript)
-- A web UI? → recommend Next.js 15 + React 19 (TypeScript)
+- A web UI? → always Node.js — recommend Next.js 15 + React 19 (TypeScript). **Never build the frontend in Python**, even when the backend is Python.
 - None of the above? → say so
 
 ### 6. Key Libraries

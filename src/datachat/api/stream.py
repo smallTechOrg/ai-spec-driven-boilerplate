@@ -1,4 +1,6 @@
+import asyncio
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
@@ -17,7 +19,7 @@ class QuestionRequest(BaseModel):
 
 
 @router.post("/sessions/{session_id}/messages/stream")
-def ask_question_stream(
+async def ask_question_stream(
     session_id: str,
     body: QuestionRequest,
     db: Session = Depends(get_session),
@@ -37,16 +39,32 @@ def ask_question_stream(
             410,
         )
 
-    # Persist user message before stream starts so it's in the DB immediately
     user_msg = MessageRow(session_id=session_id, role="user", content=body.question)
     db.add(user_msg)
     db.commit()
 
     from datachat.graph.runner import iter_agent_events
 
-    def _generate():
-        for event in iter_agent_events(session_id, body.question, df):
-            yield f"data: {json.dumps(event)}\n\n"
+    async def _generate():
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue = asyncio.Queue()
+
+        def _run_sync():
+            try:
+                for event in iter_agent_events(session_id, body.question, df):
+                    loop.call_soon_threadsafe(queue.put_nowait, event)
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = loop.run_in_executor(executor, _run_sync)
+            while True:
+                event = await queue.get()
+                if event is None:
+                    break
+                yield f"data: {json.dumps(event)}\n\n"
+            await future
+
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(

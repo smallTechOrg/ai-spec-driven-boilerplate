@@ -1,178 +1,154 @@
-# AI Agent Boilerplate — Spec-Driven, Zero-Shot to Working Agent
+# DataChat
 
-This is a boilerplate for building AI agents spec-first. Give it a one-line idea. Walk away with a working, tested, phased agent.
+A data-analysis agent. Upload CSV files into a **dataset**, then ask questions about it in
+**plain English** over a multi-turn chat. DataChat translates your question into a read-only SQL
+query, runs it against your data, and answers with an explanation plus the result table.
 
----
+It uses a **LangGraph ReAct loop** (inspect schema → write SQL → observe → answer) with **Google
+Gemini**, a **DuckDB** analytical engine over your CSVs, and **SQLite** for app metadata. Every
+generated query is validated **read-only** before it runs.
 
-## What This Is
+> **All commands run from the repo root.** The repo root *is* the project — there is no
+> subdirectory to `cd` into.
 
-A starting point for anyone who wants to build an AI agent without writing boilerplate from scratch. The repo ships with:
+## Requirements
 
-- A structured **spec template** covering product vision, architecture, capabilities, data model, API, and UI
-- An **agent-builder** sub-agent that orchestrates the full build lifecycle
-- Sub-agents for spec writing, reviewing, tech design, planning, and auditing
-- Engineering rules baked into the spec so every AI coding session is consistent
-- Phase-gated implementation — minimal working thing first, then iterative expansion
+- Python 3.12+ and [`uv`](https://docs.astral.sh/uv/)
+- A **Google Gemini API key** — DataChat is real-first; there is **no stub/offline mode**.
+  Get one at https://aistudio.google.com/apikey
 
----
+## Setup
 
-## How to Use This
-
-### Step 1 — Clone and configure
+Run from the repo root:
 
 ```bash
-git clone https://github.com/smallTechOrg/ai-spec-driven-boilerplate.git my-agent
-cd my-agent
+# 1. Install dependencies (creates .venv)
+uv sync --extra dev
+
+# 2. Configure environment
 cp .env.example .env
+# then edit .env and set DATA_ANALYST_GEMINI_API_KEY=<your key>
+
+# 3. Create the database schema (SQLite)
+uv run alembic upgrade head
+
+# 4. Verify the migration was applied — must print a revision hash, not blank:
+uv run alembic current
 ```
 
-### Step 2 — Open in Claude Code (or any AI coding assistant)
+## Run the server
+
+Run from the repo root:
 
 ```bash
-claude
+uv run python -m datachat
 ```
 
-### Step 3 — Kick off the agent builder with your idea
+The API serves on **http://localhost:8001** (set `PORT` to override).
 
-```
-/build I want an agent that monitors my Shopify store for low-inventory products and automatically drafts restock emails to suppliers
-```
+## Try it (golden path)
 
-Or just describe your idea naturally — the agent-builder will take it from there.
+Run from the repo root, with the server running:
 
----
+```bash
+# 1. Create a dataset
+DS=$(curl -s -X POST localhost:8001/datasets \
+  -H 'content-type: application/json' \
+  -d '{"name":"Sales"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["data"]["id"])')
 
-## What Happens Next (Fully Automated)
+# 2. Upload a CSV
+printf 'region,product,sales\nwest,widget,100\neast,widget,200\nwest,gadget,50\n' > /tmp/sales.csv
+curl -s -X POST "localhost:8001/datasets/$DS/files" -F "files=@/tmp/sales.csv" >/dev/null
 
-The **agent-builder** orchestrates this sequence:
+# 3. Start a conversation
+CONV=$(curl -s -X POST localhost:8001/conversations \
+  -H 'content-type: application/json' \
+  -d "{\"dataset_id\":\"$DS\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["data"]["id"])')
 
-```
-Your idea
-    ↓
-[spec-writer]     → Asks clarifying questions → Drafts product spec
-    ↓
-[spec-reviewer]   → Checks coherence, flags gaps → Requests revisions
-    ↓
-[spec-writer]     → Iterates until spec is complete
-    ↓
-[tech-designer]   → Proposes tech stack, architecture, data model
-    ↓
-You approve the spec & tech design
-    ↓
-[planner]         → Breaks work into phases (minimal → complete)
-    ↓
-[plan-reviewer]   → Validates plan against spec
-    ↓
-Phase 1: Build the minimal working agent (core loop, no polish)
-    ↓
-[qa-auditor]      → Tests phase 1
-    ↓
-Phase 2, 3, ... : Iterate and expand
-    ↓
-[drift-auditor]   → Ensures code matches spec throughout
-    ↓
-Hand-off to you
+# 4. Ask a question (streams the live agent trace + final answer over SSE)
+curl -N -X POST "localhost:8001/conversations/$CONV/query" \
+  -H 'content-type: application/json' \
+  -d '{"question":"What is the total of all sales?"}'
+
+# 5. Ask a follow-up (multi-turn — uses the prior turn as context)
+curl -N -X POST "localhost:8001/conversations/$CONV/query" \
+  -H 'content-type: application/json' \
+  -d '{"question":"Now just the west region."}'
 ```
 
-**Nothing is skipped.** If a phase fails QA, it stays in that phase until it passes.
+## API
 
----
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/datasets` | Create a dataset (`{"name": "..."}`) |
+| `GET` | `/datasets` | List datasets |
+| `GET` | `/datasets/{id}` | Get a dataset + its files |
+| `POST` | `/datasets/{id}/files` | Upload one or more CSV files (multipart `files`) |
+| `DELETE` | `/datasets/{id}` | Delete a dataset (drops its DuckDB data) |
+| `POST` | `/conversations` | Start a conversation (`{"dataset_id": "..."}`) |
+| `POST` | `/conversations/{id}/query` | Ask a question — **SSE** stream of `step` → `answer` → `done` |
+| `GET` | `/conversations/{id}` | Full conversation history |
 
-## Development Phases (Default Model)
+Every JSON response uses the envelope `{"ok": true, "data": ...}` or
+`{"ok": false, "error": {"code", "message"}}`.
 
-| Phase | What Gets Built |
-|-------|-----------------|
-| 1 | Domain models + data layer |
-| 2 | Core agent loop (no integrations, stubbed tools) |
-| 3 | First real integration (the "happy path" end-to-end) |
-| 4 | Error handling, retries, resilience |
-| 5 | Remaining integrations |
-| 6 | API / CLI surface |
-| 7 | Basic UI (if needed) |
-| 8 | Integration tests |
-| 9 | Observability + logging |
-| 10 | Polish, documentation, hand-off |
+## Tests
 
-Each phase ends with a commit and passes QA before the next phase begins.
+Run from the repo root. The LLM is **real** — set the key first.
 
----
+```bash
+# Unit + structure tests (no key needed; the real-Gemini tests skip without a key):
+uv run pytest
 
-## Repo Layout
-
-```
-.claude/
-  agents/           ← Sub-agents (agent-builder, spec-writer, etc.)
-  commands/         ← Slash commands (/build, /spec-check, /plan)
-.github/
-  copilot-instructions.md  ← Global Copilot instructions (mandatory spec reads)
-  agents/           ← Copilot agent mode definitions (drift-auditor, planner, etc.)
-  prompts/          ← Slash-style Copilot prompts (/plan, /challenge, /spec-check)
-  instructions/     ← Scoped auto-applied rules (code-style, secret-hygiene, etc.)
-spec/
-  product/          ← What your agent does (fill this in or let spec-writer do it)
-  engineering/      ← How AI agents should write code for this project (immutable rules)
-    workflows/      ← Step-by-step procedures for each agent/workflow type
-reports/
-  sessions/         ← Auto-generated session logs from every AI coding session
-CLAUDE.md           ← Entry point for Claude Code
-AGENTS.md           ← Entry point for OpenAI Codex / GitHub Copilot
-.env.example        ← Environment variable template
+# Full suite incl. the real ReAct loop, golden-path SSE, force_finalize, and evals:
+DATA_ANALYST_GEMINI_API_KEY=<your key> uv run pytest
 ```
 
----
+Tests use a file-backed `datachat_test.db` (override with `TEST_DATABASE_URL`), created and
+dropped automatically. Assertions are loose (structure + key values) to absorb LLM output variance.
 
-## Manually Editing the Spec
+Run the eval suite directly:
 
-If you prefer to write the spec yourself before involving AI:
+```bash
+DATA_ANALYST_GEMINI_API_KEY=<your key> uv run python -m evals.harness
+```
 
-1. Open `spec/product/01-vision.md` and fill in the placeholders
-2. Work through each file in `spec/product/` in order
-3. Once the spec is complete, run `/plan` to jump straight to the planning phase
+## How it works
 
----
+- **Agent loop** — a LangGraph `StateGraph` (`src/datachat/graph/`): `assemble_context` →
+  `plan_action` (Gemini picks a tool) → `execute_action` → loop, ending when the model calls the
+  `finish` tool. Bounded by `max_iterations` (default 6); on exhaustion it `force_finalize`s a
+  best-effort answer rather than failing.
+- **Tools (MCP)** — `inspect_schema` and `run_sql` are exposed as a real MCP server
+  (`src/datachat/mcp/servers/sql_server.py`) and bound to Gemini in the graph; both delegate to the
+  same read-only-safe implementation.
+- **Action-safety** — model-generated SQL is parsed (sqlglot) and rejected unless it is a single
+  read-only `SELECT`; the DuckDB query never mutates data.
+- **Privacy** — only the schema + a small row sample (≤20 rows) is ever sent to the model; the full
+  dataset stays in DuckDB.
+- **Observability** — structured JSON logs bound to `run_id`, token/cost per run, OTel GenAI spans.
 
-## Rules That AI Agents Follow
+## Configuration (`.env`, `DATA_ANALYST_` prefix)
 
-Every AI session in this repo follows the rules in `spec/engineering/ai-agents.md`:
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `DATA_ANALYST_GEMINI_API_KEY` | — (**required**) | Google Gemini API key |
+| `DATA_ANALYST_LLM_MODEL` | `gemini-2.5-flash` | Model name |
+| `DATA_ANALYST_DATABASE_URL` | `sqlite+aiosqlite:///./datachat.db` | App metadata DB |
+| `DATA_ANALYST_MAX_ITERATIONS` | `6` | ReAct loop ceiling |
+| `DATA_ANALYST_MAX_UPLOAD_BYTES` | `52428800` | Per-file upload limit |
+| `DATA_ANALYST_SAMPLE_ROWS` | `20` | Rows sampled for LLM grounding |
+| `PORT` | `8001` | Server port |
 
-- Read the full spec before writing any code
-- Open a session report at `reports/sessions/`
-- Commit every logical unit of work (never accumulate uncommitted changes)
-- One phase at a time — no skipping
-- Write tests before marking a phase complete
-- Update this README whenever the project layout changes
+## Scope
 
----
+**This release (MVP):** CSV upload into a dataset, natural-language query (read-only SQL), multi-turn
+conversations with text answers + result tables.
 
-## FAQ
-
-**Can I use this without Claude Code?**
-Yes. `AGENTS.md` has the same entry point for OpenAI Codex and GitHub Copilot. The sub-agents are plain markdown files.
-
-**What if my agent needs a database?**
-The spec template includes a data model section. The tech-designer sub-agent will recommend the right database for your use case.
-
-**What if I already have a tech stack in mind?**
-Tell the agent-builder upfront: `/build [idea] — use Python + FastAPI + PostgreSQL`. It will skip the tech design Q&A for those decisions.
-
-**What if something breaks?**
-Each phase is resilient by design. The QA auditor will catch failures before the next phase starts. You can always re-run a phase.
-
----
-
-## Test-Branch Workflow
-
-The recommended way to iterate on this boilerplate:
-
-1. Keep `main` as the clean boilerplate — only spec, engineering rules, and agent config.
-2. For each build attempt, create a numbered test branch: `test-1`, `test-2`, etc.
-3. Give the agent-builder a single-line prompt on the test branch. Let it build.
-4. Review and test the result on that branch.
-5. **Never merge the generated application code back to main.** Test branches are disposable.
-6. If a run surfaces a boilerplate improvement (a clearer spec template, a missing rule), cherry-pick or manually apply that fix to `main`.
+**Deferred (Future Phases):** charts/visualizations, narrative insights, JSON & other file formats,
+cross-dataset joins, long-term memory, retrieval/RAG, a Next.js chat UI, and Playwright E2E tests.
+See `spec/product/01-vision.md` § Future Phases.
 
 ---
 
-## Contributing
-
-This is a boilerplate, not a framework. Improvements to the spec templates, engineering rules, agent definitions, or workflow specs belong on `main`. Generated application code does not.
+*Built spec-first from the [AI Agent Boilerplate](spec/). The spec in `spec/` is the source of truth.*

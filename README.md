@@ -1,178 +1,121 @@
-# AI Agent Boilerplate — Spec-Driven, Zero-Shot to Working Agent
+# DataChat
 
-This is a boilerplate for building AI agents spec-first. Give it a one-line idea. Walk away with a working, tested, phased agent.
+A browser web app for uploading CSV/JSON datasets and asking plain-English questions about your data. Powered by a Google Gemini ReAct agent that reasons over your data iteratively using sandboxed pandas operations.
 
----
+> **All commands run from the repo root.**
 
-## What This Is
+## Quick Start
 
-A starting point for anyone who wants to build an AI agent without writing boilerplate from scratch. The repo ships with:
-
-- A structured **spec template** covering product vision, architecture, capabilities, data model, API, and UI
-- An **agent-builder** sub-agent that orchestrates the full build lifecycle
-- Sub-agents for spec writing, reviewing, tech design, planning, and auditing
-- Engineering rules baked into the spec so every AI coding session is consistent
-- Phase-gated implementation — minimal working thing first, then iterative expansion
-
----
-
-## How to Use This
-
-### Step 1 — Clone and configure
+### 1. Install dependencies
 
 ```bash
-git clone https://github.com/smallTechOrg/ai-spec-driven-boilerplate.git my-agent
-cd my-agent
+# From: repo root
+uv sync
+```
+
+### 2. Configure environment
+
+```bash
+# From: repo root
 cp .env.example .env
+# Edit .env and set DATA_ANALYST_GEMINI_API_KEY=your-key-here
 ```
 
-### Step 2 — Open in Claude Code (or any AI coding assistant)
+### 3. Apply database migrations
 
 ```bash
-claude
+# From: repo root
+uv run alembic upgrade head
+uv run alembic current    # must show a revision hash — blank = migration not applied
 ```
 
-### Step 3 — Kick off the agent builder with your idea
+### 4. Run the server
 
-```
-/build I want an agent that monitors my Shopify store for low-inventory products and automatically drafts restock emails to suppliers
+```bash
+# From: repo root
+uv run python -m data_analyst
 ```
 
-Or just describe your idea naturally — the agent-builder will take it from there.
+Server starts at **http://localhost:8001**
 
 ---
 
-## What Happens Next (Fully Automated)
+## Environment Variables
 
-The **agent-builder** orchestrates this sequence:
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATA_ANALYST_DATABASE_URL` | No | `sqlite:///./data_analyst.db` | SQLite DB path |
+| `DATA_ANALYST_GEMINI_API_KEY` | Yes (for live mode) | `` | Your Google Gemini API key |
+| `DATA_ANALYST_LLM_MODEL` | No | `gemini-2.5-flash` | Gemini model name |
+| `DATA_ANALYST_MAX_ITERATIONS` | No | `10` | Max ReAct loop iterations per question |
+| `DATA_ANALYST_MAX_UPLOAD_BYTES` | No | `52428800` | Max file size (default 50MB) |
+| `DATA_ANALYST_LOG_LEVEL` | No | `INFO` | Log level |
+| `PORT` | No | `8001` | HTTP port |
 
-```
-Your idea
-    ↓
-[spec-writer]     → Asks clarifying questions → Drafts product spec
-    ↓
-[spec-reviewer]   → Checks coherence, flags gaps → Requests revisions
-    ↓
-[spec-writer]     → Iterates until spec is complete
-    ↓
-[tech-designer]   → Proposes tech stack, architecture, data model
-    ↓
-You approve the spec & tech design
-    ↓
-[planner]         → Breaks work into phases (minimal → complete)
-    ↓
-[plan-reviewer]   → Validates plan against spec
-    ↓
-Phase 1: Build the minimal working agent (core loop, no polish)
-    ↓
-[qa-auditor]      → Tests phase 1
-    ↓
-Phase 2, 3, ... : Iterate and expand
-    ↓
-[drift-auditor]   → Ensures code matches spec throughout
-    ↓
-Hand-off to you
-```
-
-**Nothing is skipped.** If a phase fails QA, it stays in that phase until it passes.
+**Stub mode:** If `DATA_ANALYST_GEMINI_API_KEY` is not set, the app runs in stub mode — all LLM calls return deterministic placeholder responses. Set the API key to switch to live Gemini automatically.
 
 ---
 
-## Development Phases (Default Model)
+## Running Tests
 
-| Phase | What Gets Built |
-|-------|-----------------|
-| 1 | Domain models + data layer |
-| 2 | Core agent loop (no integrations, stubbed tools) |
-| 3 | First real integration (the "happy path" end-to-end) |
-| 4 | Error handling, retries, resilience |
-| 5 | Remaining integrations |
-| 6 | API / CLI surface |
-| 7 | Basic UI (if needed) |
-| 8 | Integration tests |
-| 9 | Observability + logging |
-| 10 | Polish, documentation, hand-off |
-
-Each phase ends with a commit and passes QA before the next phase begins.
-
----
-
-## Repo Layout
-
-```
-.claude/
-  agents/           ← Sub-agents (agent-builder, spec-writer, etc.)
-  commands/         ← Slash commands (/build, /spec-check, /plan)
-.github/
-  copilot-instructions.md  ← Global Copilot instructions (mandatory spec reads)
-  agents/           ← Copilot agent mode definitions (drift-auditor, planner, etc.)
-  prompts/          ← Slash-style Copilot prompts (/plan, /challenge, /spec-check)
-  instructions/     ← Scoped auto-applied rules (code-style, secret-hygiene, etc.)
-spec/
-  product/          ← What your agent does (fill this in or let spec-writer do it)
-  engineering/      ← How AI agents should write code for this project (immutable rules)
-    workflows/      ← Step-by-step procedures for each agent/workflow type
-reports/
-  sessions/         ← Auto-generated session logs from every AI coding session
-CLAUDE.md           ← Entry point for Claude Code
-AGENTS.md           ← Entry point for OpenAI Codex / GitHub Copilot
-.env.example        ← Environment variable template
+```bash
+# From: repo root
+uv run pytest tests/unit/ -v        # unit tests only
+uv run pytest tests/ -v             # all tests — no API key required
 ```
 
 ---
 
-## Manually Editing the Spec
+## API Reference
 
-If you prefer to write the spec yourself before involving AI:
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Health check + current LLM provider |
+| `POST` | `/api/sessions` | Upload a CSV or JSON file |
+| `GET` | `/api/sessions/{id}` | Get session metadata |
+| `GET` | `/api/sessions/{id}/messages` | Get chat history |
+| `POST` | `/api/sessions/{id}/messages` | Ask a question about the dataset |
 
-1. Open `spec/product/01-vision.md` and fill in the placeholders
-2. Work through each file in `spec/product/` in order
-3. Once the spec is complete, run `/plan` to jump straight to the planning phase
+### Upload a file
 
----
+```bash
+curl -X POST http://localhost:8001/api/sessions \
+  -F "file=@data.csv"
+```
 
-## Rules That AI Agents Follow
+### Ask a question
 
-Every AI session in this repo follows the rules in `spec/engineering/ai-agents.md`:
-
-- Read the full spec before writing any code
-- Open a session report at `reports/sessions/`
-- Commit every logical unit of work (never accumulate uncommitted changes)
-- One phase at a time — no skipping
-- Write tests before marking a phase complete
-- Update this README whenever the project layout changes
-
----
-
-## FAQ
-
-**Can I use this without Claude Code?**
-Yes. `AGENTS.md` has the same entry point for OpenAI Codex and GitHub Copilot. The sub-agents are plain markdown files.
-
-**What if my agent needs a database?**
-The spec template includes a data model section. The tech-designer sub-agent will recommend the right database for your use case.
-
-**What if I already have a tech stack in mind?**
-Tell the agent-builder upfront: `/build [idea] — use Python + FastAPI + PostgreSQL`. It will skip the tech design Q&A for those decisions.
-
-**What if something breaks?**
-Each phase is resilient by design. The QA auditor will catch failures before the next phase starts. You can always re-run a phase.
+```bash
+curl -X POST http://localhost:8001/api/sessions/{session_id}/messages \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is the average value in column X?"}'
+```
 
 ---
 
-## Test-Branch Workflow
+## Project Layout
 
-The recommended way to iterate on this boilerplate:
-
-1. Keep `main` as the clean boilerplate — only spec, engineering rules, and agent config.
-2. For each build attempt, create a numbered test branch: `test-1`, `test-2`, etc.
-3. Give the agent-builder a single-line prompt on the test branch. Let it build.
-4. Review and test the result on that branch.
-5. **Never merge the generated application code back to main.** Test branches are disposable.
-6. If a run surfaces a boilerplate improvement (a clearer spec template, a missing rule), cherry-pick or manually apply that fix to `main`.
+```
+src/data_analyst/     ← Python package
+  api/                ← FastAPI routers (health, sessions, chat)
+  config/             ← Settings (Pydantic BaseSettings, DATA_ANALYST_ prefix)
+  db/                 ← SQLAlchemy models + session factory
+  domain/             ← Pydantic domain models
+  graph/              ← LangGraph ReAct agent (state, nodes, edges, runner)
+  llm/                ← LLM provider abstraction (Gemini + stub)
+  tools/              ← pandas_executor (sandboxed read-only operations)
+tests/
+  unit/               ← Unit tests (no DB, no LLM)
+  integration/        ← Integration + golden-path smoke tests
+alembic/              ← Database migrations
+```
 
 ---
 
-## Contributing
+## Deferred (Future Phases)
 
-This is a boilerplate, not a framework. Improvements to the spec templates, engineering rules, agent definitions, or workflow specs belong on `main`. Generated application code does not.
+- Visual dashboards and charts
+- Automated data profiling and insights
+- Multi-user authentication
+- Export / download results
+- Multi-file uploads per session

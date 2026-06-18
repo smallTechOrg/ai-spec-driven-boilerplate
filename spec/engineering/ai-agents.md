@@ -147,8 +147,9 @@ A phase is not done until tests pass. "It looks right" is not a test.
 - **Golden-path** — the full primary user journey through the HTTP/UI layer, asserting rendered content, not just status codes (`spec/engineering/workflows/golden-path-smoke-test.md`).
 - **Frontend / UI** — any page that renders or updates content via JavaScript (charts, SPA, htmx, streamed tokens) must be tested in a **real browser** (Playwright or equivalent) asserting the **rendered DOM** — a `TestClient` HTML check cannot see what the browser actually paints.
 - **End-to-end** — at least one test drives the whole system the way a user would (browser → API → agent → DB → back), with nothing mocked beyond the LLM stub.
+- **Evals** — agents need quality tests, not just plumbing tests. Keep a small fixed set of representative inputs with expected outputs (or rubric/property checks) and run it to catch regressions in the agent's *answers* — a run that returns 200 with a wrong analysis passes every layer above. Run against the stub for deterministic CI, and against the real model when validating a prompt or model change.
 
-A UI claimed "working" on the strength of a 200 response, with no browser-level assertion, is not tested.
+A UI claimed "working" on the strength of a 200 response, with no browser-level assertion, is not tested; an agent whose answers are never eval'd is not validated.
 
 ## 8. Error Resilience
 

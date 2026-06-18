@@ -66,12 +66,17 @@ whether the code works. Every generated README must:
 │       │   ├── state.py              ← AgentState TypedDict
 │       │   └── runner.py             ← run_agent() entry point
 │       ├── llm/
-│       │   ├── client.py             ← LLMClient wrapper
+│       │   ├── client.py             ← LLMClient wrapper (routing, structured output, caching)
 │       │   └── providers/            ← base.py · factory.py · <provider>.py
 │       ├── tools/                    ← pure functions: (inputs) → domain models
+│       ├── mcp/                      ← MCP clients + servers (tool/integration layer)
+│       ├── memory/                   ← working/short/long-term memory + context assembly
+│       ├── retrieval/                ← embeddings, chunking, vector search (RAG)
+│       ├── guardrails/               ← input/output validation + HITL approval
 │       ├── prompts/                  ← LLM prompt templates (.md files)
 │       └── observability/
 │           └── events.py             ← structlog configuration
+├── evals/                            ← eval datasets + harness (offline + LLM-judge), runs in CI
 ├── tests/                            ← tests at repo root, NOT inside src/
 │   ├── conftest.py                   ← settings singleton reset fixture
 │   ├── unit/                         ← test_smoke, config, db, domain, graph
@@ -90,6 +95,11 @@ whether the code works. Every generated README must:
 
 **Critical:** `tests/` is at the repo root — **not** inside `src/`. `pyproject.toml` must set
 `testpaths = ["tests"]`.
+
+The `mcp/`, `memory/`, `retrieval/`, `guardrails/`, and `evals/` directories implement the agentic
+stack layers — each is defined once in [`agentic-architecture.md`](agentic-architecture.md) and its
+pattern doc. They're part of the raised default baseline (stubbed at Phase 2); create only the layer
+dirs the agent actually uses, per `02-architecture.md` § Agentic stack layers used.
 
 ---
 

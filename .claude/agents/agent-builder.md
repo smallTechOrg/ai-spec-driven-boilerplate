@@ -8,7 +8,9 @@ You coordinate a team of sub-agents: spec-writer, spec-reviewer, tech-designer, 
 
 ## The Goal
 
-**First prompt → working skeleton in ~10 minutes.**
+**First prompt → working skeleton, fast.** The skeleton is not a bare loop — it includes the raised
+agentic baseline (memory + MCP tools + retrieval + evals), all stubbed and offline. See
+`spec/engineering/agentic-architecture.md`.
 
 Everything before code is collapsed into two steps: one intake round, one approval. After that, build immediately. Reviews happen in the background as validation, not as gates that block momentum.
 
@@ -82,8 +84,10 @@ Immediately after intake, produce all three artifacts together:
 
 ### 2c — Skeleton Plan (inline)
 For v0.1, the plan is always two phases:
-- **Phase 1:** Domain models + DB schema (direct SQLAlchemy, no repository pattern) — passing unit tests
-- **Phase 2:** Core agent loop stubbed — full pipeline runs end-to-end, zero real API calls, one record in DB, run status "completed"
+- **Phase 1:** Domain models + DB schema incl. the baseline agentic entities (`runs`, `messages`,
+  `memory_records`, embeddings, `eval_results`) — direct SQLAlchemy, no repository pattern; passing unit tests
+- **Phase 2:** Core agent loop + raised baseline (memory + MCP tools + retrieval + eval skeleton), all
+  stubbed — full pipeline runs end-to-end, zero real API calls, one record in DB, run status "completed"
 
 Write this plan into `reports/implementation-plan.md`.
 
@@ -166,17 +170,21 @@ exactly.** Full gate definitions live in `spec/engineering/phases.md` — don't 
    (`tech-stack.md` § Database & Tests); `conftest.py` creates tables via `Base.metadata.create_all`.
 5. Gate: `uv run pytest` passes 100%. Commit: `phase-1: domain models + schema — gate PASSED (N/N tests)`.
 
-### Phase 2 — stubbed agent loop
-1. Implement `tools/*.py` (stubs), `graph/{state,nodes,edges,agent,runner}.py`, `__main__.py`
-   (port 8001), `tests/integration/test_pipeline.py`.
-2. **LLM provider + stubs + stub-mode banner** — follow `spec/engineering/patterns/llm-providers.md`.
-   For a ReAct agent, also follow `spec/engineering/patterns/react-agent.md` (stub simulates ≥2
-   iterations; loop exhaustion → `force_finalize`).
+### Phase 2 — stubbed agent loop + raised baseline
+1. Implement `graph/{state,nodes,edges,agent,runner}.py`, `tools/*.py` (stubs), `__main__.py`
+   (port 8001), and the **baseline agentic layers, stubbed/offline**: `memory/` (working + short-term +
+   context assembly), `mcp/` (≥1 MCP tool behind the action-safety boundary), `retrieval/` (embeddings +
+   vector store with deterministic fake vectors), `evals/` (tiny dataset + ≥1 assertion). Plus
+   `tests/integration/test_pipeline.py`.
+2. **Follow the layer pattern docs** (don't restate them): `patterns/llm-providers.md` (provider=auto +
+   stub banner), `patterns/react-agent.md` (≥2 iterations; exhaustion → `force_finalize`),
+   `patterns/memory-and-context.md`, `patterns/tools-and-mcp.md`, `patterns/retrieval.md`,
+   `patterns/observability-and-evals.md`. Only build the layers `02-architecture.md` says apply.
 3. Write `README.md` per `project-layout.md` § README Requirements — setting the API key is the primary
    path, stub mode the clearly-labelled fallback.
 4. Run the Phase 2 gate in `phases.md`: `uv run pytest` (DB URL set, LLM key NOT required) + golden-path
-   smoke + live-server `curl` check, all green.
-5. Commit: `phase-2: stubbed agent loop + UI + README — gate PASSED (N/N tests)`.
+   smoke + live-server `curl` check + the eval skeleton, all green.
+5. Commit: `phase-2: stubbed agent loop + baseline layers + README — gate PASSED (N/N tests)`.
 
 Announce: "Skeleton is running." Point the user to the README.
 

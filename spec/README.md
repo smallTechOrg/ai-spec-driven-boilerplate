@@ -18,16 +18,20 @@ spec/
     05-api.md          ← API surface (REST/GraphQL/CLI/etc.)
     06-ui.md           ← UI requirements (if any)
     07-agent-graph.md  ← Required for any agent-framework project
-  engineering/         ← How to build it
-    ai-agents.md       ← Rules for ALL AI coding sessions (the canonical rule list)
-    spec-driven.md     ← Spec-first development (why/how)
-    phases.md          ← Phased implementation model
-    project-layout.md  ← Canonical structure + README requirements
-    tech-stack.md      ← Stack defaults + model source-of-truth
-    code-style.md      ← Style and structural rules
-    secret-hygiene.md  ← Secret-handling rules
-    patterns/          ← Reusable engineering patterns (react-agent, llm-providers)
-    workflows/         ← Repeatable procedures
+  engineering/              ← How to build it
+    agentic-architecture.md ← The agentic AI stack (10 layers) — the reference architecture
+    ai-agents.md            ← Rules for ALL AI coding sessions (the canonical rule list)
+    spec-driven.md          ← Spec-first development (why/how)
+    phases.md               ← Phased implementation model
+    project-layout.md       ← Canonical structure + README requirements
+    tech-stack.md           ← Stack defaults + model + per-layer tech source-of-truth
+    code-style.md           ← Style and structural rules
+    secret-hygiene.md       ← Secret-handling rules
+    patterns/               ← One canonical home per stack layer:
+                              react-agent · llm-providers · memory-and-context · tools-and-mcp
+                              retrieval · multi-agent · guardrails-and-hitl · durability
+                              observability-and-evals
+    workflows/              ← Repeatable procedures
 ```
 
 ## Governance Rules

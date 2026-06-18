@@ -1,7 +1,30 @@
-# Pattern: LLM Provider Selection & Stubs
+# Pattern: Model Layer — Providers, Stubs & Routing
 
-**Canonical home for the provider/stub rules.** Any project with an LLM dependency follows these.
-Model identifiers themselves live in `spec/engineering/tech-stack.md` § Models — not here.
+**Canonical home for layer 1 (Model)** of the stack
+([`../agentic-architecture.md`](../agentic-architecture.md)). Provider selection, stubs, model routing,
+and the model-call features every agent uses. Model identifiers themselves live in
+[`../tech-stack.md`](../tech-stack.md) § Models — not here.
+
+---
+
+## Model layer essentials
+
+- **Model routing** — don't send every call to one model. Route by task difficulty: cheap/fast
+  (`claude-haiku-4-5`) for classification, extraction, routing; the default (`claude-sonnet-4-6`) for
+  the main loop; the strong model (`claude-opus-4-8`) for hard reasoning and as the eval judge. Make the
+  routing explicit in the LLM client, configurable via env.
+- **Structured outputs** — when a node needs typed data, use the provider's structured-output / tool-use
+  mode and parse into a Pydantic model — never regex over free text.
+- **Prompt caching** — keep the stable prefix (system prompt + tool descriptions) byte-stable so it
+  stays cached across turns; this is what makes resending context every turn affordable (see
+  [`memory-and-context.md`](memory-and-context.md) § Window management).
+- **Extended thinking** — enable for genuinely hard reasoning steps; it trades latency/tokens for
+  quality. Don't enable it blanket — it's per-call, on the hard nodes.
+- **Errors** — every model call has error handling, retries with backoff on transient failures, and a
+  fatal-vs-recoverable boundary the loop can act on ([`react-agent.md`](react-agent.md)).
+
+All of the above sit behind the `LLMClient` wrapper (`project-layout.md` Rule 7) — nodes never call a
+provider SDK directly.
 
 ---
 

@@ -15,12 +15,16 @@ A spec-driven boilerplate for building AI agents. The spec in `spec/` is the sin
 ```
 spec/product/01-vision.md · 02-architecture.md · capabilities/ · 04-data-model.md · 05-api.md · 06-ui.md
 spec/product/07-agent-graph.md       ← REQUIRED for any agent-framework project (LangGraph, CrewAI, …)
+spec/engineering/agentic-architecture.md  ← the agentic AI stack (10 layers) — read after the product spec
 spec/engineering/ai-agents.md · spec-driven.md · phases.md · project-layout.md · tech-stack.md · code-style.md
-spec/engineering/patterns/           ← react-agent.md (ReAct loop) · llm-providers.md (provider/stub)
+spec/engineering/patterns/           ← one canonical home per layer:
+    react-agent.md · llm-providers.md · memory-and-context.md · tools-and-mcp.md · retrieval.md
+    multi-agent.md · guardrails-and-hitl.md · durability.md · observability-and-evals.md
 ```
 
 `07-agent-graph.md` is mandatory for any orchestration-framework project. If it's missing when you reach
-Phase 2, stop and raise it as a blocker.
+Phase 2, stop and raise it as a blocker. The **default agent ships memory + MCP tools + retrieval +
+evals** (stubbed at Phase 2) — the raised baseline in `agentic-architecture.md`.
 
 ## Non-negotiables (full text in `ai-agents.md`)
 

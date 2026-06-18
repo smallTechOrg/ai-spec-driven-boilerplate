@@ -97,15 +97,19 @@ List the specific libraries for:
 - TypeScript: `pnpm` + `package.json`
 - Go: `go mod`
 
+### 8. Agentic Stack Layers
+
+Decide which of the 10 layers in [`spec/engineering/agentic-architecture.md`](../../spec/engineering/agentic-architecture.md) this agent uses, and pin the tech for each from [`spec/engineering/tech-stack.md`](../../spec/engineering/tech-stack.md) § Agentic Stack Tech. The baseline (model, context, working/short-term memory, MCP tools, retrieval wiring, observability + evals) is always on; decide the earns-its-place ones (long-term memory, real retrieval, multi-agent, HITL, durable execution) based on what the agent's job requires. **Default to LangGraph + MCP.**
+
 ---
 
 ## Your Output
 
 Fill in these files with your decisions:
 
-1. `spec/engineering/tech-stack.md` — complete the template with your decisions
+1. `spec/engineering/tech-stack.md` — complete the template, **including § Agentic Stack Tech** (vector DB/embeddings, MCP runtime, checkpointer, tracing, evals)
 2. `spec/engineering/code-style.md` — fill in the language-specific sections
-3. `spec/product/02-architecture.md` — if any sections were left empty (deployment model, components), fill them in now that you know the tech stack
+3. `spec/product/02-architecture.md` — fill empty sections **and § Agentic Stack Layers Used** (which layers + why)
 4. **`spec/product/07-agent-graph.md` — REQUIRED if you chose an agent framework (LangGraph, CrewAI, AutoGen, etc.)**
 
 ### Agent Graph Spec (mandatory when using an agent framework)

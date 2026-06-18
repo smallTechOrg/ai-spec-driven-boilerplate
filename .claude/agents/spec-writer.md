@@ -79,8 +79,14 @@ If yes — defer it. One sentence in `## Future Phases` is enough.
 | One external data source | Multiple parallel sources |
 | Config file or env vars | Config CRUD API |
 | CLI or REST — not both | Full web dashboard |
-| Core happy path only | Retry logic, rate limiting, observability |
+| Core happy path + retries | Rate limiting, multi-tenancy |
 | SQLite local file | Remote DB, multi-tenancy |
+
+**Not deferrable — the raised baseline.** Memory, MCP tools, retrieval wiring, observability, and an
+eval skeleton are part of every agent's baseline (`spec/engineering/agentic-architecture.md`), not
+"future." Don't scope them out. The earns-its-place layers (long-term memory, real retrieval,
+multi-agent, HITL, durable execution) **are** deferrable — defer them unless the core loop needs them,
+and record the decision in `02-architecture.md` § Agentic stack layers used.
 
 **Target:** 2–4 capabilities max for v1. If you have more than 5, go back and defer — you have not scoped ruthlessly enough.
 

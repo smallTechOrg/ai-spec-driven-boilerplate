@@ -6,12 +6,20 @@ Agents are built incrementally. This is the default model; the planner sub-agent
 demonstrates the core loop end-to-end — even with stubbed connections, hardcoded data, and no UI. Each
 later phase makes it more real.
 
+The **raised baseline** ([`agentic-architecture.md`](agentic-architecture.md)) means that "minimal
+working thing" now includes the core agentic layers — working/short-term memory, one MCP tool,
+retrieval wiring, and an eval-harness skeleton — all stubbed and offline at Phase 2. The earns-its-place
+layers (long-term memory, real retrieval, multi-agent, HITL, durable execution) land in later phases,
+each only when the spec needs it.
+
 ---
 
 ## Default phase model
 
 ### Phase 1 — Domain Models + Data Layer
-Define all core data types; set up the DB schema. No business logic yet.
+Define all core data types; set up the DB schema. No business logic yet. The schema includes the
+baseline agentic entities (`runs`, `messages`, `memory_records`, an embeddings/vector table,
+`eval_results` — see `../product/04-data-model.md`) plus the agent's domain entities.
 **Gate:** (1) `pyproject.toml` declares the DB driver in `[project.dependencies]`, never dev-only;
 (2) `uv run alembic upgrade head` succeeds against the configured DB and `uv run alembic current` shows a
 revision — run and confirmed, not assumed; (3) CRUD unit tests pass; (4) tree clean and committed.
@@ -33,10 +41,15 @@ done.
    drives the loop past `max_agent_iterations` into `force_finalize` (best-effort answer, not a hard
    failure). Observability baseline holds — structured per-`run_id` logs, token/cost on the run, and the
    `action_history` trace surfaced to the user. → [`patterns/react-agent.md`](patterns/react-agent.md).
+7. **Baseline agentic layers wired (stubbed):**
+   - **Memory** — working + short-term; context assembled in one place. → [`patterns/memory-and-context.md`](patterns/memory-and-context.md).
+   - **Tools/MCP** — ≥1 MCP tool behind the action-safety boundary, stub returns a deterministic typed result. → [`patterns/tools-and-mcp.md`](patterns/tools-and-mcp.md).
+   - **Retrieval** — embeddings + vector store wired with deterministic fake vectors. → [`patterns/retrieval.md`](patterns/retrieval.md).
+   - **Evals** — an eval-harness skeleton (tiny fixed dataset + ≥1 assertion) runs in CI against the stub. → [`patterns/observability-and-evals.md`](patterns/observability-and-evals.md).
 
 ### Phase 3 — First Real Integration
-Replace the most critical stub (usually the LLM or primary data source) with a real call.
-**Gate:** happy path works with real data.
+Replace the most critical stub (usually the LLM, the primary data source, or the first real MCP server)
+with a real call. **Gate:** happy path works with real data.
 
 ### Phase 4 — Error Handling + Resilience
 Add try/catch, retries, timeouts to all external calls; degrade rather than crash on non-critical
@@ -66,6 +79,22 @@ backend). **Gate:** per-run token, cost, and latency are queryable in aggregate;
 ### Phase 10 — Polish + Hand-off
 Fix rough edges, improve error messages, update docs. Final drift audit; accurate README.
 **Gate:** drift audit passes; README reviewed by user; user accepts hand-off.
+
+---
+
+## Agentic layers by phase
+
+The baseline layers (memory, MCP tools, retrieval, evals) land **stubbed in Phase 2** above. The
+earns-its-place layers land later, each only when `02-architecture.md` says the agent needs it:
+
+| Layer | Lands at | Trigger |
+|-------|----------|---------|
+| Real MCP servers / integrations | Phase 3 / 5 | the agent acts on a real external system |
+| Long-term memory + real retrieval / RAG | Phase 3 / 5 | answers depend on cross-session memory or a corpus |
+| Human-in-the-loop ([`patterns/guardrails-and-hitl.md`](patterns/guardrails-and-hitl.md)) | Phase 4 | the agent gains a real irreversible/high-stakes action |
+| Durable execution / checkpointing ([`patterns/durability.md`](patterns/durability.md)) | Phase 4 / 8 | runs become long, resumable, or must survive a restart |
+| Multi-agent topologies ([`patterns/multi-agent.md`](patterns/multi-agent.md)) | Phase 5+ | an escalation criterion is met |
+| Advanced observability + richer evals ([`patterns/observability-and-evals.md`](patterns/observability-and-evals.md)) | Phase 9 | trace export / aggregate metrics / LLM-judge suite needed |
 
 ---
 

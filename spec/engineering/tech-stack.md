@@ -16,7 +16,9 @@
   SQLAlchemy 2.0).
 - **Dependency management:** `uv` + `pyproject.toml` (Python); `pnpm` or `npm` (Node.js).
 
-This is the stack the intake question (`agent-builder` Q2) recommends first.
+This is the stack the intake question (`agent-builder` Q2) recommends first. The agentic layers built on
+top of it are speced in [`agentic-architecture.md`](agentic-architecture.md); their exact tech is the
+**Agentic Stack Tech** table below.
 
 ## Models (source of truth — every other file links here)
 
@@ -30,6 +32,28 @@ Verify against the provider's current docs / `ListModels` before hardcoding.
 | **Anthropic** (default) | `claude-sonnet-4-6` | `claude-haiku-4-5-20251001` | `claude-opus-4-8` | `claude-fable-5` also available |
 | Google Gemini | `gemini-2.5-flash` | `gemini-2.5-flash` | `gemini-2.5-pro` | older `1.5`/`2.0-flash` unavailable to new users |
 | OpenAI | `gpt-4o-mini` | `gpt-4o-mini` | `gpt-4o` | |
+
+## Agentic Stack Tech (source of truth for layers 2–9)
+
+Defaults for the layers in [`agentic-architecture.md`](agentic-architecture.md). Zero-ops choices first;
+the override column is what to reach for at scale. The tech-designer pins the actual choice per project.
+
+| Layer | Default (zero-ops) | Override at scale |
+|-------|--------------------|-------------------|
+| Orchestration | **LangGraph** (`StateGraph`) | — (Claude Agent SDK for Claude-native/light) |
+| Tools / integration | **MCP** via `mcp` SDK (stdio) | MCP over streamable HTTP; official servers |
+| Memory store | SQLite tables (`memory_records`) | PostgreSQL |
+| Vector / embeddings | **`sqlite-vec`** + Anthropic/`voyage` or local embeddings | **pgvector**, or a dedicated vector DB (Qdrant/Weaviate) |
+| Retrieval rerank | none (top-k) | cross-encoder / LLM reranker |
+| Checkpointer (durability) | **`SqliteSaver`** | **`PostgresSaver`** |
+| Guardrails | in-process validators + Pydantic | a dedicated guardrails lib if policy grows |
+| Tracing | structured logs (`structlog`) | **OTel GenAI** export → LangSmith / Langfuse |
+| Evals | `pytest` + a fixed dataset + LLM-judge | a dedicated eval framework / online judges |
+
+**Raised baseline:** the default agent ships layers 1–5 + 9 (model, context, working/short-term memory,
+MCP tools, retrieval wiring, observability + an eval skeleton) — all stubbed/offline at Phase 2. Layers
+6 (multi-agent), 7 (HITL), 8 (durable execution) and long-term memory are added when they earn their
+place. See [`phases.md`](phases.md).
 
 ---
 

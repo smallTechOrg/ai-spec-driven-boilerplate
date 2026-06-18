@@ -8,6 +8,19 @@
 
 <!-- FILL IN: What database/storage does this project use and why? -->
 
+## Baseline agentic entities (start here, then add domain entities)
+
+The raised baseline (`../engineering/agentic-architecture.md`) assumes these tables exist alongside the
+agent's domain entities. Keep the ones the chosen layers use; drop a row only if that layer is unused.
+
+| Entity | Holds | Layer |
+|--------|-------|-------|
+| `runs` | one agent invocation: status, usage (tokens/cost), error, timestamps | 6/9 |
+| `messages` | conversation turns per session (`thread_id`) | 3 (short-term) |
+| `memory_records` | long-term memory: content, kind, salience, embedding | 3 (long-term) |
+| `embeddings` / vector table | chunk vectors + source metadata for retrieval | 5 |
+| `eval_results` | eval run scores per dataset case | 9 |
+
 ## Entities
 
 <!-- FILL IN: One section per major entity. -->

@@ -9,6 +9,14 @@ search. If the agent acts on the outside world, it must run this loop — not a 
 "gather context → pass to LLM → return answer" pipeline. A one-shot pipeline cannot verify its inputs
 or self-correct, and breaks the moment the real environment differs from the sampled context.
 
+> **Place in the stack:** this is layer 6's **single-agent default** in
+> [`../agentic-architecture.md`](../agentic-architecture.md). The other layers wire around it: context +
+> memory ([`memory-and-context.md`](memory-and-context.md)), tools/MCP ([`tools-and-mcp.md`](tools-and-mcp.md)),
+> retrieval ([`retrieval.md`](retrieval.md)), guardrails/HITL ([`guardrails-and-hitl.md`](guardrails-and-hitl.md)),
+> durability ([`durability.md`](durability.md)), and observability/evals
+> ([`observability-and-evals.md`](observability-and-evals.md)). Escalate to multiple agents only when a
+> single loop can't keep the task coherent — [`multi-agent.md`](multi-agent.md) § Escalation criteria.
+
 ---
 
 ## The loop

@@ -19,6 +19,8 @@ You are invoked by the agent-builder after the spec-writer produces a draft, and
 - [ ] All `<!-- FILL IN -->` placeholders are replaced
 - [ ] `spec/product/01-vision.md`: purpose, users, success criteria, and out-of-scope are all defined
 - [ ] `spec/product/02-architecture.md`: system overview, components, and data flow are clear
+- [ ] `spec/product/02-architecture.md` § **Agentic Stack Layers Used** is filled — baseline layers
+      present, each earns-its-place layer marked yes/no with a reason (`spec/engineering/agentic-architecture.md`)
 - [ ] At least one capability file exists in `spec/product/capabilities/`
 - [ ] Every capability has: what it does, inputs, outputs, external calls, and success criteria
 - [ ] Every external call has a defined failure mode

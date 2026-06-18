@@ -3,6 +3,8 @@
 > **Boilerplate status:** Required when the project uses an agent framework (LangGraph, CrewAI, AutoGen, etc.). Filled in by the tech-designer as part of the tech design stage. Delete this file if there's no agent framework (a simple script or API). The spec-reviewer treats it as a **CRITICAL BLOCKER** — the tech design is not approved if it's absent or incomplete when a framework is in use.
 >
 > **If the agent acts on the outside world** (tools, data, search), it must use a **ReAct loop**. Fill this file in per [`../engineering/patterns/react-agent.md`](../engineering/patterns/react-agent.md) — answer its eight pre-coding questions, carry the loop-control + usage fields in State, route iteration exhaustion to `force_finalize` (not a one-shot pipeline), and surface `action_history` to the user live. The Force-Finalize node section below applies only to ReAct loops.
+>
+> **This graph wires the stack layers** declared in `02-architecture.md` § Agentic stack layers used: a context-assembly step pulls memory + retrieval ([`memory-and-context.md`](../engineering/patterns/memory-and-context.md), [`retrieval.md`](../engineering/patterns/retrieval.md)); `act` calls tools/MCP behind the action-safety boundary ([`tools-and-mcp.md`](../engineering/patterns/tools-and-mcp.md)); high-stakes actions route through guardrails/HITL ([`guardrails-and-hitl.md`](../engineering/patterns/guardrails-and-hitl.md)). For multi-agent, each sub-agent is its own subgraph ([`multi-agent.md`](../engineering/patterns/multi-agent.md)); for resumable runs, compile with a checkpointer ([`durability.md`](../engineering/patterns/durability.md)).
 
 ---
 

@@ -46,7 +46,9 @@ next steps **in real time** — never reconstruct it at the end. A missing sessi
 
 ## 3. The One-Approval Gate Law
 
-Goal: **one prompt → working skeleton in ~10 minutes.** Decisions are captured upfront and approved once.
+Goal: **one prompt → working skeleton fast.** Decisions are captured upfront and approved once. The
+skeleton is not a bare loop — it includes the raised agentic baseline (memory + MCP tools + retrieval +
+evals), all stubbed and offline. → [`agentic-architecture.md`](agentic-architecture.md).
 
 ```
 INTAKE (scope · stack · trigger · constraints)  →  DRAFT (spec + tech design + plan together)
@@ -122,13 +124,17 @@ Build what the spec says, nothing more. No extra features "while you're in there
 outside the current phase, no premature abstractions. Note future improvements in the session report and
 keep moving.
 
-## 10. ReAct Agents
+## 10. Agentic Architecture
 
 If the agent acts on the outside world (tools, data, search), it must run a ReAct loop with all the
 mandatory mechanics — termination signal, max-iterations guard, `force_finalize`, self-correction, the
 action-safety boundary, usage accounting, and a live user-facing trace. Defined once in
-[`patterns/react-agent.md`](patterns/react-agent.md); LLM provider/stub rules in
-[`patterns/llm-providers.md`](patterns/llm-providers.md).
+[`patterns/react-agent.md`](patterns/react-agent.md).
+
+Build to the **agentic baseline** in [`agentic-architecture.md`](agentic-architecture.md): the default
+agent ships memory + MCP tools + retrieval + evals (stubbed at Phase 2). Before Phase 2, record in
+`02-architecture.md` which stack layers apply and why; each layer is defined once in its pattern doc
+under [`patterns/`](patterns/) — never restate, link.
 
 ## 11. When Stuck
 

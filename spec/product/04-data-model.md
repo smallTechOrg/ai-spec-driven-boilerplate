@@ -4,12 +4,14 @@
 
 Two stores, each for what it's good at:
 
-- **PostgreSQL** — application metadata: datasets, uploaded files (+ inferred schema), conversations,
-  messages, and agent runs. Durable, relational, queried by the API.
+- **SQLite** (binding user override — demo/single-machine; async via `aiosqlite`) — application
+  metadata: datasets, uploaded files (+ inferred schema), conversations, messages, and agent runs.
+  Durable, relational, queried by the API. The same async SQLAlchemy 2.0 code moves to PostgreSQL by
+  changing only the driver/URL if the project outgrows a single machine.
 - **DuckDB** (in-process analytical engine) — the actual CSV-derived data. On upload, each file's rows
   are materialized as a **DuckDB table** (one table per file, named from the dataset/file id). The
   ReAct agent's `run_sql` MCP tool executes read-only `SELECT`s against these tables. DuckDB tables are
-  **not** modeled in PostgreSQL beyond the `file` record that describes their schema.
+  **not** modeled in SQLite beyond the `file` record that describes their schema.
 
 Timestamps are **naive UTC** (`datetime.utcnow()`, no tzinfo) — store UTC, format at the edge.
 
@@ -125,12 +127,12 @@ A score for one eval case (NL question against a fixture dataset vs. a reference
   DuckDB tables (releasing the session-scoped engine resource per
   [`react-agent.md`](../engineering/patterns/react-agent.md) § Resource lifecycle).
 - **Volatility** — DuckDB tables live in the in-process engine; on a process restart they must be
-  **re-materialized** from the stored files (or the dataset is reported as "not loaded"). PostgreSQL
+  **re-materialized** from the stored files (or the dataset is reported as "not loaded"). SQLite
   metadata is durable.
 
 ## Sensitive Data
 
-- Uploaded CSVs may contain user/business data; it stays in PostgreSQL/DuckDB on the deployment and is
+- Uploaded CSVs may contain user/business data; it stays in SQLite/DuckDB on the deployment and is
   **never** sent wholesale to the LLM — only schema + a ≤20-row sample. No PII fields are added by the
   system itself.
 - `GEMINI_API_KEY`/`GOOGLE_API_KEY` is a secret — env-only, never stored in the DB, never logged

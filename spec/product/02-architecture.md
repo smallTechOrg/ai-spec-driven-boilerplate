@@ -8,7 +8,7 @@ a table in an in-process **DuckDB** analytical engine. The user then chats about
 question runs a **LangGraph ReAct agent** that uses **Google Gemini** (`gemini-2.5-flash`) to inspect
 the schema and generate a **read-only SQL query**, executes it via an **MCP tool** against DuckDB, and
 streams back a plain-English answer plus the result table over **SSE**. App metadata (datasets, files,
-conversations, messages, runs) lives in **PostgreSQL**; the CSV-derived data lives in DuckDB. This is
+conversations, messages, runs) lives in **SQLite**; the CSV-derived data lives in DuckDB. This is
 the single-ReAct-loop default of the agentic stack
 ([`../engineering/agentic-architecture.md`](../engineering/agentic-architecture.md)) — every baseline
 layer real from Phase 1.
@@ -37,7 +37,7 @@ Next.js / React / Tailwind UI  (dataset picker + upload, chat, result tables, li
         ↓  (HTTP + SSE)
 Async FastAPI API  (ok()/api_error() envelope)
         ├─ Dataset/Upload service ──► CSV parse + schema inference ──► DuckDB (per-dataset tables)
-        ├─ Conversation service ────► PostgreSQL (datasets, files, conversations, messages, runs)
+        ├─ Conversation service ────► SQLite (datasets, files, conversations, messages, runs)
         └─ Agent runner: LangGraph ReAct StateGraph
                ├─ context assembly  ← short-term memory (messages) + schema/sample
                ├─ plan_action  ← Google Gemini (init_chat_model)
@@ -58,14 +58,14 @@ Observability: OTel GenAI traces · token/cost on run · structured run_id logs 
 | Model | Gemini via `init_chat_model`; structured usage returned per call. |
 | Memory/context | Working state + short-term conversation memory; context assembled once. |
 | Analytical engine | DuckDB — executes read-only SQL over the dataset's CSV-derived tables. |
-| Metadata storage | PostgreSQL — datasets, files, conversations, messages, runs. |
+| Metadata storage | SQLite — datasets, files, conversations, messages, runs. |
 | Observability | OTel traces, token/cost on runs, structured logs, eval skeleton. |
 
 ## Data Flow
 
 1. **Trigger:** User uploads CSV(s) into a dataset via the UI/API, then sends a chat question.
 2. **Setup (upload):** Each CSV is parsed, its schema (columns + inferred types) recorded in
-   PostgreSQL, and the rows loaded into a DuckDB table for that dataset.
+   SQLite, and the rows loaded into a DuckDB table for that dataset.
 3. **Question:** The API opens a `run`, assembles context (schema + sample + recent turns), and starts
    the ReAct loop.
 4. **Loop:** Gemini plans an action (inspect schema or generate a read-only SQL query); the read-only
@@ -80,11 +80,11 @@ Observability: OTel GenAI traces · token/cost on run · structured run_id logs 
 | Dependency | Purpose | Failure Mode |
 |------------|---------|--------------|
 | Google Gemini API | LLM for the ReAct loop (NL→SQL planning + answer) | Fail loud; the run records `error`, API returns `api_error("LLM_UNAVAILABLE", …)`. |
-| PostgreSQL | App metadata (datasets, files, conversations, messages, runs) | Startup fails loud if unreachable; request returns `api_error`. |
+| SQLite | App metadata (datasets, files, conversations, messages, runs) | Startup fails loud if unreachable; request returns `api_error`. |
 | DuckDB (in-process) | Analytical engine executing read-only SQL over dataset data | If the dataset's in-memory table is missing (e.g. after restart), API returns a clear "dataset not loaded — re-materialize" error, not a 500. |
 
 ## Deployment Model
 
 A long-running async FastAPI service (uvicorn) plus the Next.js frontend. DuckDB runs **in-process**
-inside the API service; PostgreSQL is an external service. Single-node, single-deployment for the first
+inside the API service; SQLite is an external service. Single-node, single-deployment for the first
 release (no horizontal scale-out of the in-process DuckDB engine).

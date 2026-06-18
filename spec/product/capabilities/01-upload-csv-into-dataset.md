@@ -17,7 +17,7 @@ inferring its column schema and types, and materializing the rows as a queryable
 
 | Output | Type | Destination |
 |--------|------|-------------|
-| dataset record | row in `dataset` (PostgreSQL) | persistence |
+| dataset record | row in `dataset` (SQLite) | persistence |
 | file record + inferred schema | row in `file` (columns + types JSON) | persistence |
 | DuckDB table | one table per file, named from the dataset/file | DuckDB analytical engine |
 | schema summary | JSON (columns, types, row count) | API response → UI |
@@ -26,7 +26,7 @@ inferring its column schema and types, and materializing the rows as a queryable
 
 | System | Operation | On Failure |
 |--------|-----------|------------|
-| PostgreSQL | insert dataset + file rows | fail loud → `api_error("DB_ERROR", …, 500)` |
+| SQLite | insert dataset + file rows | fail loud → `api_error("DB_ERROR", …, 500)` |
 | DuckDB | `read_csv_auto` / register table; `DESCRIBE` for inferred types | parse/load error → `api_error("CSV_PARSE_ERROR", detail, 400)`; file rejected, dataset left intact |
 
 ## Business Rules

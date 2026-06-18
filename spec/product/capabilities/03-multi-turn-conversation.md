@@ -11,20 +11,20 @@ filter that to 2024", "what about by region?") build on prior turns as context.
 |-------|------|--------|----------|
 | conversation id | uuid | client (or created on first turn) | yes (after first turn) |
 | new question | string (NL) | user | yes |
-| prior turns | list of `message` rows | PostgreSQL (`messages`, by conversation) | yes (assembled into context) |
+| prior turns | list of `message` rows | SQLite (`messages`, by conversation) | yes (assembled into context) |
 
 ## Outputs
 
 | Output | Type | Destination |
 |--------|------|-------------|
-| new user + assistant messages | rows in `message` | PostgreSQL (persisted) |
+| new user + assistant messages | rows in `message` | SQLite (persisted) |
 | context-aware answer | answer text + result table | SSE → UI (see [`02-natural-language-query.md`](02-natural-language-query.md)) |
 
 ## External Calls
 
 | System | Operation | On Failure |
 |--------|-----------|------------|
-| PostgreSQL | load recent turns for the conversation; append new turns | DB error → `api_error("DB_ERROR", …, 500)` |
+| SQLite | load recent turns for the conversation; append new turns | DB error → `api_error("DB_ERROR", …, 500)` |
 | (downstream) NL-query capability | runs the actual ReAct loop with prior turns in context | see [`02-natural-language-query.md`](02-natural-language-query.md) |
 
 ## Business Rules
@@ -35,7 +35,7 @@ filter that to 2024", "what about by region?") build on prior turns as context.
   older turns summarized if the budget is exceeded) per
   [`memory-and-context.md`](../../engineering/patterns/memory-and-context.md). No long-term memory
   across conversations in v1.
-- Conversation history **persists** in PostgreSQL and is retrievable for display and for context on the
+- Conversation history **persists** in SQLite and is retrievable for display and for context on the
   next turn.
 - A follow-up must be interpretable against the prior turn — e.g. "now just 2024" should narrow the
   previous result, which means the prior turn measurably influences the newly generated query.

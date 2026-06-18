@@ -112,9 +112,11 @@ Errors return as JSON via the response envelope, never an HTML page. Runs on **p
 ### Database & ORM
 **Two stores, distinct roles — do not conflate them:**
 
-- **PostgreSQL** — app metadata and agentic entities: datasets, uploaded-file metadata, chat sessions,
-  `runs`, `messages`. Accessed via **async SQLAlchemy 2.0 + `asyncpg`**, migrations via **Alembic**.
-  This is the durable system-of-record.
+- **SQLite** (binding user override — demo/single-machine) — app metadata and agentic entities:
+  datasets, uploaded-file metadata, chat sessions, `runs`, `messages`. Accessed via **async
+  SQLAlchemy 2.0 + `aiosqlite`**, migrations via **Alembic**. This is the durable system-of-record. The
+  same SQLAlchemy 2.0 code moves to PostgreSQL by changing only the driver/URL if the project outgrows a
+  single machine. Tests run against SQLite (same driver as production — correct per § Database & Tests).
 - **DuckDB** — the **analytical query engine** that executes the agent's read-only SQL over the
   uploaded CSV data (in-process, fast columnar). DuckDB holds the *data being analyzed*; it is not the
   app's metadata store. CSVs are parsed with **pandas** for schema inference and a small sample; the
@@ -134,8 +136,8 @@ FastAPI backend over HTTP + SSE. Dependencies via `npm`/`pnpm`. Never Python.
 | `uvicorn[standard]` | `>=0.32` | ASGI server (port 8001) |
 | `sse-starlette` | `>=2.1` | SSE streaming of the chat response / live action trace |
 | `python-multipart` | `>=0.0.12` | CSV file upload (multipart form parsing) |
-| `sqlalchemy[asyncio]` | `>=2.0` | Async ORM for Postgres metadata |
-| `asyncpg` | `>=0.30` | Async PostgreSQL driver (in `[project.dependencies]`, not dev-only) |
+| `sqlalchemy[asyncio]` | `>=2.0` | Async ORM for SQLite metadata |
+| `aiosqlite` | `>=0.20` | Async SQLite driver (in `[project.dependencies]`, not dev-only) |
 | `alembic` | `>=1.14` | Database migrations |
 | `duckdb` | `>=1.1` | In-process columnar engine — runs read-only SQL over uploaded CSVs |
 | `pandas` | `>=2.2` | CSV parsing, schema inference, sampling rows for the LLM |
@@ -171,8 +173,8 @@ wrong/deprecated model name.
   `COPY`/`INSTALL`/`LOAD`, etc.). The MCP SQL tool never mutates data.
 - **Never send the full dataset to the LLM** — pass only the inferred schema plus a small sample of
   rows; the data lives in DuckDB and is queried there.
-- **Don't conflate the two stores** — Postgres is metadata/agentic entities, DuckDB is the analytical
-  data. Don't run app metadata through DuckDB or push CSV rows into Postgres.
+- **Don't conflate the two stores** — SQLite is metadata/agentic entities, DuckDB is the analytical
+  data. Don't run app metadata through DuckDB or push CSV rows into SQLite.
 
 ---
 
@@ -205,10 +207,10 @@ services). `__main__.py` hard-codes `port=8001` unless an env var overrides it; 
 ## Phase Gate Commands
 
 `GOOGLE_API_KEY` must be set (locally from `.env`, in CI from a secret); `TEST_DATABASE_URL` points at a
-`_test` PostgreSQL database. Run from the backend package via `uv`.
+file-backed `_test.db` SQLite database. Run from the repo root via `uv`.
 
 | Phase | Gate command |
 |-------|-------------|
-| 1 | `uv run alembic upgrade head` (real Postgres) + `uv run pytest tests/test_agent_loop.py` (real Gemini — drives ≥2 ReAct iterations: one DuckDB query action, then `finish`; plus a force_finalize past `max_agent_iterations`) |
+| 1 | `uv run alembic upgrade head` (real SQLite) + `uv run pytest tests/test_agent_loop.py` (real Gemini — drives ≥2 ReAct iterations: one DuckDB query action, then `finish`; plus a force_finalize past `max_agent_iterations`) |
 | 2 | `uv run pytest` (full suite: CSV upload → dataset, multi-turn chat over session, read-only SQL enforcement, MCP tools, SSE stream) |
 | 3 | `uv run pytest && (cd frontend && npm test) && uv run pytest tests/e2e` (Playwright browser E2E: upload CSV, ask a question, see answer + result table) |

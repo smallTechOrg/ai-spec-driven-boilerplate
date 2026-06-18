@@ -77,7 +77,7 @@ class AgentState(TypedDict):
 **External calls:**
 | System | Operation | On Failure |
 |--------|-----------|------------|
-| PostgreSQL | load `file` schemas/samples + recent `messages` | fatal → set `error` |
+| SQLite | load `file` schemas/samples + recent `messages` | fatal → set `error` |
 | DuckDB | ensure dataset tables are loaded (setup) | missing engine → fatal → set `error` (`DATASET_NOT_LOADED`) |
 
 **Behaviour:** The `setup` step. Loads the dataset schema + row sample and the recent conversation

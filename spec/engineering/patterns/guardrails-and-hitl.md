@@ -48,6 +48,9 @@ reads and the agent's own scratch are auto-approved.
 
 ## Phasing
 
-Baseline — input + output validation + the action-safety boundary at Phase 2 (the classifier exists but
-passes, since nothing high-stakes is live yet); real HITL interrupts earn their place the moment the
-agent gains a real irreversible action. Authority: [`../phases.md`](../phases.md) § Agentic layers by phase.
+Baseline — the **action guardrail** (typed-arg validation + the action-safety boundary) ships in
+Phase 1; the high-stakes classifier exists but passes, since nothing irreversible is live yet. **Input
+and output guardrails earn their place** — add input guardrails (prompt-injection screening, size/schema
+bounds) when the agent ingests untrusted content, and output guardrails (groundedness, PII) when answers
+are high-stakes. Real HITL interrupts earn their place the moment the agent gains a real irreversible
+action. Authority: [`../phases.md`](../phases.md) § Agentic layers by phase.

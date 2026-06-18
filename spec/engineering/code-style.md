@@ -7,8 +7,10 @@
 
 ## Universal Rules
 
-1. **Types at boundaries** — every function crossing a module boundary uses typed inputs and outputs
-   (Pydantic, TypeScript interfaces, Go structs) — never raw dicts or `any`.
+1. **Pragmatic typing** — type the public interfaces: every function crossing a module boundary uses
+   typed inputs and outputs (Pydantic, TypeScript interfaces, Go structs). Plain dicts are fine for
+   internal/local use where a model would be ceremony — don't force a type on everything, but never
+   leak an untyped dict across a module boundary.
 2. **One responsibility per file** — if a file does two things, split it.
 3. **No comments explaining WHAT** — names carry that; comment only non-obvious WHY.
 4. **No dead code** — remove unused imports/functions/variables immediately; don't comment them out.
@@ -29,56 +31,49 @@
 ## See also (don't restate these here)
 
 - **ReAct loop, AST safe-executor, reasoning trace** → [`patterns/react-agent.md`](patterns/react-agent.md).
-- **LLM provider selection, stubs, stub-mode banner, dirty-`.env` tolerance** →
+- **LLM provider selection (real-first, no stubs), dirty-`.env` tolerance** →
   [`patterns/llm-providers.md`](patterns/llm-providers.md).
 - **DB driver / test environment** → [`tech-stack.md`](tech-stack.md) § Database & Tests.
 
 ---
 
-## Framework Gotchas (Python / FastAPI — keep current)
+## Framework Gotchas (Python / async FastAPI — keep current)
 
-### Starlette ≥ 1.0 `TemplateResponse` signature
+The backend is **async** (async FastAPI + async SQLAlchemy) and serves a **Next.js/React frontend** — so
+errors travel back as **JSON**, not server-rendered HTML.
 
-```python
-# CORRECT (Starlette ≥ 1.0)
-return templates.TemplateResponse(request, "page.html", {"foo": bar})
-# WRONG (pre-1.0) — fails with TypeError: unhashable type: 'dict'
-return templates.TemplateResponse("page.html", {"request": request, "foo": bar})
-```
+### Errors are JSON — never an HTML error page
 
-A small helper keeps call sites tidy:
-
-```python
-def render(request: Request, name: str, **ctx):
-    return templates.TemplateResponse(request, name, ctx)
-```
-
-### Pydantic-settings — always set `extra="ignore"`
-
-`pydantic-settings` reads the **entire** `.env` and validates every key against the model. If `.env`
-contains variables the model doesn't declare (`TEST_DATABASE_URL`, `EDITOR`, CI vars), Pydantic raises
-`ValidationError: Extra inputs are not permitted`. Set `extra="ignore"` in `model_config` for any
-project whose `.env` carries variables owned by other tools.
-
-### Pipeline errors — render an error template, never raise `HTTPException`
-
-When an LLM pipeline node fails, the error propagates back via the pipeline state's `error` field. Don't
-re-raise it as `HTTPException` (that returns a bare JSON body to the browser) — render a readable error
-page instead:
+The API returns errors through the standard envelope (`api_error()` → [`../product/05-api.md`](../product/05-api.md))
+as JSON; the Next.js frontend renders them. There is no `error.html` template. When an agent run fails,
+the error propagates back via the run state's `error` field — surface it as JSON, never re-raise a bare
+`HTTPException`:
 
 ```python
 if state["error"]:
-    log.error("analyze.pipeline_error", error=state["error"])
-    return render(request, "error.html", detail=state["error"])
+    log.error("run.error", run_id=run_id, error=state["error"])
+    return api_error("RUN_FAILED", state["error"], status=500)
 ```
 
-`error.html` must always exist and link back to the start page. Every web route that runs the pipeline
-follows this pattern.
+Every route that runs the agent follows this pattern; the frontend owns presentation.
+
+### Pydantic-settings — `extra="ignore"` + `.env` auto-reload
+
+- Set `extra="ignore"` in `model_config`. `pydantic-settings` reads the **entire** `.env` and validates
+  every key; if `.env` carries variables the model doesn't declare (`TEST_DATABASE_URL`, `EDITOR`, CI
+  vars), it raises `ValidationError: Extra inputs are not permitted` without it.
+- **Dev server auto-restarts on `.env` change.** Run the dev server under a reloader that watches `.env`
+  (uvicorn `--reload --reload-include .env`, or `watchfiles`), so editing the API key or a setting takes
+  effect without a manual restart. Settings are read at startup (fail-loud, [`code-style.md`](code-style.md)
+  Universal Rule 5) — the reload is what makes that ergonomic in dev.
 
 ### Async test footguns
 
+- Use `pytest-asyncio`; mark async tests (`@pytest.mark.asyncio` or `asyncio_mode = "auto"`).
 - Replace an async `init_db()` with an **async** noop, not a sync lambda:
   `async def _noop(): ...` then `monkeypatch.setattr("<pkg>.graph.runner.init_db", _noop)`. A sync lambda
   breaks `await`.
-- Use `tmp_path` (a file DB), not `:memory:`, for integration tests — `:memory:` has shared-state issues
-  across the engine/connection boundary.
+- Use a file-backed test DB (`tmp_path` for SQLite demos; a `_test` Postgres database for real projects),
+  not an in-memory DB — in-memory has shared-state issues across the async engine/connection boundary.
+- Drive the async DB with `create_async_engine` + an `AsyncSession`; don't mix sync and async sessions
+  against the same engine.

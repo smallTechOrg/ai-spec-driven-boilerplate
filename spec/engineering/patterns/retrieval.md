@@ -29,7 +29,8 @@ query:   user text → embed → vector search (top-k)
 - **Chunking** — semantic or fixed-size with overlap; store source + offsets in metadata for citations.
   Chunk size is a quality knob — too big dilutes, too small loses context.
 - **Embeddings & vector DB** — pick from [`../tech-stack.md`](../tech-stack.md) § Agentic Stack Tech.
-  SQLite + `sqlite-vec` is the zero-ops default; pgvector / a dedicated vector DB when scale needs it.
+  `pgvector` (on the default Postgres) is the standard; `sqlite-vec` for demos; a dedicated vector DB
+  when scale needs it.
 - **Hybrid search** — combine dense (embeddings) + sparse (keyword/BM25); dense alone misses exact terms
   (names, IDs, error codes).
 - **Rerank** — a cross-encoder or LLM reranker over the top-k sharply improves precision before the
@@ -53,6 +54,7 @@ wrong answer because retrieval missed.
 
 ## Phasing
 
-Baseline — embeddings + vector store **wired/stubbed** at Phase 2 (+ the retrieval eval hook); a real
-corpus, real embeddings, hybrid + rerank earn their place when answers depend on a knowledge base.
-Authority: [`../phases.md`](../phases.md) § Agentic layers by phase.
+**Earns its place** — retrieval is **not** in the Phase 1 baseline. Add it (real embeddings + vector
+store + the retrieval eval hook, then hybrid + rerank) when answers depend on a corpus or knowledge
+base, recorded in `02-architecture.md` § Agentic stack layers used. Authority:
+[`../phases.md`](../phases.md) § Agentic layers by phase.

@@ -17,8 +17,8 @@ If your context is compressed and you can remember only a few rules, these are t
    output. If you can't run it, say so — never fabricate results.
 3. **Commit then push, every time.** `git commit -m "…" && git push origin <branch>` is one indivisible
    action. An unpushed commit does not exist. → § 6.
-4. **`main` is boilerplate-only.** Application code lives on a feature branch and reaches `main` only
-   via a reviewed PR, and a PR must exist before the first feature-branch commit. → § 6.
+4. **`main` is boilerplate-only.** Application code lives on a `feature/<slug>-<date>` branch and reaches
+   `main` only via a reviewed PR, and a PR must exist before the first feature-branch commit. → § 6.
 5. **Agents that act on the outside world use a ReAct loop**, never a sample-and-guess pipeline. Spec
    it before coding. → [`patterns/react-agent.md`](patterns/react-agent.md).
 
@@ -33,7 +33,7 @@ Complete in order before writing any code:
       agent-builder and **do not write application code**.
 - [ ] If complete, read the full spec manifest in `CLAUDE.md`.
 - [ ] `git status` — the working tree must be clean.
-- [ ] Create and switch to a feature branch: `git checkout -b feature/<slug>-v0.1`. **Never build on `main`.**
+- [ ] Create and switch to a feature branch: `git checkout -b feature/<slug>-<date>`. **Never build on `main`.**
 - [ ] Open a session report at `reports/sessions/YYYY-MM-DD-HHMMSS-[branch].md` — **must exist before
       Phase 1.** → § 2.
 - [ ] Confirm which phase you're implementing (`phases.md`).
@@ -41,27 +41,31 @@ Complete in order before writing any code:
 ## 2. Session Report
 
 Every session has a report at `reports/sessions/YYYY-MM-DD-HHMMSS-[branch].md`, using the template in
-[`workflows/session-report.md`](workflows/session-report.md). Log Goal, Phase, steps, a prompt log, and
-next steps **in real time** — never reconstruct it at the end. A missing session report is a build failure.
+[`workflows/session-report.md`](workflows/session-report.md). It is a **handoff document**: log **every
+activity** — not just builds, but spec edits, investigations, decisions, and dead ends — in real time, so
+the user can switch chats or coding agents and resume seamlessly. Capture Goal, Phase, steps, a prompt
+log, and next steps as you go — never reconstruct it at the end. `reports/` is gitignored (the template
+under `workflows/` stays tracked); a missing session report is a build failure.
 
 ## 3. The One-Approval Gate Law
 
-Goal: **one prompt → working skeleton fast.** Decisions are captured upfront and approved once. The
-skeleton includes the raised agentic baseline (stubbed/offline), not a bare loop — see § 10.
+Goal: **one prompt → working agent fast.** Decisions are captured upfront and approved once. Phase 1
+delivers the raised agentic baseline running with **real** integrations (real LLM + MCP tools + memory +
+evals), not a bare loop — see § 10.
 
 ```
-INTAKE (scope · stack · trigger · constraints)  →  DRAFT (spec + tech design + plan together)
-   →  ONE APPROVAL (user sees everything, one response)  →  BUILD (Phase 1 → 2, each gated by tests)
+INTAKE (scope · stack · provider · trigger · constraints)  →  DRAFT (spec + tech design + plan together)
+   →  ONE APPROVAL (user sees everything, one response)  →  BUILD (Phase 1 = real baseline, then gated phases)
 ```
 
-- Stack decisions (database, language, hosting) belong to the user — captured at intake, never chosen
-  autonomously.
+- Stack decisions (database, language, hosting, **LLM provider**) belong to the user — captured at
+  intake, never chosen autonomously.
 - No code before the single approval gate clears.
 - Each build phase passes its gate test before the next starts.
 - Reviewers (spec-reviewer, plan-reviewer) run as background validation and surface blockers; they do
-  not add approval rounds for v0.1.
+  not add approval rounds for the first release.
 
-After v0.1 is running, every later phase follows: implemented → gate test passes → committed → next.
+After Phase 1 is running, every later phase follows: implemented → gate test passes → committed → next.
 
 ## 4. Spec-First
 
@@ -78,11 +82,11 @@ committed and pushed, its tests pass, and the qa-auditor (or the manual QA check
 
 - Commit every logical unit of work — never leave the tree dirty across more than one logical change.
 - **Push immediately after every commit** (Non-Negotiable 3). Never leave a commit unpushed.
-- **`main` is boilerplate-only.** All application code lives on `feature/<slug>-v0.1` and reaches `main`
+- **`main` is boilerplate-only.** All application code lives on `feature/<slug>-<date>` and reaches `main`
   only via PR. Spec/engineering/boilerplate-only changes may commit directly to `main`. If you find
   yourself on `main` writing application code, stop and create the branch first.
 - **A PR must exist before the first feature-branch commit** (`gh pr create --base main --head
-  feature/<slug>-v0.1`). Every later push updates that same PR automatically.
+  feature/<slug>-<date>`). Every later push updates that same PR automatically.
 - Commit message format: `phase-N: [what you did]`.
 - **Never `git add -A` / `git add .`** — stage specific files or directories; `-A` sweeps in untracked
   leftovers from prior attempts and poisons the commit.
@@ -98,19 +102,20 @@ implement, and run the full suite before marking a phase complete.
 **Test across every layer**, not just units:
 
 - **Unit** — domain logic, parsing, pure functions.
-- **Integration** — the agent loop + DB end-to-end with stubs (no API key).
+- **Integration** — the agent loop + DB end-to-end against the **real** model (key from a CI secret),
+  with **loose assertions** (structure + non-empty) to tolerate LLM output variance.
 - **Golden-path** — the full primary user journey through the HTTP/UI layer, asserting rendered
   **content**, not just status codes. → [`workflows/golden-path-smoke-test.md`](workflows/golden-path-smoke-test.md).
 - **Frontend / browser** — any client-rendered content (charts, SPA, htmx, streamed tokens) tested in a
   real browser (Playwright) asserting the post-JavaScript DOM. A `TestClient` HTML check cannot see what
   the browser paints.
 - **End-to-end** — at least one test drives the whole stack as a user does (browser → API → agent → DB →
-  back), nothing mocked beyond the LLM stub.
-- **Evals** — a small fixed set of representative inputs with expected outputs (or rubric/property
-  checks) to catch regressions in the agent's *answers*. A run that returns 200 with a wrong analysis
-  passes every layer above.
+  back), nothing mocked — the model is real.
+- **Evals** — a small fixed set of representative inputs with rubric/property checks to catch regressions
+  in the agent's *answers*. A run that returns 200 with a wrong analysis passes every layer above.
 
-Tests must use the same DB driver as production. → [`tech-stack.md`](tech-stack.md) § Database & Tests.
+Tests run against the real model with loose asserts, and use the same DB driver as production. →
+[`tech-stack.md`](tech-stack.md) § Database & Tests, [`patterns/llm-providers.md`](patterns/llm-providers.md).
 
 ## 8. Error Resilience
 
@@ -131,7 +136,8 @@ action-safety boundary, usage accounting, and a live user-facing trace. Defined 
 [`patterns/react-agent.md`](patterns/react-agent.md).
 
 Build to the **agentic baseline** in [`agentic-architecture.md`](agentic-architecture.md): the default
-agent ships memory + MCP tools + retrieval + evals (stubbed at Phase 2). Before Phase 2, record in
+agent ships memory + MCP tools + evals + OTel tracing, all **real in Phase 1**. Retrieval, long-term
+memory, multi-agent, HITL, and durability earn their place in later phases. Before Phase 1, record in
 `02-architecture.md` which stack layers apply and why; each layer is defined once in its pattern doc
 under [`patterns/`](patterns/) — never restate, link.
 

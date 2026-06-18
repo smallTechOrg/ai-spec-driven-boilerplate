@@ -22,7 +22,8 @@
 | 4 Tools / MCP | ✅ baseline | <!-- which MCP servers --> |
 | 5 Retrieval / RAG | <!-- yes/no --> | <!-- depends on a knowledge corpus? --> |
 | 6 Multi-agent | <!-- yes/no --> | <!-- escalation reason (multi-agent.md) --> |
-| 7 Guardrails + HITL | <!-- yes/no --> | <!-- any irreversible/high-stakes action? --> |
+| 7 Guardrails — action-safety | ✅ baseline | |
+| 7 Guardrails — input/output + HITL | <!-- yes/no --> | <!-- untrusted input / irreversible action? --> |
 | 8 Durability / checkpointing | <!-- yes/no --> | <!-- long/resumable runs? --> |
 | 9 Observability + evals | ✅ baseline | |
 | 10 Interface / serving | ✅ | <!-- API / UI / CLI / webhook --> |

@@ -32,7 +32,7 @@ everything up front.
 ```
 START → setup → plan_action ──(action)──► execute_action ──┐
                   ▲   │                                     │
-                  │   ├─(FINAL ANSWER)─► finalize → END     │
+                  │   ├─(finish tool called)─► finalize → END   │
                   │   └─(fatal error)─► handle_error → END  │
                   └──────────(observe: result loops back)───┘
                                                             │
@@ -46,11 +46,14 @@ START → setup → plan_action ──(action)──► execute_action ──┐
 
 ## Mandatory mechanics
 
-- **Termination signal.** The LLM ends the loop with a fixed prefix, e.g. `FINAL ANSWER: <text>`.
-  `plan_action` checks for it (case-insensitive): if present, strip it and route to `finalize`;
-  otherwise treat the response as the next action. Without this the loop never terminates on its own.
-- **Max-iterations guard.** Configurable ceiling (`max_agent_iterations`, default 10). On reaching it —
-  or after repeated consecutive errors — route to **`force_finalize`**, never loop unboundedly.
+- **Termination signal.** The LLM ends the loop by calling a **structured finish tool** (e.g. a
+  `finish(answer: str)` tool exposed alongside the action tools) — not a magic text prefix. The router
+  checks whether the model called `finish`: if so, route to `finalize` with its typed argument;
+  otherwise execute the chosen action. A structured tool call is unambiguous to parse and impossible to
+  trigger accidentally from prose. Without a termination signal the loop never terminates on its own.
+- **Max-iterations guard.** Configurable ceiling (`max_agent_iterations`) — **no hardcoded default;
+  each project sets it explicitly** in `07-agent-graph.md` based on its task. On reaching it — or after
+  repeated consecutive errors — route to **`force_finalize`**, never loop unboundedly.
 - **Best-effort finalization (`force_finalize`).** Running out of iterations is not a crash:
   synthesise the best answer from `action_history` and note what's missing — never a bare "I couldn't
   do it." Reserve `handle_error` for fatal failures (data missing, LLM/network down).
@@ -114,7 +117,7 @@ mechanism.
 ```python
 action_history: list[dict]  # [{"description": str, "action": str, "result": str, "is_error": bool}]
 iteration_count: int
-llm_response: str           # raw last LLM output — router inspects it for FINAL ANSWER
+last_tool_call: dict        # the model's last tool call — router checks if it's `finish`
 tokens_input: int           # accumulated usage — persisted on the run record
 tokens_output: int
 estimated_cost_usd: float | None
@@ -167,9 +170,9 @@ generic 500.
 `07-agent-graph.md` must answer, before any node code is written:
 
 1. What action the LLM generates (query, HTTP request, file path, tool call…).
-2. The exact `FINAL ANSWER` string.
+2. The `finish` tool's signature (what typed answer it returns).
 3. The recoverable-vs-fatal error boundary.
-4. The `max_agent_iterations` default.
+4. The `max_agent_iterations` value for this project (no default — set it).
 5. What `setup` prepares and how it's cleaned up (run-scoped vs. session-scoped).
 6. What fields `AgentState` carries for history, iteration count, and usage — and how the trace is
    surfaced to the user live.
@@ -177,14 +180,14 @@ generic 500.
    validated, and what sandbox it runs in.
 8. What `force_finalize` synthesises when iterations are exhausted.
 
-If any are missing, raise a blocker before Phase 2.
+If any are missing, raise a blocker before Phase 1.
 
 ---
 
-## Phase 2 gate for ReAct agents
+## Phase 1 gate for ReAct agents
 
-The stub must simulate **at least two iterations** — one where the LLM generates an action, one where
-it emits `FINAL ANSWER:`. A stub that returns a final answer on the first call without executing any
-action does not validate the loop. A test must also drive the loop past `max_agent_iterations` and
-assert a substantive best-effort answer from `force_finalize`, not a hard failure. See
-`spec/engineering/phases.md` § Phase 2.
+A test must exercise **at least two iterations** against the real model — one where the LLM generates an
+action, one where it calls the `finish` tool. A run that finishes on the first call without executing any
+action does not validate the loop; assert loosely (an action ran, then `finish`), not on exact text. A
+test must also drive the loop past `max_agent_iterations` and assert a substantive best-effort answer
+from `force_finalize`, not a hard failure. See `spec/engineering/phases.md` § Phase 1.

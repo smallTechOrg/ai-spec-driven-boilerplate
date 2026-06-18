@@ -66,22 +66,21 @@ whether the code works. Every generated README must:
 │       │   ├── state.py              ← AgentState TypedDict
 │       │   └── runner.py             ← run_agent() entry point
 │       ├── llm/
-│       │   ├── client.py             ← LLMClient wrapper (routing, structured output, caching)
-│       │   └── providers/            ← base.py · factory.py · <provider>.py
+│       │   └── model.py              ← init_chat_model accessor (routing, structured output, caching)
 │       ├── tools/                    ← pure functions: (inputs) → domain models
-│       ├── mcp/                      ← MCP clients + servers (tool/integration layer)
-│       ├── memory/                   ← working/short/long-term memory + context assembly
-│       ├── retrieval/                ← embeddings, chunking, vector search (RAG)
-│       ├── guardrails/               ← input/output validation + HITL approval
+│       ├── mcp/                      ← MCP clients + servers (all tools — internal + external)
+│       ├── memory/                   ← working/short-term memory + context assembly (long-term: earns its place)
+│       ├── retrieval/                ← embeddings, chunking, vector search (RAG) — earns its place
+│       ├── guardrails/               ← action-safety (baseline); input/output + HITL earn their place
 │       ├── prompts/                  ← LLM prompt templates (.md files)
 │       └── observability/
 │           └── events.py             ← structlog configuration
-├── evals/                            ← eval datasets + harness (offline + LLM-judge), runs in CI
+├── evals/                            ← eval datasets + harness (real model, loose asserts), runs in CI
 ├── tests/                            ← tests at repo root, NOT inside src/
 │   ├── conftest.py                   ← settings singleton reset fixture
 │   ├── unit/                         ← test_smoke, config, db, domain, graph
 │   └── integration/
-│       └── test_pipeline.py          ← stub run, one DB record, status=completed
+│       └── test_pipeline.py          ← real run (loose asserts), one DB record, status=completed
 ├── alembic/
 │   ├── env.py                        ← reads DB URL from settings; target_metadata = Base.metadata
 │   ├── script.py.mako               ← REQUIRED — alembic revision fails without it
@@ -96,10 +95,11 @@ whether the code works. Every generated README must:
 **Critical:** `tests/` is at the repo root — **not** inside `src/`. `pyproject.toml` must set
 `testpaths = ["tests"]`.
 
-The `mcp/`, `memory/`, `retrieval/`, `guardrails/`, and `evals/` directories implement the agentic
-stack layers — each is defined once in [`agentic-architecture.md`](agentic-architecture.md) and its
-pattern doc. They're part of the raised default baseline (stubbed at Phase 2); create only the layer
-dirs the agent actually uses, per `02-architecture.md` § Agentic stack layers used.
+The `mcp/`, `memory/`, `guardrails/`, and `evals/` directories implement the agentic stack layers —
+each is defined once in [`agentic-architecture.md`](agentic-architecture.md) and its pattern doc. They're
+part of the raised default baseline, **real in Phase 1**. `retrieval/` (and long-term memory inside
+`memory/`) is earns-its-place — create it only when a later phase needs it. Create only the layer dirs
+the agent actually uses, per `02-architecture.md` § Agentic stack layers used.
 
 ---
 
@@ -163,8 +163,10 @@ was applied.
 4. **TypedDict state** — not dataclass or Pydantic model.
 5. **Tools are pure functions** — `(inputs) → domain model`, no class instantiation.
 6. **Prompts are `.md` files** in `<package>/prompts/` — loaded at runtime.
-7. **LLM abstraction** — `LLMClient` wrapper; never call a provider SDK directly in nodes.
-8. **FastAPI response envelope** — every route returns `ok(data)` or raises `api_error()`.
+7. **LLM via `init_chat_model`** — construct the model through LangChain's `init_chat_model` behind a
+   thin `llm/model.py` accessor; never call a provider SDK directly in nodes, and no bespoke `LLMClient`.
+8. **FastAPI response envelope** — every async route returns `ok(data)` or raises `api_error()` (JSON).
 9. **Settings singleton** must be resettable via `monkeypatch.setattr(m, "_settings", None)`.
-10. **Phase 2 gate must pass with zero env vars beyond the DB URL** — SQLite in tests, stubs only,
-    no network I/O (see `phases.md` and `patterns/llm-providers.md`).
+10. **Phase 1 gate runs against the real model** — DB URL set + the provider API key set (locally from
+    `.env`, in CI from a secret), with loose assertions; there is no stub/offline path (see `phases.md`
+    and `patterns/llm-providers.md`).

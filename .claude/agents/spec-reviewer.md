@@ -19,8 +19,11 @@ You are invoked by the agent-builder after the spec-writer produces a draft, and
 - [ ] All `<!-- FILL IN -->` placeholders are replaced
 - [ ] `spec/product/01-vision.md`: purpose, users, success criteria, and out-of-scope are all defined
 - [ ] `spec/product/02-architecture.md`: system overview, components, and data flow are clear
-- [ ] `spec/product/02-architecture.md` § **Agentic Stack Layers Used** is filled — baseline layers
-      present, each earns-its-place layer marked yes/no with a reason (`spec/engineering/agentic-architecture.md`)
+- [ ] `spec/product/02-architecture.md` § **Agentic Stack Layers Used** is filled — the baseline layers
+      (model + context + working/short-term memory + MCP tools + evals + OTel observability) are present,
+      and each earns-its-place layer (retrieval/RAG, long-term memory, multi-agent, HITL, durability) is
+      marked yes/no **with a reason** (`spec/engineering/agentic-architecture.md`). Treat a missing or
+      reasonless layer decision as a Critical Issue.
 - [ ] At least one capability file exists in `spec/product/capabilities/`
 - [ ] Every capability has: what it does, inputs, outputs, external calls, and success criteria
 - [ ] Every external call has a defined failure mode

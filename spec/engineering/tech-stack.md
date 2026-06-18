@@ -8,12 +8,15 @@
 
 ## Default Stack (when the user states no preference)
 
-- **Backend / agent:** Python 3.12+ — agent logic, data processing, API server.
-- **Frontend:** Node.js 20+ (TypeScript / Next.js). **The frontend is always Node.js, never Python.**
-  There is no Python frontend option; any UI/web surface is Node.js regardless of the backend.
-- **Database:** SQLite — zero-ops, file-based, ships with Python. Upgrade to PostgreSQL only when
-  multi-user concurrency or full-text search requires it (then it's a migration-only change with
-  SQLAlchemy 2.0).
+- **Backend / agent:** Python 3.12+, **async** — agent logic, data processing, API server. The API is
+  async FastAPI and the DB layer is **async SQLAlchemy** (`asyncpg` / `aiosqlite` driver); the agent
+  loop is `async def` throughout. Async is the default, not an upgrade.
+- **Frontend:** Node.js 20+ — **Next.js 15 + React + TailwindCSS**. **The frontend is always Node.js,
+  never Python.** There is no Python frontend option; any UI/web surface is Node.js regardless of backend.
+- **Database:** **PostgreSQL for any real project** (multi-user, durable, `pgvector`-ready). SQLite is
+  for quick demos/prototypes only. Same SQLAlchemy 2.0 code either way — it's a driver/URL change.
+- **LLM provider:** **chosen at intake** (`agent-builder` Q-provider) — Anthropic / OpenAI / Gemini /
+  OpenRouter / other. No hardcoded default; Anthropic is the recommendation, not an assumption.
 - **Dependency management:** `uv` + `pyproject.toml` (Python); `pnpm` or `npm` (Node.js).
 
 This is the stack the intake question (`agent-builder` Q2) recommends first. The agentic layers built on
@@ -27,9 +30,13 @@ configurable via an env var (e.g. `APP_LLM_MODEL`) so it changes without a code 
 `NOT_FOUND` from an LLM API almost always means a wrong/deprecated model name — check the name first.
 Verify against the provider's current docs / `ListModels` before hardcoding.
 
+The provider is chosen at intake (→ [`patterns/llm-providers.md`](patterns/llm-providers.md)); the model
+is constructed with LangChain `init_chat_model`, so switching is a config change. Pick the default +
+cheap + strong row for whichever provider the user chose.
+
 | Provider | Default | Cheap / fast | Hard reasoning | Notes |
 |----------|---------|--------------|----------------|-------|
-| **Anthropic** (default) | `claude-sonnet-4-6` | `claude-haiku-4-5-20251001` | `claude-opus-4-8` | `claude-fable-5` also available |
+| **Anthropic** (recommended) | `claude-sonnet-4-6` | `claude-haiku-4-5-20251001` | `claude-opus-4-8` | `claude-fable-5` also available |
 | Google Gemini | `gemini-2.5-flash` | `gemini-2.5-flash` | `gemini-2.5-pro` | older `1.5`/`2.0-flash` unavailable to new users |
 | OpenAI | `gpt-4o-mini` | `gpt-4o-mini` | `gpt-4o` | |
 
@@ -38,29 +45,30 @@ Verify against the provider's current docs / `ListModels` before hardcoding.
 Defaults for the layers in [`agentic-architecture.md`](agentic-architecture.md). Zero-ops choices first;
 the override column is what to reach for at scale. The tech-designer pins the actual choice per project.
 
-| Layer | Default (zero-ops) | Override at scale |
+| Layer | Default | Override at scale |
 |-------|--------------------|-------------------|
 | Orchestration | **LangGraph** (`StateGraph`) | — (Claude Agent SDK for Claude-native/light) |
-| Tools / integration | **MCP** via `mcp` SDK (stdio) | MCP over streamable HTTP; official servers |
-| Memory store | SQLite tables (`memory_records`) | PostgreSQL |
-| Vector / embeddings | **`sqlite-vec`** + Anthropic/`voyage` or local embeddings | **pgvector**, or a dedicated vector DB (Qdrant/Weaviate) |
+| Model client | **LangChain `init_chat_model`** (provider-agnostic) | direct provider SDK if a feature needs it |
+| Tools / integration | **MCP everywhere** via `mcp` SDK (stdio) — internal *and* external tools | MCP over streamable HTTP; official servers |
+| Memory store | PostgreSQL tables (`memory_records`); SQLite for demos | PostgreSQL + partitioning |
+| Vector / embeddings | **`pgvector`** + provider or local embeddings (`sqlite-vec` for demos) | a dedicated vector DB (Qdrant/Weaviate) |
 | Retrieval rerank | none (top-k) | cross-encoder / LLM reranker |
-| Checkpointer (durability) | **`SqliteSaver`** | **`PostgresSaver`** |
+| Checkpointer (durability) | **`PostgresSaver`** (`SqliteSaver` for demos) | — |
 | Guardrails | in-process validators + Pydantic | a dedicated guardrails lib if policy grows |
-| Tracing | structured logs (`structlog`) | **OTel GenAI** export → LangSmith / Langfuse |
-| Evals | `pytest` + a fixed dataset + LLM-judge | a dedicated eval framework / online judges |
+| Tracing | **OTel GenAI** spans (baseline) → LangSmith / Langfuse / OTLP | aggregate metrics + latency dashboards |
+| Evals | `pytest` + a fixed dataset, real model, loose asserts | LLM-judge + component evals + online judges |
 
-**Raised baseline:** the default agent ships layers 1–5 + 9 (model, context, working/short-term memory,
-MCP tools, retrieval wiring, observability + an eval skeleton) — all stubbed/offline at Phase 2. Layers
-6 (multi-agent), 7 (HITL), 8 (durable execution) and long-term memory are added when they earn their
-place. See [`phases.md`](phases.md).
+**Raised baseline (real, Phase 1):** the default agent ships layers 1–4 + 9 (model, context,
+working/short-term memory, MCP tools, observability + OTel tracing + an eval skeleton) — **real, not
+stubbed**, from Phase 1. Layer 5 (retrieval/RAG), layer 6 (multi-agent), layer 7 (HITL), layer 8
+(durable execution), and long-term memory are added when they earn their place. See [`phases.md`](phases.md).
 
 ---
 
 ## To fill in (tech-designer)
 
 ### Language & Runtime
-<!-- FILL IN: e.g. Python 3.12 backend; Node.js 20 frontend. Default stack above unless overridden. -->
+<!-- FILL IN: e.g. Python 3.12 async backend; Node.js 20 frontend. Default stack above unless overridden. -->
 **Why:** <!-- reason -->
 
 ### Agent Framework
@@ -68,18 +76,19 @@ place. See [`phases.md`](phases.md).
 **Why:** <!-- reason -->
 
 ### LLM Provider & Model
-<!-- FILL IN: provider + a specific model from the Models table above -->
+<!-- FILL IN: provider chosen at intake + a specific model from the Models table above; built via
+     init_chat_model. -->
 **Why:** <!-- reason -->
 
 ### Backend Framework
-<!-- FILL IN: FastAPI (Python, recommended) · Express · none -->
+<!-- FILL IN: async FastAPI (Python, recommended) · Express · none -->
 
 ### Database & ORM
-<!-- FILL IN: SQLite (default) / PostgreSQL / none — see § Database & Tests for the binding rules.
-     ORM: SQLAlchemy 2.0 (works with both SQLite and PostgreSQL). -->
+<!-- FILL IN: PostgreSQL (default for real projects) / SQLite (demos only) — see § Database & Tests.
+     ORM: async SQLAlchemy 2.0 (asyncpg for Postgres, aiosqlite for SQLite). -->
 
 ### Frontend
-<!-- FILL IN: Node.js only — Next.js 15 + React, Vite + React, etc. Never Python. -->
+<!-- FILL IN: Node.js only — Next.js 15 + React + TailwindCSS (default). Never Python. -->
 
 ### Key Libraries
 <!-- FILL IN: HTTP client, LLM client, ORM, testing, logging, integration-specific libs. -->
@@ -100,14 +109,15 @@ place. See [`phases.md`](phases.md).
 - **Driver in main dependencies.** The DB driver (e.g. `psycopg2-binary` for PostgreSQL) goes in
   `[project.dependencies]`, never a dev-only group. Alembic migrations run at deploy/setup time, not
   just in tests — a dev-only driver makes `alembic upgrade head` fail wherever dev deps aren't installed.
-- **Tests use the same driver as production.** If production is PostgreSQL, tests run against
-  PostgreSQL — tests that only pass on SQLite are not a passing gate. If production is SQLite (the
-  default stack), SQLite tests are correct.
+- **Tests use the same driver as production.** If production is PostgreSQL (the default for real
+  projects), tests run against PostgreSQL — tests that only pass on SQLite are not a passing gate. If
+  production is SQLite (demos), SQLite tests are correct.
 - **Test DB is set up automatically** via `conftest.py` (`Base.metadata.create_all` against the test DB
   URL, dropped after). No manual steps. The URL comes from an env var (`TEST_DATABASE_URL`, or a
   `_test` database via `DATABASE_URL`), provided by a gitignored `.env.test` or a CI variable, and the
   README documents it.
-- The Phase 2 gate must pass with **no LLM API key set** — the DB URL is set, the LLM is stubbed
+- **The LLM is real in tests** — the API key is set (locally from `.env`, in CI from a secret). Tests
+  assert loosely (structure + non-empty) to absorb output variance; there is no stub
   (`patterns/llm-providers.md`).
 
 ### Default Dev Port — 8001

@@ -20,27 +20,35 @@ signals that justify escalation:
 If none of these hold, a single loop with good tools and memory is cheaper, faster, and easier to debug.
 Multi-agent adds latency, cost, and coordination failure modes — it is not a default.
 
-## Topologies
+## Topology — supervisor / worker (the one default)
 
-| Topology | Shape | Use when |
-|----------|-------|----------|
-| **Supervisor / worker** | a router agent delegates to specialized workers and integrates results | distinct sub-skills; the supervisor owns the plan |
-| **Planner–executor** | one agent decomposes into a plan, another executes steps | the plan is worth fixing before acting |
-| **Evaluator–optimizer** | a generator proposes, a critic scores, loop until threshold | quality matters and is checkable (drafts, code) |
-| **Reflection** | the agent critiques and revises its own output before finalizing | single-agent quality boost without a second agent |
+The boilerplate prescribes a **single topology: supervisor / worker** — a router agent delegates to
+specialized workers and integrates their results; the supervisor owns the plan. It covers the common
+escalation cases (distinct sub-skills, parallel subtasks, an independent check) without the boilerplate
+carrying four patterns it rarely needs.
 
-In LangGraph these are subgraphs/nodes wired into the parent `StateGraph` — not separate processes.
+Planner–executor, evaluator–optimizer, and a separate reflection agent are **variations a project can
+adopt when its spec calls for them** — but they are not part of the default; record the choice in
+`02-architecture.md`. (Reflection — the agent critiquing and revising its own output — is usually best
+done as a same-agent step in the single ReAct loop, no second agent needed.)
 
-## State isolation
+In LangGraph the supervisor and workers are subgraphs/nodes wired into the parent `StateGraph` — not
+separate processes.
 
-Each sub-agent gets its **own scoped state** — it should not see the parent's full `action_history` or
-the other workers' scratch. Pass an explicit, minimal **task contract** in and a **typed result** out.
-Shared, unscoped state across agents is the top cause of multi-agent incoherence and runaway loops.
+## Sub-agent state — shared
 
-- The supervisor holds the master plan + integrated results.
-- Workers get `{task, inputs, constraints}` and return `{result, status, notes}`.
+Sub-agents **share the run's state** (working memory / `action_history`) rather than each getting an
+isolated scope. This keeps the supervisor and workers coherent — every agent sees the same evolving
+picture, and there's no contract-marshalling boilerplate between them.
+
+- The supervisor holds the master plan + integrated results in the shared state.
+- Workers read the shared context and write their results back to it.
 - Usage (tokens/cost) from every sub-agent **rolls up** to the parent run — see
   [`observability-and-evals.md`](observability-and-evals.md).
+
+> ⚠ **Caution:** shared state trades isolation for coherence. The risk is cross-talk — a worker acting
+> on another's half-finished scratch. Mitigate by giving each worker a clear task framing and bounding
+> **total** work (the global step budget below), so shared state can't fuel a runaway loop.
 
 ## Guards still apply
 
@@ -51,7 +59,7 @@ agents — bound the **total** work (a global step budget), not just each loop.
 
 ## Phasing
 
-Baseline — a single ReAct loop (reflection available as a same-agent quality step); true multi-agent
-topologies earn their place only when an escalation criterion above is met and recorded in
+Baseline — a single ReAct loop (reflection available as a same-agent quality step); the supervisor /
+worker topology earns its place only when an escalation criterion above is met and recorded in
 `02-architecture.md` § Agentic stack layers used. Authority: [`../phases.md`](../phases.md) § Agentic
 layers by phase.

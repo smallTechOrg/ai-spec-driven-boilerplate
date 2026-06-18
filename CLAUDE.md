@@ -23,8 +23,9 @@ spec/engineering/patterns/           ← one canonical home per layer:
 ```
 
 `07-agent-graph.md` is mandatory for any orchestration-framework project. If it's missing when you reach
-Phase 2, stop and raise it as a blocker. The **default agent ships memory + MCP tools + retrieval +
-evals** (stubbed at Phase 2) — the raised baseline in `agentic-architecture.md`.
+Phase 1, stop and raise it as a blocker. The **default agent ships memory + MCP tools + evals + OTel
+tracing, all real in Phase 1** — the raised baseline in `agentic-architecture.md`. Retrieval, long-term
+memory, multi-agent, HITL, and durability earn their place in later phases.
 
 ## Non-negotiables (full text in `ai-agents.md`)
 

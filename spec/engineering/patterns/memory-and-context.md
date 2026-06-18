@@ -34,10 +34,10 @@ relevant.
 Every `plan_action` call is built from a fixed budget, highest-value first:
 
 ```
-system prompt (role, rules, output contract, the FINAL ANSWER signal)
-+ tool descriptions (only the tools in scope this turn)
-+ retrieved context (top-k from retrieval.md, reranked)
-+ long-term memory hits (top-k relevant memory_records)
+system prompt (role, rules, output contract, the finish-tool contract)
++ tool descriptions (only the tools in scope this turn, incl. the finish tool)
++ retrieved context (top-k from retrieval.md, reranked)        ← only if retrieval is in use
++ long-term memory hits (top-k relevant memory_records)        ← only if long-term memory is in use
 + short-term: recent messages (most recent N, older ones summarized)
 + working state: action_history (descriptions + results)
 + the user's current input
@@ -62,6 +62,6 @@ stays cached.
 
 ## Phasing
 
-Baseline — working + short-term memory + context assembly land **stubbed at Phase 2** (long-term
-embeddings stubbed); long-term memory + compaction earn their place. Authority:
+Baseline — working + short-term memory + context assembly land **real at Phase 1**; long-term memory
+(vector-backed `memory_records`) and compaction earn their place. Authority:
 [`../phases.md`](../phases.md) § Agentic layers by phase.

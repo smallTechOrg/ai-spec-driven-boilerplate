@@ -33,17 +33,21 @@ def get_weather(city: str) -> WeatherReport: ...
 - **Errors are values, not exceptions** — a tool returns a structured error the loop can observe and
   retry on (`react-agent.md` § Self-correction), never a crash.
 
-## MCP (Model Context Protocol) — the integration standard
+## MCP (Model Context Protocol) — the integration standard, everywhere
 
-External integrations (GitHub, Slack, a database, a SaaS API) are exposed as **MCP servers**, not
-hand-rolled SDK calls scattered through nodes. Why MCP: one wire protocol, tool discovery, the same
-server works across LangGraph / Claude Agent SDK / other clients, and a clean trust boundary.
+**Every tool is an MCP tool — internal capabilities as well as external integrations.** Both your own
+in-process capabilities and third-party systems (GitHub, Slack, a database, a SaaS API) are exposed as
+**MCP servers**, not hand-rolled SDK calls scattered through nodes. Why MCP everywhere: one wire
+protocol for the whole tool surface, uniform tool discovery, the same server works across LangGraph /
+Claude Agent SDK / other clients, and a single clean trust boundary regardless of where the tool runs.
 
 - **Client side:** the agent connects to MCP servers at startup and registers their tools into the same
   registry. Code lives in `src/<package>/mcp/`.
-- **Transports:** `stdio` for local/subprocess servers, `http` (streamable) for remote ones.
-- **Servers:** wrap an integration once as an MCP server (in `mcp/servers/` or a separate package) and
-  reuse it. Prefer an existing official MCP server over writing your own.
+- **Transports:** `stdio` for local/in-process servers (including your own internal tools), `http`
+  (streamable) for remote ones.
+- **Servers:** wrap a capability once as an MCP server (in `mcp/servers/` or a separate package) and
+  reuse it — internal tools are local `stdio` servers, external ones wrap the integration. Prefer an
+  existing official MCP server over writing your own.
 - **Auth & secrets:** MCP server credentials follow [`../secret-hygiene.md`](../secret-hygiene.md) —
   never in code, never logged.
 
@@ -59,6 +63,6 @@ Treat every model-chosen tool call as untrusted input:
 
 ## Phasing
 
-Baseline — tool registry + ≥1 **stubbed MCP tool** behind the action-safety boundary at Phase 2; real
-MCP servers + more integrations earn their place. Authority: [`../phases.md`](../phases.md) § Agentic
-layers by phase.
+Baseline — tool registry + ≥1 **real MCP tool** behind the action-safety boundary at Phase 1; more
+integrations / external MCP servers earn their place. Authority: [`../phases.md`](../phases.md) §
+Agentic layers by phase.

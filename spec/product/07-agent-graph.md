@@ -2,9 +2,9 @@
 
 > **Boilerplate status:** Required when the project uses an agent framework (LangGraph, CrewAI, AutoGen, etc.). Filled in by the tech-designer as part of the tech design stage. Delete this file if there's no agent framework (a simple script or API). The spec-reviewer treats it as a **CRITICAL BLOCKER** — the tech design is not approved if it's absent or incomplete when a framework is in use.
 >
-> **If the agent acts on the outside world** (tools, data, search), it must use a **ReAct loop**. Fill this file in per [`../engineering/patterns/react-agent.md`](../engineering/patterns/react-agent.md) — answer its eight pre-coding questions, carry the loop-control + usage fields in State, route iteration exhaustion to `force_finalize` (not a one-shot pipeline), and surface `action_history` to the user live. The Force-Finalize node section below applies only to ReAct loops.
+> **If the agent acts on the outside world** (tools, data, search), it must use a **ReAct loop**. Fill this file in per [`../engineering/patterns/react-agent.md`](../engineering/patterns/react-agent.md) — answer its pre-coding questions, carry the loop-control + usage fields in State, end the loop with the **structured finish tool** (not a text prefix), set `max_agent_iterations` explicitly (no default) and route exhaustion to `force_finalize`, and surface `action_history` to the user live. The Force-Finalize node section below applies only to ReAct loops.
 >
-> **This graph wires the stack layers** declared in `02-architecture.md` § Agentic stack layers used: a context-assembly step pulls memory + retrieval ([`memory-and-context.md`](../engineering/patterns/memory-and-context.md), [`retrieval.md`](../engineering/patterns/retrieval.md)); `act` calls tools/MCP behind the action-safety boundary ([`tools-and-mcp.md`](../engineering/patterns/tools-and-mcp.md)); high-stakes actions route through guardrails/HITL ([`guardrails-and-hitl.md`](../engineering/patterns/guardrails-and-hitl.md)). For multi-agent, each sub-agent is its own subgraph ([`multi-agent.md`](../engineering/patterns/multi-agent.md)); for resumable runs, compile with a checkpointer ([`durability.md`](../engineering/patterns/durability.md)).
+> **This graph wires the stack layers** declared in `02-architecture.md` § Agentic stack layers used: a context-assembly step pulls working/short-term memory ([`memory-and-context.md`](../engineering/patterns/memory-and-context.md)) — and retrieval/long-term memory only if those earns-its-place layers are in use ([`retrieval.md`](../engineering/patterns/retrieval.md)); `act` calls tools/MCP behind the action-safety boundary ([`tools-and-mcp.md`](../engineering/patterns/tools-and-mcp.md)); high-stakes actions route through guardrails/HITL ([`guardrails-and-hitl.md`](../engineering/patterns/guardrails-and-hitl.md)). For multi-agent, each sub-agent is its own subgraph with shared run state ([`multi-agent.md`](../engineering/patterns/multi-agent.md)); for resumable runs, compile with a checkpointer ([`durability.md`](../engineering/patterns/durability.md)).
 
 ---
 
@@ -25,9 +25,9 @@ class AgentState(TypedDict):
     error: str | None   # set by any node on fatal failure
 
     # ReAct loop only (omit for one-shot pipelines)
-    action_history: list[dict]  # [{"action": str, "result": str, "is_error": bool}]
-    iteration_count: int        # guarded against max_iterations → force_finalize
-    llm_response: str           # raw last LLM output — router checks it for FINAL ANSWER
+    action_history: list[dict]  # [{"description": str, "action": str, "result": str, "is_error": bool}]
+    iteration_count: int        # guarded against max_agent_iterations (project sets it) → force_finalize
+    last_tool_call: dict        # the model's last tool call — router checks if it's the `finish` tool
 
     # Usage accounting (persist on the run record — see patterns/react-agent.md § State)
     tokens_input: int

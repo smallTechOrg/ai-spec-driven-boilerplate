@@ -55,8 +55,12 @@ class Verdict:
     payload: str                   # text to use downstream (redacted on transform)
     reason: str = ""
 
-def scan_pii(text: str) -> Verdict:
-    """Deterministic redact/mask/hash/block. Returns the transformed text or a block verdict."""
+def scan_pii(text: object) -> Verdict:
+    """Deterministic redact/mask/hash/block. Accepts any content type — coerces to str first."""
+    if isinstance(text, list):   # structured content (list-of-parts) — extract text fields
+        text = "\n".join(p["text"] for p in text if isinstance(p, dict) and p.get("type") == "text") or str(text)
+    elif not isinstance(text, str):
+        text = str(text)
     found, out, blocked = [], text, False
     for kind, rx in PII.items():
         if not rx.search(out):

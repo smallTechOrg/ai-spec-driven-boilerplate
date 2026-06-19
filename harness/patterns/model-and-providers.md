@@ -57,6 +57,17 @@ def get_model():
 `init_chat_model` dispatches on `model_provider`; the graph binds tools to whatever it returns
 (`patterns/react-agent.md`). The rest of the agent never imports a provider SDK — that's the whole point.
 
+## Content coercion — not all providers return plain strings
+Some models return `AIMessage.content` as a structured list (parts + metadata) when reasoning or
+multi-modal features are active. `str()` on a list gives `"[{'type': ...}]"`, not the text.
+Always coerce before string APIs (`finalize_node`, `scan_pii`, guardrails, anywhere you read `.content`):
+```python
+raw = msg.content
+if isinstance(raw, list):
+    raw = "\n".join(p["text"] for p in raw if isinstance(p, dict) and p.get("type") == "text")
+content: str = raw or ""
+```
+
 ## Provider switch = config change
 Set `APP_LLM_PROVIDER` + `APP_LLM_MODEL` (+ key) in `.env`. No code edits. Install the matching provider
 package. Example `.env` swaps:

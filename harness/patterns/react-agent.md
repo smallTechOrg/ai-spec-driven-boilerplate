@@ -58,14 +58,27 @@ def build_graph(model):
         return {"messages": state["messages"] + out}
 
     async def finalize_node(state):
-        last = state["messages"][-1]
+        # Force-finalize must ALWAYS yield a best-effort answer — never a blank "(no answer produced)".
+        msgs = state["messages"]
         answer = None
-        for tc in getattr(last, "tool_calls", None) or []:
-            if tc["name"] == FINISH:
-                answer = tc["args"].get("answer")
-        if answer is None:
-            answer = getattr(last, "content", None) or "(no answer produced)"
-        return {"answer": answer}
+        # 1. the finish tool's answer — scan from the END for ANY finish call (not just the last message,
+        #    which on a hit cap is an AIMessage with pending tool_calls, not a finish).
+        for m in reversed(msgs):
+            for tc in getattr(m, "tool_calls", None) or []:
+                if tc["name"] == FINISH and tc["args"].get("answer"):
+                    answer = tc["args"]["answer"]
+                    break
+            if answer:
+                break
+        # 2. the last AIMessage text — some providers (e.g. Gemini) zero .content when tool_calls are present.
+        if not answer:
+            answer = getattr(msgs[-1], "content", None) or None
+        # 3. last resort: the most recent tool result, so the user gets the data we DID gather.
+        if not answer:
+            last_tool = next((m for m in reversed(msgs) if isinstance(m, ToolMessage) and m.content), None)
+            if last_tool:
+                answer = "Ran out of steps before finishing — here is what I gathered:\n\n" + str(last_tool.content)
+        return {"answer": answer or "(no answer produced)"}
 
     def route(state):
         if state["iterations"] >= settings.max_iterations:
@@ -85,7 +98,14 @@ def build_graph(model):
 
 ## Mandatory mechanics (do not omit)
 - **Termination** — the `finish` tool carries the final answer.
-- **Max-iterations guard + force_finalize** — never loop forever; on cap, finalize a best-effort answer.
+- **Max-iterations guard + force_finalize** — never loop forever; on cap, finalize a *best-effort* answer
+  (the multi-layer fallback above — never a blank `"(no answer produced)"`). Size `max_iterations` to the
+  realistic **worst-case tool depth** (e.g. discovery + one call per resource + finish), not the happy path:
+  a cap that's too tight turns complex requests into silent empty answers.
+- **Multi-turn (when checkpointed)** — on resume the checkpointer returns a raw **dict** (read
+  `cp["channel_values"]["messages"]`, not an attribute). Strip the stored `SystemMessage` and prepend a
+  freshly-built one **each turn** so the *current* context (active resource, rules) applies — never replay a
+  stale system prompt from when the thread started. → `patterns/memory.md`.
 - **Observability** — every LLM + tool step is wrapped in a span → `patterns/observability-and-evals.md`.
 - **Deep-Agent pillars** — add a `write_todos` planning tool; sub-agents + scratchpad memory earn their place.
 

@@ -45,6 +45,10 @@ class Run(Base):
     status:     Mapped[str]  = mapped_column(String, default="running")   # running|completed|error
     answer:     Mapped[str | None] = mapped_column(Text, nullable=True)
     iterations: Mapped[int]  = mapped_column(Integer, default=0)
+    input_tokens:  Mapped[int]   = mapped_column(Integer, default=0)      # summed from this run's LLM spans
+    output_tokens: Mapped[int]   = mapped_column(Integer, default=0)
+    cost_usd:      Mapped[float] = mapped_column(Float, default=0.0)       # tokens × per-1M price (config.py)
+    thread_id:     Mapped[str | None] = mapped_column(String, nullable=True, index=True)  # multi-turn session
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
@@ -98,6 +102,13 @@ lifespan (`agent/server.py`) so tables exist on boot. `db.py` exports `get_sessi
 
 These three are non-negotiable: they *are* observability + evals. Don't skip `spans` to "add it later" —
 the demo gate requires visible traces.
+
+**Cost is a first-class column, not an afterthought.** Every run consumes tokens and money, so `runs` carries
+`input_tokens` / `output_tokens` / `cost_usd` from Phase 1 — sum the run's `LLM` spans' `usage_metadata`,
+price via per-1M rates in `agent/config.py`. Wiring this in later means a migration *and* a UI retrofit; from
+the start it's free. For **multi-turn** products add a `threads` (session) table keyed by `thread_id` that
+accumulates per-session token + cost totals and the active resource id — that row is what the UI's
+always-visible session header reads (`patterns/interface.md`).
 
 ## Adding domain entities — extend, don't fork
 Your capability's nouns (tickets, invoices, documents, …) are new models on the **same `Base`**. Same engine,

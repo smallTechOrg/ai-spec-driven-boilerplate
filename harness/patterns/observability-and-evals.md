@@ -154,3 +154,36 @@ async def test_demo_gate():
 Wire the deterministic trajectory half into CI with no key (drive `run_agent` with the FakeModel from
 `patterns/react-agent.md`); the LLM-judge outcome half needs a funded `APP_LLM_API_KEY` and runs in the
 demo gate proper.
+
+## Test layers — the FakeModel loop test is necessary, NOT sufficient
+The scripted FakeModel loop test (`patterns/react-agent.md`) proves the *mechanics* — the loop runs, spans
+land, `force_finalize` fires. It does **not** prove the *product works for a user*. The failure mode it
+misses, seen for real: every mechanic-level test green while the actual feature is broken. Three layers above
+it close that gap, and every build with a UI ships all three.
+
+- **Capability journey tests** (`tests/test_capabilities.py`) — one per EARS criterion in
+  `spec/capabilities/*.md`. Each **ingests real data through the real pipeline** (not mocked) and drives the
+  loop with a **context-aware fake model** that *reads the actual tool outputs* to form its answer — so real
+  tool results flow through the agent and into the assertions. Assert **both** trajectory (right tools, right
+  order) **and** outcome (the answer contains the real data values; any structured field is well-formed). A
+  scripted model returning canned text cannot catch a grounding bug; one that reads tool output can.
+  ```python
+  class ContextAwareFakeModel:               # no API key — but NOT canned: it reacts to real tool results
+      def bind_tools(self, tools): return self
+      async def ainvoke(self, msgs):
+          last = msgs[-1]
+          if isinstance(last, ToolMessage):  # a real tool just ran — finish using ITS output
+              return AIMessage(content="", tool_calls=[{"name": "finish",
+                       "args": {"answer": f"Result: {last.content}"}, "id": "f"}])
+          return AIMessage(content="", tool_calls=[{"name": "<your_query_tool>", "args": {...}, "id": "t"}])
+  ```
+- **Full-stack contract test** (`tests/test_api_flow.py`) — httpx + ASGI transport, FakeModel, **no key**.
+  Exercise the real request/response path the UI depends on and assert **every field the UI consumes is
+  present** — not just a `200`. The canonical miss: the backend returned the answer but dropped a structured
+  field (a `chart_spec`), every backend test stayed green, and the UI silently rendered nothing. Assert the
+  `POST /runs` envelope shape **and** the SSE `done` event shape (answer, run_id, thread_id, + any structured
+  payload the client reads).
+- **Browser journey test** (`tests/e2e/test_primary_journey.py`) — Playwright against the running app,
+  asserting the **post-JS DOM** after the real run (`patterns/interface.md`). This is the demo gate's UI half.
+
+Unit tests verify isolated mechanics; these verify the product. → `workflows/gates.md` (check 1 runs all of them).

@@ -184,10 +184,27 @@ answer stream in → a link to its trace. The agent's value is the run, not the 
 
 - **Stack:** Next.js (App Router) + React + Tailwind. The page calls `POST /runs` (or `/runs/stream` for
   SSE) and renders the `ok()` envelope. Keep state minimal — input, streaming answer, run-id link.
+- **Always render the answer as markdown.** LLM output *is* markdown — headings, tables, lists, code,
+  bold. Render it through a markdown component (`react-markdown` + `remark-gfm` for tables/strikethrough),
+  never as raw text or `{answer}` in a `<pre>`. Stream tokens into that same markdown surface so the
+  formatted answer builds up live. A wall of unformatted text is a bug, not a style choice.
 - **Honesty:** real network call to the real agent. No mocked answer, no fake latency, no lorem.
 - **Deep-link the trace:** show `run_id` as a link to `/traces` so a human can inspect the actual steps —
   the UI and the observability layer are the same truth (`patterns/observability-and-evals.md`).
 - **Don't rebuild `/traces`.** The server already renders the timeline; the UI links to it.
+
+### Visualizations — suggest minimal, let the user drive (data / analytics products only)
+Skip this entirely for non-data products. When the product *does* produce charts, do **not** auto-render a
+wall of dashboards the user never asked for — that pre-judges what matters and buries the answer in noise.
+Charts are an **affordance, not the default surface**: the primary journey stays ask → answer, and
+visualization is opt-in and user-driven.
+- **Suggest, don't flood.** Offer a few sensible default charts inferred from the schema (one per key
+  column or relationship) as one-click suggestions — not a pre-built board of everything.
+- **User-authored charts.** The user adds a chart by typing a natural-language prompt ("revenue by region
+  as a bar chart"); the agent returns the chart spec (Plotly JSON via the `finish` tool —
+  `patterns/react-agent.md`) and the UI renders it. The chart comes from a real run, not a hardcoded view.
+- **Fine-tune by prompt.** Each chart keeps its prompt editable — the user refines the wording and the
+  chart regenerates. A chart is a conversation, not a frozen artifact.
 
 ### Gate — Playwright asserts the post-JS DOM (run it, don't trust it)
 The journey test drives a real browser against the running app and asserts what a user actually sees

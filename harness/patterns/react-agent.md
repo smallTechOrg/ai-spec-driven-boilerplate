@@ -42,7 +42,11 @@ def build_graph(model):
         async with span(state["run_id"], f"chat {settings.llm_model}", "LLM") as sp:
             resp = await bound.ainvoke(state["messages"])
             if (u := getattr(resp, "usage_metadata", None)):
-                sp["tokens"] = u
+                # usage_metadata may be a TypedDict (dict) or an object — guard both
+                sp["tokens"] = {
+                    "input":  u.get("input_tokens", 0) if isinstance(u, dict) else getattr(u, "input_tokens", 0),
+                    "output": u.get("output_tokens", 0) if isinstance(u, dict) else getattr(u, "output_tokens", 0),
+                }
         return {"messages": state["messages"] + [resp], "iterations": state["iterations"] + 1}
 
     async def tools_node(state):
@@ -58,11 +62,9 @@ def build_graph(model):
         return {"messages": state["messages"] + out}
 
     async def finalize_node(state):
-        # Force-finalize must ALWAYS yield a best-effort answer — never a blank "(no answer produced)".
         msgs = state["messages"]
         answer = None
-        # 1. the finish tool's answer — scan from the END for ANY finish call (not just the last message,
-        #    which on a hit cap is an AIMessage with pending tool_calls, not a finish).
+        # 1. finish tool's answer — scan backwards (hit cap = AIMessage with tool_calls, not finish)
         for m in reversed(msgs):
             for tc in getattr(m, "tool_calls", None) or []:
                 if tc["name"] == FINISH and tc["args"].get("answer"):
@@ -70,14 +72,17 @@ def build_graph(model):
                     break
             if answer:
                 break
-        # 2. the last AIMessage text — some providers (e.g. Gemini) zero .content when tool_calls are present.
+        # 2. last AIMessage text — coerce structured content (list-of-parts) to str
         if not answer:
-            answer = getattr(msgs[-1], "content", None) or None
-        # 3. last resort: the most recent tool result, so the user gets the data we DID gather.
+            raw = getattr(msgs[-1], "content", None)
+            if isinstance(raw, list):
+                raw = "\n".join(p["text"] for p in raw if isinstance(p, dict) and p.get("type") == "text") or None
+            answer = raw or None
+        # 3. last resort: most recent tool result (best-effort answer, never blank)
         if not answer:
             last_tool = next((m for m in reversed(msgs) if isinstance(m, ToolMessage) and m.content), None)
             if last_tool:
-                answer = "Ran out of steps before finishing — here is what I gathered:\n\n" + str(last_tool.content)
+                answer = "Ran out of steps — here is what I gathered:\n\n" + str(last_tool.content)
         return {"answer": answer or "(no answer produced)"}
 
     def route(state):

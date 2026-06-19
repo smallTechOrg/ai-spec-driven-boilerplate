@@ -53,6 +53,11 @@ async def span(run_id: str, name: str, kind: str = "INTERNAL", **attrs):
 The loop calls this around every LLM and tool step — `patterns/react-agent.md`. The mutable yield is the
 whole contract: enrich `sp` in the block (tokens, result preview, args) and it lands in `attributes`.
 
+> **Check the type of `usage_metadata` before reading tokens.** Some providers return a TypedDict
+> (plain `dict`); `getattr(u, "input_tokens", 0)` silently returns 0 on a dict. Use
+> `u.get("input_tokens", 0) if isinstance(u, dict) else getattr(u, "input_tokens", 0)`.
+> See `patterns/react-agent.md` `agent_node` for the canonical pattern.
+
 ### The `/traces` viewer lives in `patterns/interface.md`
 The `/traces` viewer (server-rendered HTML, no JS, no build step — a timeline of runs, each span with a
 kind-color badge, duration bar, attributes, and any error in red) is part of the self-contained

@@ -36,8 +36,8 @@ chosen provider (`claude-haiku-4-5-20251001` / `gpt-5-nano` class / `gemini-2.5-
 against the provider before pinning, per `harness.md`). The tool answer maps straight onto the 3-layer
 model in `patterns/tools-and-mcp.md`: in-process `@tool` for own logic/data, MCP for external SaaS only.
 
-**A missing or unfunded API key is a true blocker.** No real run, no outcome eval, no green demo gate
-without one (`harness.md`). Stop and ask; do not stub a fake key to proceed.
+**Collect the API key here (Q4) — the build runs unattended from approval to green gate.**
+If the user skips it, ask once before generating code. Never pause mid-build for it.
 
 ## 2. Draft the spec + plan (no code yet)
 
@@ -58,17 +58,28 @@ Every layer marked ON must trace to a capability; no speculative layers (`agent.
 
 ## 3. One approval
 
-Present scope + stack + plan in a single message and get one confirm (`agent-builder.md` § One approval):
+Present scope + stack + plan via `AskUserQuestion` — **always use the dynamic question UI, never plain
+text** — and get one confirm before any code is written:
 
-```
-Building: <product, one line>
-Capabilities: <list> · Layers ON: <from spec/agent.md>
-Stack: <provider>/<runtime model> · <DB> · interface=<…> · tools=<in-process|MCP …>
-Plan: Phase 1 <skeleton+capability> … Phase N productionise   (reports/implementation-plan.md)
-Proceed? (one confirm — then I build to the demo gate autonomously)
+```python
+AskUserQuestion(questions=[{
+    "question": "Ready to build? Review scope, stack, and plan below then confirm.",
+    "header": "Proceed?",
+    "options": [
+        {"label": "Proceed", "description": "<summary: Building <product> · <capabilities> · <stack> · Phase 1 …>"},
+        {"label": "Cancel / adjust", "description": "Stop here — I'll revise the spec or plan first."},
+    ]
+}])
 ```
 
-No application code exists before this confirm. After it, autonomy is on.
+Embed the full scope summary in the `Proceed` option description (one-liner per item):
+- Building: `<product, one line>`
+- Capabilities: `<list>`
+- Layers ON: `<from spec/agent.md>`
+- Stack: `<provider>/<runtime model>` · `<DB>` · `interface=<…>` · `tools=<in-process|MCP …>`
+- Plan: `Phase 1 <skeleton+all capabilities> … Phase N productionise`
+
+No application code exists before this confirm. After the user selects **Proceed**, autonomy is on.
 
 ## 4. Generate code fresh — on `feature/<slug>-<date>`
 
@@ -154,14 +165,10 @@ async def run_agent(goal: str, model=None, run_id: str | None = None) -> dict:
 
 Build only what the spec needs — no gold-plating (`agent-builder.md`).
 
-## 5. Demo-tier gate — the only proof of "done"
+## 5. Demo-tier gate — run → diagnose → fix → repeat until green
 
-Run the gate (`workflows/gates.md`); **done = the gate script exits 0**, never prose (`harness.md`). The
-demo tier asserts, in order: the package imports, tests pass (a `FakeModel` drives the ReAct loop with no
-key — ≥2 iterations, tool spans recorded, `force_finalize` on runaway), the server boots, `GET /health`
-→ 200, a **real** `POST /runs` completes against the funded key, the **outcome eval passes** (a 200 with a
-wrong answer is a fail — the answer must satisfy the capability's EARS criteria), and spans are visible at
-`/traces`. qa-auditor confirms the exit code (`agents/qa-auditor.md`).
+**Done = the gate exits 0**, never prose. Run it (`workflows/gates.md`); when it fails, read the
+output, fix the cause, and re-run. The gate is a loop exit condition, not a one-shot checkpoint.
 
 ```bash
 python -m pytest -q                                   # FakeModel loop, no key needed
@@ -172,20 +179,20 @@ curl -sf -X POST localhost:8001/runs -d '{"goal":"<a real success-criterion task
 # open localhost:8001/traces — timeline of runs + spans must render
 ```
 
-Green gate → the agent is **running** and demo-complete. Maintain/extend via `/spec-new-capability`;
-productionise via `/deploy` when the user asks (`workflows/deploy.md`).
+**When a step fails:** read the actual error output, trace it to the source file, fix it, re-run
+the gate from that step. Don't ask the user; don't guess. The only external blocker is an unfunded
+key — everything else is diagnosable from logs and `/traces`. qa-auditor confirms the exit code.
 
-## On a stall — partial-delivery report
+**After the gate passes**, leave the server running and tell the user how to reach it:
+- Backend: `http://localhost:8001` · Traces: `http://localhost:8001/traces`
+- UI (if built): `cd ui && npm run dev` → `http://localhost:3001`
 
-If a true blocker stops the demo gate (missing/unfunded key, a red gate you cannot resolve, an ambiguous
-spec), stop and emit a short report — do **not** fake a pass (`harness.md`, `qa-auditor.md`):
+The user must be able to test immediately — do not kill the server.
 
-```
-PARTIAL DELIVERY — <product>   branch: feature/<slug>-<date>
-Works:    <green checks — e.g. imports, tests, /health, /traces>
-Stubbed:  <what isn't real yet, and why>
-Blocker:  <the one thing — e.g. APP_LLM_API_KEY unfunded → no real run / outcome eval>
-Next fix: <the single action that unblocks the demo gate>
-```
+Maintain/extend via `/spec-new-capability`; productionise via `/deploy` when the user asks.
 
-Then ask the one unblocking question via the dynamic question UI. Resume to the demo gate once cleared.
+## On a true blocker
+
+An external blocker (missing/unfunded key, a spec ambiguity that stops code generation) stops the
+loop. Emit a one-paragraph status — what works, what's blocked, the single fix needed — then ask
+via `AskUserQuestion`. Resume to the gate once cleared. Do **not** fake a pass.

@@ -214,6 +214,12 @@ visualization is opt-in and user-driven.
 - **Fine-tune by prompt.** Each chart keeps its prompt editable — the user refines the wording and the
   chart regenerates. A chart is a conversation, not a frozen artifact.
 
+**Verify the UI serves before reporting done.** Confirm HTTP 200 from the dev server before running
+the gate. If it returns an error, read the process log — the first error line names the cause.
+Common fixes: wrong dev port (default **3001**, not 3000 — conflicts with Grafana and other local
+tools), a browser-only library evaluated server-side (disable SSR for that component), or a missing
+global that the Node.js version partially implements. Fix the root cause from the log; don't guess.
+
 ### Gate — Playwright asserts the post-JS DOM (run it, don't trust it)
 The journey test drives a real browser against the running app and asserts what a user actually sees
 *after* React hydrates and the answer arrives — never the raw HTML, never a 200 alone. → `workflows/gates.md`.
@@ -222,7 +228,7 @@ The journey test drives a real browser against the running app and asserts what 
 from playwright.sync_api import expect
 
 def test_user_gets_an_answer(page):
-    page.goto("http://localhost:3000")
+    page.goto("http://localhost:3001")
     page.get_by_role("textbox", name="goal").fill("What does the onboarding doc say about refunds?")
     page.get_by_role("button", name="Run").click()
     answer = page.get_by_test_id("answer")

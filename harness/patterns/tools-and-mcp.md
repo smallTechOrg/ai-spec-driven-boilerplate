@@ -103,6 +103,11 @@ MCP crosses a trust boundary, so treat every MCP tool like an outbound API call 
 - **Least privilege.** Request the narrowest OAuth scopes the capability needs; prefer read-only scopes
   unless a write is in the EARS criteria for the capability.
 
+**Tool output must contain everything the model needs for follow-up calls.** If a tool creates or
+looks up a record whose internal identifier differs from its user-visible name, include both in the
+output. The model reads tool results verbatim and uses them in the next call — a mismatch between
+what it sees and what the backend expects is a silent query failure, not an error it can recover from.
+
 ## The action-safety boundary
 Tools are where an agent stops talking and starts *doing*. Classify every tool and gate the dangerous ones:
 - **Read-only** (search, fetch, query) → run freely.

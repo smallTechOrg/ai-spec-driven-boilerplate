@@ -19,7 +19,7 @@ Pass all intake answers explicitly to each (sub-agents share no memory).
 2. **Draft** — spec-writer fills the 4 spec files (EARS capabilities); tech-designer fills
    `spec/tech-stack.md`; planner writes the phased plan. spec-reviewer + plan-reviewer validate in the
    background (advisory — the gate is mechanical).
-3. **One approval** — present scope + stack + plan in one message; one confirm. No code before this.
+3. **One approval** — present scope + stack + plan via `AskUserQuestion` (always — never plain text); one confirm. No code before this.
 4. **Generate** — on a `feature/<slug>-<date>` branch (hooks enforce), generate the agent code **from the
    pattern recipes** for the layers `spec/agent.md` marks ON. Pin current library versions (verify latest
    first). Build only what the spec needs — no gold-plating.

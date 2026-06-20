@@ -1,6 +1,6 @@
 # Tech Stack
 
-> EMPTY TEMPLATE — the spec-writer fills the `<!-- FILL IN -->` markers from the user's choices.
+> Filled by the **tech-designer** from intake (harness defaults — see `spec/product.md`).
 > The locked stack lives in [`harness/harness.md`](../harness/harness.md); this file records only the
 > per-build decisions. Defaults below are the harness defaults — keep them unless the user overrides.
 > This is the **reused tested-core** zone (code is truth, like a framework dependency — see
@@ -19,9 +19,11 @@ accessor (`agent/llm.py` — `harness/patterns/model-and-providers.md`); no besp
 the nodes. Switching tiers is two env vars, no code edit. **The runtime LLM is never stubbed** — even in v1,
 the one real capability calls the real model (Decision #2).
 
-- Provider: <!-- FILL IN: anthropic | openai | google --> (default `anthropic`) — env `APP_LLM_PROVIDER`
-- Runtime model: <!-- FILL IN --> (default `claude-haiku-4-5` — cheap tier) — env `APP_LLM_MODEL`
-- API key env var: `APP_LLM_API_KEY` (pydantic-settings, prefix `APP_`; collected at Q4 intake)
+- Provider: `anthropic` (harness default) — env `APP_LLM_PROVIDER`
+- Runtime model: `claude-haiku-4-5` (cheap tier — resolves to `claude-haiku-4-5-20251001`) — env `APP_LLM_MODEL`
+- API key env var: `APP_LLM_API_KEY` (pydantic-settings, prefix `APP_`; collected at Q4 intake). **The funded
+  key is the owner's; it is wired through config + `.env.example`, never hardcoded. The real-LLM demo-gate run
+  is the owner's manual step.**
 
 > A wrong/stale model name surfaces as a **404 at first real call** while the build looks green — verify the
 > exact ID against the provider's models list before pinning, and pin a current one (the cheap-tier alias
@@ -58,11 +60,12 @@ Local-first by default; the SAME async code runs on both — only the URL change
 - Tables: `runs`, `messages`, `spans` (+ domain entities below). The `runs` table carries
   `input_tokens` / `output_tokens` / `cost_usd` / `thread_id` as first-class columns from Phase 1
   (usage/cost accounting — read `usage_metadata` via a type-guarded `.get()`).
-- Domain entities: <!-- FILL IN: tables beyond runs/messages/spans, or "none" -->
+- Domain entities: `tickets` — one row per triaged ticket (subject, body, urgency, category, draft_reply),
+  tied to the `runs.id` that produced it (`harness/patterns/persistence.md` § Adding domain entities).
 
 ## Deploy target
 
-- Target: <!-- FILL IN: TBD | Railway | Fly.io | Modal --> (default `TBD` — chosen at PRODUCTIONISE)
+- Target: `TBD` — chosen at PRODUCTIONISE (`/deploy`)
 - Artifact: portable build (`langgraph build` / `langgraph.json`, Dockerfile) — `harness/patterns/deploy.md`
 - Prod ladder: PostgreSQL + Redis (Layer 11 "Deploy & Operate").
 
@@ -80,6 +83,23 @@ Local-first by default; the SAME async code runs on both — only the URL change
 | MCP (external only) | `langchain-mcp-adapters` / `mcp`         | EXTERNAL integrations only — see What to avoid |
 | Tests               | `pytest`, `pytest-asyncio`               | FakeModel drives the loop with no API key |
 | UI E2E (UI builds)  | `pytest-playwright`, `playwright`        | pin for any UI build — gate check 2 runs `tests/e2e/` too, so a missing playwright aborts collection; omit for a headless product |
+
+### Pinned versions (verified against PyPI at build time, 2026-06-20) — see `pyproject.toml`
+
+| Package | Pinned | Package | Pinned |
+|---|---|---|---|
+| `langchain` | 1.3.10 | `fastapi` | 0.138.0 |
+| `langchain-core` | 1.4.8 | `uvicorn` | 0.49.0 |
+| `langchain-anthropic` | 1.4.6 | `sqlalchemy` | 2.0.51 |
+| `langgraph` | 1.2.6 | `aiosqlite` | 0.22.1 |
+| `langgraph-checkpoint-sqlite` | 3.1.0 | `pydantic` | 2.13.4 |
+| `pydantic-settings` | 2.14.2 | `httpx` | 0.28.1 |
+| `pytest` | 9.1.1 | `pytest-asyncio` | 1.4.0 |
+| `pytest-playwright` | 0.8.0 | `playwright` | 1.60.0 |
+
+UI: `next` ^15, `react` ^19, `react-markdown` ^9, `remark-gfm` ^4. These match the usage-spec stamps
+(`langchain`/`langgraph` 1.x, `fastapi` 0.13x, `sqlalchemy` 2.0.x, `pydantic-settings` 2.x) — no usage-spec
+refresh required.
 
 ## What to avoid (load-bearing — do not relitigate; full rationale in `harness/harness.md`)
 

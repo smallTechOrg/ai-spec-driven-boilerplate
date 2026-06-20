@@ -1,0 +1,44 @@
+[project]
+name = "support-triage-agent"
+version = "0.1.0"
+description = "A customer-support triage agent: classify a ticket by urgency + category and draft a suggested reply."
+requires-python = ">=3.12"
+dependencies = [
+    # orchestration (LangChain / LangGraph 1.x)
+    "langchain==1.3.10",
+    "langchain-core==1.4.8",
+    "langchain-anthropic==1.4.6",
+    "langgraph==1.2.6",
+    "langgraph-checkpoint-sqlite==3.1.0",
+    # web / serving
+    "fastapi==0.138.0",
+    "uvicorn==0.49.0",
+    # persistence (async — aiosqlite local; asyncpg added at /deploy, NEVER psycopg2)
+    "sqlalchemy==2.0.51",
+    "aiosqlite==0.22.1",
+    # config / models
+    "pydantic==2.13.4",
+    "pydantic-settings==2.14.2",
+    # http client (used by the full-stack contract test + tooling)
+    "httpx==0.28.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==8.4.2",
+    "pytest-asyncio==0.25.3",
+    "pytest-playwright==0.8.0",
+    "playwright==1.60.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"          # REQUIRED — else pytest-asyncio silently SKIPS every unmarked async test + the autouse DB fixture
+asyncio_default_fixture_loop_scope = "function"   # one loop per test — pinned so the default-scope warning never errors
+pythonpath = ["."]             # so `from tests.helpers import ...` and `import agent...` resolve from repo root
+testpaths = ["tests"]
+# pytest-playwright's sync `page` fixture drives its OWN greenlet event loop; co-running it in the same
+# process as pytest-asyncio's auto-mode async tests poisons the shared loop (the async tests error at
+# Runner teardown once the page fixture has initialized). So the DETERMINISTIC suite (gate check 2) excludes
+# tests/e2e/, and the BROWSER journey (gate check 7) runs `pytest tests/e2e/...` as its own process — exactly
+# the gate's two-phase split (deterministic suite vs live browser journey, workflows/gates.md checks 2 & 7).
+addopts = "--ignore=tests/e2e"

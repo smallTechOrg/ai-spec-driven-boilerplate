@@ -1,0 +1,16 @@
+{
+  "name": "support-triage-ui",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001"
+  },
+  "dependencies": {
+    "next": "^15",
+    "react": "^19",
+    "react-dom": "^19",
+    "react-markdown": "^9",
+    "remark-gfm": "^4"
+  }
+}

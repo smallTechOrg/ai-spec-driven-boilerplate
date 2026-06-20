@@ -12,6 +12,12 @@ build/
 .DS_Store
 *.log
 
+# Local runtime DB + checkpoint artifacts (created by boot / the gate) — never tracked
+*.db
+agent.db
+checkpoints.db
+test_agent.db
+
 # Session reports & build artifacts are local handoff docs, not tracked.
 # The session-report TEMPLATE stays tracked at spec/engineering/workflows/session-report.md.
 reports/

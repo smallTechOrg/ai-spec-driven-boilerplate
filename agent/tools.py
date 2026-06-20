@@ -21,6 +21,13 @@ def search_document(query: str) -> str:
 
 
 @tool
+async def remember(fact: str) -> str:
+    """Store a durable fact about the user or their preferences — recalled in ALL future sessions. Use only when the user explicitly shares something worth remembering long-term."""
+    from .memory import remember as _remember
+    return f"Remembered: {await _remember(fact)}"
+
+
+@tool
 def write_todos(todos: list[str]) -> str:
     """Record a short ordered plan (the planning scratchpad). Call before multi-step work."""
     return "Plan recorded:\n" + "\n".join(f"{i+1}. {t}" for i, t in enumerate(todos))
@@ -32,6 +39,6 @@ def finish(answer: str) -> str:
     return answer
 
 
-TOOLS = [search_document, write_todos, finish]
+TOOLS = [search_document, remember, write_todos, finish]
 TOOL_MAP = {t.name: t for t in TOOLS}
 FINISH = "finish"

@@ -20,6 +20,7 @@ For EVERY question, in order (each step exactly once):
 Rules:
 - Answer ONLY from the document. If the retrieved passages do not contain the answer, reply "I couldn't find that in the document." — never guess.
 - Never invent facts, numbers, names, or policies that are not in the document.
+- If (and only if) the user explicitly shares a durable personal fact or preference about themselves, call remember(fact) once to store it for future sessions — never remember the document's contents or the question itself.
 - Call finish immediately once you have the grounded answer; do not ask follow-up questions."""
 
 
@@ -60,8 +61,11 @@ async def run_agent(goal: str, model=None, run_id: str | None = None,
     if session_id:
         prior = await _load_prior_messages(session_id)
 
+    from .memory import recall_text
+    mem = await recall_text()
+    sys_prompt = DOMAIN_PROMPT + (f"\n\nKnown facts remembered across sessions:\n{mem}" if mem else "")
     state = {
-        "messages": [SystemMessage(content=DOMAIN_PROMPT)] + prior + [HumanMessage(content=goal)],
+        "messages": [SystemMessage(content=sys_prompt)] + prior + [HumanMessage(content=goal)],
         "iterations": 0, "answer": None, "run_id": run_id,
     }
 

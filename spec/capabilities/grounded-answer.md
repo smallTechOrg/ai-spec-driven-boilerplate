@@ -12,6 +12,7 @@ is the v1 real slice — it calls the real runtime LLM and is proven live by the
 
 - WHEN the user provides a document and asks a question answerable from it the system SHALL answer with the correct fact, grounded in the document's content. [@eval: tests/test_demo_gate.py::test_demo_gate]
 - WHILE a document is loaded in the session WHEN the user asks a follow-up question the system SHALL answer from the retained document without re-upload. [@eval: tests/test_demo_gate.py::test_followup_retains_document]
+- WHEN the user shares a durable personal fact the system SHALL remember it and recall it in later sessions. [@eval: tests/test_memory.py::test_long_term_memory_persists]
 
 ## Tools & layers touched
 
@@ -20,6 +21,7 @@ is the v1 real slice — it calls the real runtime LLM and is proven live by the
 - tool: `write_todos`  (in-process @tool — planning scratchpad within the run)
 - layers: Retrieval ON (passage retrieval over the provided document)
 - layers: Memory (short-term) ON — the session document persists across turns within one `session_id`
+- layers: Memory (long-term) ON — durable facts stored via `remember`, recalled across sessions
 
 ## Evaluation
 

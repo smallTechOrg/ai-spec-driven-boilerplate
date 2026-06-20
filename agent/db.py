@@ -54,6 +54,13 @@ class Span(Base):
     created_at:  Mapped[dt.datetime]   = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class Memory(Base):
+    __tablename__ = "memories"
+    id:         Mapped[str]           = mapped_column(String, primary_key=True, default=_uuid)
+    content:    Mapped[str]           = mapped_column(Text)
+    created_at: Mapped[dt.datetime]   = mapped_column(DateTime(timezone=True), default=_now)
+
+
 engine = create_async_engine(get_settings().database_url)
 _sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
 

@@ -181,11 +181,29 @@ sub-threshold judge mean **fails the gate**. → `workflows/gates.md`.
 > silently disabling this 200-with-a-wrong-answer guard (the exact false-green the gate exists to stop). The
 > same applies to the autouse async DB fixture in `patterns/persistence.md`.
 ```python
+import os, pytest
+
+# KEY GUARD (REQUIRED): this is a REAL run + a REAL LLM judge. Gate check 2 (`uv run pytest`) collects this
+# file; the SAME suite also runs in a keyless lane (the deterministic CI half below / any keyless invocation),
+# where run_agent → get_model() RAISES `RuntimeError("APP_LLM_API_KEY is required")` and ERRORS collection
+# instead of skipping. The skipif turns that into a clean SKIP; with a funded key it runs as the gate's
+# in-process check-6 twin.
+@pytest.mark.skipif(not os.getenv("APP_LLM_API_KEY"), reason="real run + LLM judge needs a funded key")
 async def test_demo_gate():
     run_id = "gate-1"
-    state = await run_agent("How long do refunds take?", run_id=run_id)   # real run, real model
+    GOAL = "How long do refunds take?"
+    # DATA-INGEST branch (REQUIRED when a capability is session-scoped — C-SESSION-SCOPE), mirroring
+    # demo_gate.sh check 5 and the Playwright journey: a real key is NOT enough — without the resource loaded
+    # into the session, the query tool returns "No <resource> loaded", the answer is a non-answer, and the
+    # outcome assert below FALSE-REDs a CORRECT agent. So load the fixture into a session and pass session_id:
+    #   from agent.sessions import load_resource
+    #   sid = "gate-sess-1"
+    #   load_resource(sid, open("scripts/fixtures/<resource>.<ext>").read())   # build.md §3 fixture
+    #   state = await run_agent(GOAL, run_id=run_id, session_id=sid)
+    # For a key-free/own-data agent (no C-SESSION-SCOPE) use the plain form on the next line and delete the above.
+    state = await run_agent(GOAL, run_id=run_id)              # real run, real model
     ok_o, mean, detail = await stable_outcome_eval(           # multi-sample judge — deterministic, not a coin-flip
-        goal="How long do refunds take?", answer=state["answer"],
+        goal=GOAL, answer=state["answer"],
         criterion="WHEN asked about refund timing the system SHALL state 5 business days.",
         evaluation_steps=["Does the answer mention refunds?",
                           "Does it state 5 business days?",

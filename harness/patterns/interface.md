@@ -123,6 +123,7 @@ a per-run **drill-down** that narrates each step in plain English ("Asked the AI
 the refund policy — 0.3s") with the technical span name available but secondary. The whole point: a person
 who can't read code can still see *what the agent did, whether it worked, and what it cost*.
 ```python
+import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -185,8 +186,14 @@ async def create_run(request: Request, body: RunIn):
         # so the tools see it — and so Q2 on the same session reuses it (persistence.md § session-scoped).
         # Generate `load_resource` only when a capability ingests data (C-SESSION-SCOPE); a key-free/own-data
         # agent omits the `data` field and this block. Example loader (CSV → DataFrame) below the server code.
-        if body.data is not None and body.session_id is not None:
+        # If `data` arrives WITHOUT a session_id, auto-mint one server-side so the upload is NEVER silently
+        # dropped: a client that POSTs the resource on a fresh thread (no session_id yet) would otherwise get a
+        # 200 with a "no <resource> loaded" wrong answer — a load_resource keyed on `session_id is not None`
+        # silently skips. Minting one (and threading it through) makes the upload always take effect.
+        if body.data is not None:
             from .sessions import load_resource          # generated for data agents only
+            if body.session_id is None:
+                body.session_id = uuid.uuid4().hex       # never lose the upload — mint a session for it
             load_resource(body.session_id, body.data)
         # session_id threads through to the Run's thread_id + the session resource store (persistence.md);
         # the shared checkpointer (app state) gives Q2 on the same session Q1's context (memory.md).
@@ -349,6 +356,10 @@ answer stream in → a link to its trace. The agent's value is the run, not the 
 - **One command runs both.** Ship a `make dev` that starts backend **and** UI together
   (`trap 'kill 0' INT; python -m agent & cd ui && npm run dev`) — Ctrl-C kills both. The user never starts the
   backend by hand; a UI with a dead backend is the most common "it's broken" report.
+- **Send a `session_id` whenever you send `data`.** A resource POSTed without a `session_id` is loaded into a
+  server-minted session (the recipe never drops the upload), but that session id is internal — generate one
+  client-side (`crypto.randomUUID()`, as in the `page.tsx` recipe) and send it WITH the first `data` POST so
+  the follow-up turn can reuse the same session. Omitting it on Q1 means Q2 can't find Q1's resource.
 - **Persist the session client-side.** For multi-turn UIs, store `thread_id` (and the active resource id) in
   `localStorage` so a page reload resumes the same conversation — React state alone resets to a fresh thread
   on every refresh, which reads to the user as "all my history vanished."
@@ -389,6 +400,55 @@ A UI page with no runnable project and a Playwright step with no browser are bot
    }
    ```
    Port **3001** (not 3000 — `next dev -p 3001`). `make dev` runs `cd ui && npm run dev` against this project.
+
+   **`ui/app/page.tsx` MUST expose the exact accessible names the e2e journey binds to.** Playwright's
+   `get_by_role(name=…)` matches the element's *accessible name* (a `<label>`, `aria-label`, or `placeholder`)
+   — a freehand page with a "Paste your diff" label, a "Submit" button, or `data-testid="result"` will make
+   check 7 die with an opaque Playwright `TimeoutError` a non-tech owner can't diagnose. This is the UI-tier
+   analogue of the `GOAL`/`CRITERION` sync rule: **the page and the e2e journey share one contract — keep the
+   accessible names in sync.** The journey (§ Gate) locates: a `name="goal"` textbox, a `name="<resource>"`
+   textbox for a session-scoped build (e.g. `contract`/`diff`), a `Run` button, a `data-testid="answer"`
+   markdown surface, and a `trace` link. A copyable minimal page that ships exactly those:
+   ```tsx
+   // ui/app/page.tsx — the accessible names below are the e2e contract; do not rename without updating the journey.
+   "use client";
+   import { useState } from "react";
+   import ReactMarkdown from "react-markdown";
+   import remarkGfm from "remark-gfm";
+   export default function Page() {
+     const [resource, setResource] = useState("");   // session-scoped builds only; delete for a key-free agent
+     const [goal, setGoal] = useState("");
+     const [answer, setAnswer] = useState("");
+     const [runId, setRunId] = useState("");
+     async function run() {
+       const sid = crypto.randomUUID();
+       const body: any = { goal, session_id: sid };
+       if (resource) body.data = resource;            // DATA-INGEST: send the resource WITH a session_id (server.py)
+       const res = await fetch("http://localhost:8001/runs", {
+         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+       });
+       const json = await res.json();
+       setAnswer(json.data?.answer ?? json.error?.message ?? "");
+       setRunId(json.data?.run_id ?? "");
+     }
+     return (
+       <main style={{ maxWidth: 720, margin: "2rem auto", fontFamily: "system-ui" }}>
+         {/* session-scoped builds only — the aria-label IS the accessible name the journey fills */}
+         <textarea aria-label="contract" placeholder="Paste the document"
+                   value={resource} onChange={(e) => setResource(e.target.value)} rows={6} style={{ width: "100%" }} />
+         <input aria-label="goal" placeholder="Ask a question"
+                value={goal} onChange={(e) => setGoal(e.target.value)} style={{ width: "100%" }} />
+         <button onClick={run}>Run</button>
+         <div data-testid="answer"><ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown></div>
+         {runId && <a href={`http://localhost:8001/traces`}>trace</a>}
+       </main>
+     );
+   }
+   ```
+   For a session-scoped build the `aria-label="contract"` textbox carries the resource and is sent as `data`
+   with a `session_id` (rename `contract`→`diff`/`document` to match your journey + fixture). For a key-free
+   agent delete the resource textarea and the `data` field. Keep `aria-label="goal"`, the `Run` button text,
+   `data-testid="answer"`, and the `trace` link verbatim — the journey (§ Gate) binds to all four.
 2. **Install deps + the chromium binary**: `cd ui && npm install`, then `uv run playwright install chromium`
    (the browser the `page` fixture drives — never auto-downloaded). Put both in a `make setup` / install step,
    never inside the gate. The gate **auto-skips check 7 with a printed reason** when `ui/node_modules` is
@@ -437,6 +497,19 @@ field alone carries the question and the `to_contain_text` assert checks a known
 assert the answer contains a REAL expected value, never merely that it is non-empty — a non-empty string is
 also what a wrong-answer error returns, so `not_to_be_empty()` alone lets a wrong-answer journey pass the UI
 gate (HARDENING-LOG iter 7).
+
+**"A real expected value" means a value derivable deterministically from the INPUT — not a paraphrase of the
+output.** For an **extraction** agent the answer echoes a literal token from the resource (the `"30 days"`
+example), so asserting that token is robust. But for the large **transform/judgment** class — code review,
+summarize, classify, verdict — the answer is *generated prose that paraphrases the input*, and there is no
+guaranteed literal substring the live model will emit. Do **not** over-fit to a brittle paraphrase substring
+(it false-REDs the moment the model words it differently) and do **not** fall back to `not_to_be_empty()`
+(the false-green this rule forbids). Instead assert the answer echoes a literal **symbol present in the
+input** — an identifier, a number, a filename — which the model reliably reproduces when it actually engaged
+with the input. For a code-review-on-a-diff agent, assert the review mentions a changed identifier from the
+diff (`get_user`, `login`, a SQL keyword) rather than a paraphrase of the critique. (Alternatively, run a
+cheap-tier outcome-judge assertion in the e2e tier too.) Input-symbol echo is the robust default for any
+non-extraction agent.
 
 A headless product replaces this with the API + outcome-eval gate only (no browser). The mechanical
 two-tier success (demo / productionise) is defined in `harness/harness.md` and `workflows/gates.md` — this

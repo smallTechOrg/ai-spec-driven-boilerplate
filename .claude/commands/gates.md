@@ -26,19 +26,20 @@ even if the first turn was perfect).
 
 ---
 
-## DEMO gate — eight checks, all mechanical
+## DEMO gate — the mechanical checks, all mechanical
 
 Each line below is one command whose exit code is the verdict; the gate is their `&&`. None is prose.
 
 | # | Check | How it's proven |
 |---|-------|-----------------|
+| 0 | **README present + documents `make gate`** | `README.md` exists (a REQUIRED deliverable — `build.md` §3) and documents the `make gate` entry point a non-tech owner runs (`C-RUNNER-PREFIX`). Cheap mechanical owner for a "Required" file that no check previously verified — a build could otherwise ship zero README and pass green (the "documented, not proven" gap the thesis condemns, HARDENING-LOG iter 8). Run inside `demo_gate.sh` before boot. |
 | 1 | **`[@eval]` lint** | every EARS line in `spec/capabilities/*.md` carries an `[@eval: path::case]` token that resolves to a real test/case. An unbound criterion **fails the build** (`COMPETITIVE-RESEARCH.md` §5.2). Run first — cheapest, and it is the differentiator. |
 | 2 | **Suite passes (real key)** | `uv run pytest` — the FakeModel loop tests + the `test_demo_gate` judge test + the Playwright journey test (`patterns/observability-and-evals.md`, `patterns/interface.md`). Loose asserts (≥2 iterations, tool spans present, force_finalize) — a live model's wording varies; the *outcome eval*, not a string match, judges correctness. |
 | 3 | **Server boots** | start `python -m agent` (`agent/__main__.py` → uvicorn on `settings.port`), wait for it to answer. |
 | 4 | **`/health` 200** | `curl -fsS localhost:$PORT/health` returns `{"ok":true}` (`agent/server.py`). |
 | 5 | **Two-turn run completes** | `POST /runs {goal}` (Q1) → `.ok == true and .data.status == "completed"` (the `ok()` envelope — read `.data.*`, not the top level), then `POST /runs {goal:<follow-up>, session_id:<same>}` (Q2) on the **same session** → also completed. **Any Q2 error fails the gate**, even if Q1 was perfect (`SPEC-RECONCILIATION.md` C3, decision #12). A 500 or `.data.status != completed` on either turn fails. |
 | 6 | **Outcome (judge-stable) eval passes; trajectory advisory** | the run's answer scores against its EARS criterion — **multi-sampled** (the judge is run *N* times; pass requires the margin-protected mean `≥ threshold − margin`, and the spread is reported so a flaky borderline verdict is visible, not a coin-flip). A **200 with a wrong answer fails here.** The persisted-span `trajectory_eval` runs too but is **ADVISORY for a 1-capability v1 slice** — logged, not gate-blocking (a benign fail-soft tool span would else false-RED a correct answer); it is promoted to a hard blocker when a 2nd capability adds a tool-ordering contract (`patterns/observability-and-evals.md` L95-98/197). |
-| 7 | **UI journey (Playwright)** | the post-JS DOM shows the real answer after the run completes, with **no console error**, invariant asserts, **bounded retries** so it never flakes (`patterns/interface.md` Gate, decisions #5/#10). The answer assert checks the DOM **contains a real expected value**, not merely `not_to_be_empty()` — a "no data loaded" error is also a non-empty string, so non-empty alone false-greens a wrong-answer journey (HARDENING-LOG iter 7). For a **session-scoped** agent (`C-SESSION-SCOPE`) the journey first fills the upload/paste affordance with the fixture (browser-tier mirror of check 5's `data` field) before asking, else Q1 hits an empty session. Headless products skip this; every build with a UI ships it. |
+| 7 | **UI journey (Playwright)** | the post-JS DOM shows the real answer after the run completes, with **no console error**, invariant asserts, **bounded retries** so it never flakes (`patterns/interface.md` Gate, decisions #5/#10). The answer assert checks the DOM **contains a real expected value**, not merely `not_to_be_empty()` — a "no data loaded" error is also a non-empty string, so non-empty alone false-greens a wrong-answer journey (HARDENING-LOG iter 7). "A real expected value" means a value derivable deterministically from the **INPUT**. For an **extraction** agent that is a literal token in the resource (the `30 days` example); for a **transform/judgment** agent (code review, summarize, classify, verdict) whose answer paraphrases the input, assert an **input symbol** the model echoes — an identifier, number, or filename from the input — never a brittle paraphrase of the output, and never a non-empty fallback (`patterns/interface.md` § Gate). For a **session-scoped** agent (`C-SESSION-SCOPE`) the journey first fills the upload/paste affordance with the fixture (browser-tier mirror of check 5's `data` field) before asking, else Q1 hits an empty session. Headless products skip this; every build with a UI ships it. |
 | 8 | **Traces present** | `/traces` renders ≥1 run with spans for that run (`agent/observability.py`, the `spans` table). No spans = not observable = fail. |
 
 Checks 5–8 share the same real run: submit Q1+Q2, read `status`, judge the answer, render the UI, confirm
@@ -58,16 +59,27 @@ is a real EARS line in `spec/capabilities/*` and not the refund placeholder, so 
 fails the gate at step 1 with a named cause — not a downstream "outcome below threshold" pointing at the answer.
 
 ```makefile
-PORT     ?= 8001
-GOAL     ?= How long do refunds take?    # OVERRIDE per build — from the P1 EARS trigger (same line as gate_eval's CRITERION)
-FOLLOWUP ?= And how do I start one?      # OVERRIDE per build — a natural follow-up on the same session
+PORT      ?= 8001
+GOAL      ?= How long do refunds take?    # OVERRIDE per build — from the P1 EARS trigger (same line as gate_eval's CRITERION)
+FOLLOWUP  ?= And how do I start one?      # OVERRIDE per build — a natural follow-up on the same session
+DATA_FILE ?=                              # OVERRIDE to scripts/fixtures/<resource>.<ext> for a SESSION-SCOPED agent
+                                          # (C-SESSION-SCOPE); leave UNSET for a key-free/own-data agent
 
 demo-gate: gate            # alias
 gate:
 	python -m agent.eval_lint                                      # 1 — [@eval] lint: every EARS line bound
 	uv run pytest -q                                              # 2 — suite (real key, loose asserts) + Playwright
-	@bash scripts/demo_gate.sh $(PORT) "$(GOAL)" "$(FOLLOWUP)" # 3-8 — boot, health, two-turn, judge, UI, traces
+	@DATA_FILE="$(DATA_FILE)" bash scripts/demo_gate.sh $(PORT) "$(GOAL)" "$(FOLLOWUP)" # 3-8 — boot, health, two-turn, judge, UI, traces
 ```
+
+**`DATA_FILE` MUST be exported into `demo_gate.sh` (the `@DATA_FILE="$(DATA_FILE)" …` prefix above).** The
+script reads `DATA_FILE` from the **environment** (`${DATA_FILE:-}`); a recipe that just runs
+`bash scripts/demo_gate.sh …` leaves it unset, so for a session-scoped agent Q1 POSTs `{goal, session_id}`
+with **no `data`**, the session is empty, the query tool returns "No `<resource>` loaded", and the
+judge-stable outcome eval (check 6) false-REDs a *correct* agent on a 200-with-a-wrong-answer — the exact
+failure class the gate exists to catch, here turned against a working build. The Makefile var + the export
+are one edit: a data-ingest build sets `DATA_FILE = scripts/fixtures/<resource>.<ext>`; a key-free build
+leaves it blank and both turns send just `{goal, session_id}`.
 
 The `[@eval]` lint runs **twice** by design — as the explicit makefile step 1 (so a missing binding fails
 fast before the suite starts) and again inside `uv run pytest` via `tests/test_eval_lint.py` (a one-line
@@ -79,12 +91,20 @@ and suspenders: neither the binding nor the outcome check can silently slip thro
 
 ```bash
 #!/usr/bin/env bash
-# DEMO gate checks 3-8 (1 = eval_lint, 2 = pytest run before this). Exit 0 = done.
+# DEMO gate: check 0 (README) + checks 3-8 (1 = eval_lint, 2 = pytest run before this). Exit 0 = done.
 # Generate fresh per project; this is the shape.
 set -euo pipefail
 PORT="${1:-8001}"; GOAL="${2:-How long do refunds take?}"; FOLLOWUP="${3:-And how do I start one?}"
 BASE="http://localhost:${PORT}"
 : "${APP_LLM_API_KEY:?fund a key for a real run}"        # no key -> no gate
+
+# 0 — README is a REQUIRED deliverable (build.md §3), so it gets a mechanical owner here, not just prose.
+# Cheap check: it exists and references the runner-prefixed gate entry point a non-tech owner follows
+# (C-RUNNER-PREFIX). Without this a build could ship ZERO README and pass every other check green — the
+# "documented, not proven" gap the harness's own thesis condemns (HARDENING-LOG iter 8).
+[ -f README.md ] || { echo "FAIL: README.md is missing (a REQUIRED deliverable — build.md §3)"; exit 1; }
+grep -q 'make gate' README.md \
+  || { echo "FAIL: README.md does not document \`make gate\` — the gate entry point an owner runs"; exit 1; }
 
 # 3 — boot the server in the background, ensure we kill it on any exit
 python -m agent & SERVER=$!
@@ -102,12 +122,13 @@ curl -fsS "${BASE}/health" | grep -q '"ok": *true' || { echo "FAIL: /health not 
 # The response is the ok() envelope: {"ok":true,"data":{run_id, status, answer, ...}}. Read .data.*,
 # NOT the top level — run_agent's dict carries `status:"completed"` (patterns/interface.md runner.py).
 # DATA-INGEST: for an "analyze an uploaded X" agent, Q1 must CARRY the resource (else it answers "no data is
-# loaded" and the outcome eval fails). DATA_FILE defaults to the generated fixture (build.md §3 manifest:
-# scripts/fixtures/<resource>.<ext>); Q1 sends `data`, Q2 reuses it from the SAME session (no re-upload — the
-# session-scoped store working, persistence.md). For a key-free/own-data agent, leave it as the unset default
-# below and both turns send just {goal, session_id}. A session-scoped build that points DATA_FILE at a missing
-# fixture gets a self-diagnosing message here, not a raw `jq --rawfile: No such file`.
-DATA_FILE="${DATA_FILE:-}"      # OVERRIDE for a data-ingest agent: scripts/fixtures/<resource>.<ext> (build.md §3)
+# loaded" and the outcome eval fails). DATA_FILE is read from the ENVIRONMENT — the Makefile `gate` target
+# exports it (`@DATA_FILE="$(DATA_FILE)" bash scripts/demo_gate.sh …`); a session-scoped build sets the
+# Makefile var to scripts/fixtures/<resource>.<ext> (build.md §3 manifest) so Q1 sends `data` and Q2 reuses it
+# from the SAME session (no re-upload — the session-scoped store working, persistence.md). For a key-free/
+# own-data agent it stays UNSET and both turns send just {goal, session_id}. A session-scoped build that
+# points DATA_FILE at a missing fixture gets a self-diagnosing message below, not a raw `jq --rawfile: No such file`.
+DATA_FILE="${DATA_FILE:-}"      # from the env (Makefile exports it); set the Makefile DATA_FILE var per build
 SID="gate-$(date +%s)"
 Q1_PAYLOAD="$(jq -n --arg g "$GOAL" --arg s "$SID" '{goal:$g, session_id:$s}')"
 if [ -n "$DATA_FILE" ]; then

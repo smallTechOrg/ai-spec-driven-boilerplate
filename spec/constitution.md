@@ -160,7 +160,9 @@ a core rule means fix the recipe/core; a domain rule means fix the spec.
   → enforced by: `agent/llm.py` recipe + a grep/reviewer check that nodes import the accessor (DEMO 2).
 - **C-RUNNER-PREFIX** · SHOULD · Every README command is prefixed with its runner (`uv run …`) and runs from
   repo root.
-  → enforced by: README discipline; the gate runs the literal commands (DEMO 1–8).
+  → enforced by: `demo_gate.sh` check 0 asserts a README exists and documents the `make gate` entry point
+  (the owner-facing command); the gate proves the Makefile targets those commands wrap (`make gate` = DEMO
+  1–8), not the README prose verbatim. README runner-prefix discipline is reviewer-checked.
 
 ---
 

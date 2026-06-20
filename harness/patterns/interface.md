@@ -197,8 +197,15 @@ async def create_run(request: Request, body: RunIn):
             load_resource(body.session_id, body.data)
         # session_id threads through to the Run's thread_id + the session resource store (persistence.md);
         # the shared checkpointer (app state) gives Q2 on the same session Q1's context (memory.md).
+        # READ IT WITH getattr, NOT `request.app.state.checkpointer` — the checkpointer is set in the LIFESPAN,
+        # and httpx's ASGITransport (the keyless full-stack contract test, observability-and-evals.md
+        # tests/test_api_flow.py) does NOT run the lifespan, so `app.state.checkpointer` is unset there and a
+        # bare attribute access raises AttributeError → caught below as api_error("RUN_FAILED") → every faithful
+        # in-process contract test 500s (HARDENING-LOG iter 9). getattr(..., None) degrades to a single-turn run
+        # (no short-term memory) in-process while the live server (which DOES run the lifespan) keeps multi-turn.
+        checkpointer = getattr(request.app.state, "checkpointer", None)
         return ok(await run_agent(body.goal, session_id=body.session_id,
-                                  checkpointer=request.app.state.checkpointer))   # dict → straight into ok()
+                                  checkpointer=checkpointer))   # dict → straight into ok()
     except ApiError:
         raise                                    # already coded — the handler renders the JSON envelope
     except Exception as e:                        # surface key/model failures as a CODED JSON error, not a 500 stacktrace

@@ -42,15 +42,23 @@ async def _h(_req, exc: ApiError):
 
 ## Request body — a pydantic model, not raw dict
 ```python
+from fastapi import Request
 from pydantic import BaseModel
 class RunIn(BaseModel): goal: str
 
 @app.post("/runs")
-async def create_run(body: RunIn):
-    return ok(await run_agent(body.goal))
+async def create_run(request: Request, body: RunIn):
+    # The checkpointer is created in the LIFESPAN and stashed on app.state. Read it with getattr(..., None),
+    # NOT `request.app.state.checkpointer` — httpx's ASGITransport (the keyless contract test) skips the
+    # lifespan, so a bare access raises AttributeError. See the authoritative handler in `interface.md`
+    # (this is the same shape, minus the session/data seam) and the ASGITransport note below.
+    checkpointer = getattr(request.app.state, "checkpointer", None)
+    return ok(await run_agent(body.goal, checkpointer=checkpointer))
 ```
 - ✅ Async route handlers (`async def`) — our stack is async; a sync handler blocks the event loop on the
   DB/LLM await.
+- ⚠️ This is the **stripped** shape; the **authoritative** `POST /runs` (with the `session_id`/`data` seam and
+  the full envelope) is `interface.md` § *Code — `agent/server.py`*. Keep this in sync with it — never diverge.
 
 ## SSE streaming (when `Streaming: yes` in the spec)
 ```python
@@ -78,4 +86,9 @@ uvicorn.run("agent.server:app", host="0.0.0.0", port=get_settings().port)   # de
 ```
 - ✅ Pass the app as an **import string** (`"agent.server:app"`) so reload works; bind the configured port.
 - For the gate over HTTP use a real `httpx` + `ASGITransport` client in tests (no network) and `python -m agent`
-  for the live boot (`gates.md` DEMO 2).
+  for the live boot (`gates.md` DEMO 2). **`ASGITransport` does NOT run the FastAPI lifespan** — anything set on
+  `app.state` in the lifespan (the `checkpointer`) is therefore **absent** in-process, so any handler that reads
+  it must use `getattr(request.app.state, "checkpointer", None)` (above), never a bare attribute access, or every
+  in-process contract test 500s with `'State' object has no attribute 'checkpointer'` (HARDENING-LOG iter 9). If
+  a test genuinely needs the lifespan to run (e.g. to assert init_db ran), wrap the app in
+  `asgi-lifespan`'s `LifespanManager` (`async with LifespanManager(app): …`) and pin `asgi-lifespan`.

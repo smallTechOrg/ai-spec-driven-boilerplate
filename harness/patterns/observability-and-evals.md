@@ -255,6 +255,14 @@ it close that gap, and every build with a UI ships all three.
   field (a `chart_spec`), every backend test stayed green, and the UI silently rendered nothing. Assert the
   `POST /runs` envelope shape **and** the SSE `done` event shape (answer, run_id, thread_id, + any structured
   payload the client reads).
+  > **`ASGITransport` skips the FastAPI lifespan.** The checkpointer is created in the lifespan and stashed on
+  > `app.state`; ASGITransport never runs it, so `app.state.checkpointer` is **unset** in this test. The
+  > `POST /runs` handler therefore reads it as `getattr(request.app.state, "checkpointer", None)`
+  > (`interface.md` / `usage-specs/fastapi.md`) — a bare `request.app.state.checkpointer` raises AttributeError,
+  > which `create_run` re-wraps as `api_error("RUN_FAILED")`, so the route returns **500** and every faithful
+  > contract test false-REDs (HARDENING-LOG iter 9). With `getattr` the in-process run is single-turn (no
+  > short-term memory — fine for a one-shot contract assert). If a test must run the lifespan, wrap the app in
+  > `asgi-lifespan`'s `LifespanManager` and pin `asgi-lifespan`.
 - **Browser journey test** (`tests/e2e/test_primary_journey.py`) — Playwright against the running app,
   asserting the **post-JS DOM** after the real run (`patterns/interface.md`). This is the demo gate's UI half.
 

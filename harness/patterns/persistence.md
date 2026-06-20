@@ -116,7 +116,22 @@ A parsed file, a loaded DataFrame, a built index, **a pasted document or transcr
 a *per-question* one. (Don't gate on "heavy" / "expensive to derive": a meeting transcript is just a cheap
 string, yet a Q2 like "now group those action items by owner" still needs it without a re-paste. The trigger
 is **reuse across turns**, not cost.) Key it by `session_id` (= `thread_id`) and keep it for the life of the
-session. **Releasing it after each question is a correctness bug**: Q2 ("now break that down by region")
+session.
+
+**The discriminator — supplied vs generated (read before reaching for this).** sessions.py exists for a
+resource that **ARRIVES from the user**: uploaded or pasted via the `data` field, parsed by `load_resource`,
+then reused. A resource the **model GENERATES on Q1 and then REFINES on Q2** — an itinerary, a draft email, a
+story, a project plan, the whole *generate-then-refine* class — is **not** a session resource: it is carried
+across turns by **short-term memory** (the checkpointer transcript + the `runner.py` prior-message merge —
+`patterns/memory.md`, `patterns/react-agent.md`). It needs **no sessions.py**, no `load_resource`, no `data`
+field, no `current_session_id` read tool. Generating that machinery for a generated-then-refined resource is
+a bug: there is **nothing to populate it** (the user uploads nothing), so you ship dead code, or a read tool
+that always reports "no data loaded." Rule of thumb: *user uploads/pastes it → sessions.py; the model writes
+it → checkpointer transcript, no sessions.py.* Example: "plan a 3-day Lisbon itinerary" (Q1) then "make day 2
+rainy-day-friendly" (Q2) carries the itinerary in the transcript — no sessions.py; "analyze this CSV" (Q1,
+`data` carries the file) then "now break it down by region" (Q2) keeps the DataFrame in sessions.py.
+
+**Releasing it after each question is a correctness bug**: Q2 ("now break that down by region")
 arrives, the DataFrame is gone, and the agent answers `SESSION_DATA_LOST` instead of the follow-up — a green
 build, a broken product, the single most common multi-turn failure.
 

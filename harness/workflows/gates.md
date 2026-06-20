@@ -45,10 +45,17 @@ the spans landed. Don't re-run the model per assertion — one two-turn session,
 
 ### `make gate` / `make demo-gate`
 
+**`GOAL`/`FOLLOWUP` here and `gate_eval.py`'s `CRITERION` MUST come from the SAME P1 EARS line.** They are two
+per-spec edits the builder keeps in sync: DEMO 6 judges the answer to `GOAL` (this Makefile var) against
+`CRITERION` (a `gate_eval.py` constant). The defaults below are refund-domain placeholders — **both must be
+overridden per build**. Update `GOAL`/`FOLLOWUP` from the P1 capability's trigger + a natural follow-up, and
+`CRITERION`/`EVALUATION_STEPS`/`EXPECT_TOOLS` from the SAME P1 EARS line. A half-applied edit (travel
+`CRITERION`, refund `GOAL`) runs one domain's goal against the other's rubric — a guaranteed false-RED.
+
 ```makefile
 PORT     ?= 8001
-GOAL     ?= How long do refunds take?
-FOLLOWUP ?= And how do I start one?
+GOAL     ?= How long do refunds take?    # OVERRIDE per build — from the P1 EARS trigger (same line as gate_eval's CRITERION)
+FOLLOWUP ?= And how do I start one?      # OVERRIDE per build — a natural follow-up on the same session
 
 demo-gate: gate            # alias
 gate:
@@ -142,7 +149,10 @@ echo "DEMO GATE PASS"          # the only success signal is exit 0
 
 The cheapest check and the actual differentiator: parse every EARS line in `spec/capabilities/*.md`,
 require an `[@eval: path::case]` token, and confirm the referenced test exists and **defines a case pytest
-would actually collect**. Resolution is by **AST** (`ast.parse` → FunctionDef/AsyncFunctionDef names +
+would actually collect**. An **EARS line** is one that opens (after an optional list bullet) with an EARS
+trigger — `WHEN` / `WHILE` / `IF` / `WHERE` — *and* contains `SHALL`; a prose sentence that merely uses the
+word SHALL in a `## What & why` paragraph is **not** a criterion and is ignored, so descriptive spec text
+never false-blocks the build (HARDENING-LOG iter 5). Resolution is by **AST** (`ast.parse` → FunctionDef/AsyncFunctionDef names +
 parametrize ids), an **exact** match — never a substring scan: a substring scan false-greens a case that
 appears only in a `# TODO` comment and a misnamed superset (`test_stub_route_and_more` passing for
 `test_stub_route`), so the differentiator could certify a criterion with **zero** executable check behind
@@ -161,7 +171,13 @@ existence + case-in-file resolution. Same parser, one flag: `--preflight` skips 
 #   default (full, DEMO check 1): token present AND its path::case resolves to a real, COLLECTABLE test case.
 #   --preflight (analyze pre-flight, before code exists): token present + shape + uniqueness only (no path.exists).
 import argparse, ast, pathlib, re, sys
-EARS = re.compile(r"\bSHALL\b")
+# An EARS *criterion* — not any prose sentence that happens to contain SHALL. It must START (after an
+# optional list bullet/whitespace) with an EARS keyword AND contain SHALL. This is the load-bearing scope
+# fix: spec-writers (and this harness's own _template) phrase descriptive prose as "The agent SHALL be the
+# single source of truth…" inside a `## What & why` paragraph; a bare `\bSHALL\b` match treats that prose
+# as an unbound criterion and HARD-BLOCKS the build on a sentence (HARDENING-LOG iter 5). Only a line that
+# opens with WHEN/WHILE/IF/WHERE (the EARS triggers) is a criterion requiring an [@eval].
+EARS = re.compile(r"^\s*-?\s*(WHEN|WHILE|IF|WHERE)\b.*\bSHALL\b")
 TOKEN = re.compile(r"\[@eval:\s*([^\]:]+)::([^\]]+)\]")
 
 def _defined_cases(path: pathlib.Path) -> set[str]:
@@ -243,7 +259,10 @@ from sqlalchemy import select
 from .db import get_sessionmaker, Run
 from .evals import stable_outcome_eval, trajectory_eval   # the ONE judge-stability impl (observability-and-evals.md)
 
-# Filled from the spec at build time (one block per capability under test).
+# Filled from the spec at build time (one block per capability under test). CRITERION/EVALUATION_STEPS/
+# EXPECT_TOOLS come from the SAME P1 EARS line that the Makefile's GOAL/FOLLOWUP are derived from — a
+# mismatch (this block = travel, the Makefile GOAL = refund) runs one domain's goal against the other's
+# rubric and FALSE-REDs the gate. Override every refund-domain default below per build.
 CRITERION = "WHEN asked about refund timing the system SHALL state 5 business days."
 EVALUATION_STEPS = ["Does the answer mention refunds?",
                     "Does it state 5 business days?",

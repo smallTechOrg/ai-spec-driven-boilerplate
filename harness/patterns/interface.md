@@ -402,6 +402,14 @@ The journey test drives a real browser against the running app and asserts what 
 *after* React hydrates and the answer arrives — never the raw HTML, never a 200 alone. → `workflows/gates.md`.
 ```python
 # tests/e2e/test_primary_journey.py  (pytest + playwright; agent server + next dev both up)
+import pytest
+# Skip cleanly if pytest-playwright isn't installed, rather than aborting COLLECTION of the whole suite.
+# Gate check 2 is `uv run pytest` over EVERYTHING, including tests/e2e/; a bare `from playwright…` import on
+# a project where the package isn't present raises at collection time and `pytest` exits non-zero before any
+# other test even registers (`Interrupted: 1 error during collection`). importorskip turns that into a clean
+# SKIP. pytest-playwright IS pinned in pyproject.toml for a UI build (build.md §3 / tech-stack.md), so this
+# guard only ever fires on a headless project that shipped the file by mistake — never on a real UI build.
+pytest.importorskip("playwright")
 from playwright.sync_api import expect
 
 def test_user_gets_an_answer(page):

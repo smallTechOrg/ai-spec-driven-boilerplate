@@ -79,6 +79,7 @@ Local-first by default; the SAME async code runs on both — only the URL change
 | Observability       | `opentelemetry-api` / `-sdk`             | OTel-GenAI spans → SQLite; opt-in OTLP export |
 | MCP (external only) | `langchain-mcp-adapters` / `mcp`         | EXTERNAL integrations only — see What to avoid |
 | Tests               | `pytest`, `pytest-asyncio`               | FakeModel drives the loop with no API key |
+| UI E2E (UI builds)  | `pytest-playwright`, `playwright`        | pin for any UI build — gate check 2 runs `tests/e2e/` too, so a missing playwright aborts collection; omit for a headless product |
 
 ## What to avoid (load-bearing — do not relitigate; full rationale in `harness/harness.md`)
 

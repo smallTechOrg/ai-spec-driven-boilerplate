@@ -9,9 +9,11 @@
   },
   "dependencies": {
     "next": "15.3.3",
+    "plotly.js-dist-min": "^3.6.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-markdown": "10.1.0",
+    "react-plotly.js": "^4.0.0",
     "remark-gfm": "^4.0.0",
     "tailwindcss": "3.4.17"
   }

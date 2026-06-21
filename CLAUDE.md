@@ -14,8 +14,8 @@ sub-agents. You do not write `src/` or `spec/` directly. See
 2. Continue or open a session report in `logs/sessions/` (the SessionStart hook surfaces
    the latest one).
 3. Check spec readiness:
-   - `spec/product/` still has `<!-- FILL IN -->` placeholders → spec is not ready; run
-     **/build** to author it. Do not write application code yet.
+   - `spec/features/vision.md` still has `<!-- FILL IN -->` placeholders → spec is not
+     ready; run **/build** to author it. Do not write application code yet.
    - Spec is filled in → read it, then proceed under the relevant workflow.
 
 ## The four layers

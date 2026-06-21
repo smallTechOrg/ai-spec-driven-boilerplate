@@ -14,17 +14,30 @@ where they are the established default.
   (Python/pytest convention; stack recipes may vary for other languages.)
 - **Outcome goes to `logs/`** — `runtime/` is gitignored (live data); `sessions/` and
   `analysis/` are **committed** (the durable record of decisions and the analyser's drift findings).
-- **The spec is the contract** — `src/` conforms to `spec/`, never the reverse.
+  `logs/PLAN.md` is the live coordination hub for the **current phase** (Step DAG +
+  Progress Tracker + Phase Acceptance) — a single hardcoded path every sub-agent opens
+  without being told its name; ephemeral, rewritten whole by the planner at the start of
+  each phase, and may stay gitignored.
+  (Note: `.gitignore` currently ignores all of `logs/`; for `sessions/` and `analysis/`
+  to be committed as stated, add negation rules — `logs/PLAN.md` may remain ignored.)
+- **The spec is the contract** — `src/` conforms to `spec/`, never the reverse. `spec/`
+  holds exactly the seven product-spec docs above and **no live execution state** (that
+  lives in `logs/PLAN.md`).
 
 ---
 
 ## Repo skeleton
 
 ```
-spec/
-  features/     FR-NNN.md and CR-NNN.md files — one per request
-  rules/         tech-stack.md, code-style.md, and any project overrides
-  patterns/      agentic-ai.md, working-with-llms.md, lateral patterns
+spec/            the product spec — exactly seven docs, no live state
+  vision.md       what it is, who it's for, the goal
+  architecture.md the shape of the system
+  data-model.md   entities and their relationships
+  api.md          the interface contract
+  ui.md           the user-facing surface
+  agent-graph.md  the agent loop, nodes, graph
+  delivery-plan.md the durable phase roadmap — ordered phases, per-phase EARS
+                  criteria (PN-ACn), inter-phase deps. Edited only on a real spec change.
 
 src/             all application code
   agent/         agent loop, nodes, graph assembly (LangGraph projects)
@@ -41,7 +54,9 @@ tests/           all tests
   e2e/           golden-path smoke tests
 evals/           golden cases (input + approved output) + threshold + runner — same defs local/gate/CI
 
-logs/            runtime/ (gitignored, live data) · sessions/ + analysis/ (committed)
+logs/            PLAN.md (current-phase Step DAG + Progress Tracker + Phase Acceptance —
+                 the single hardcoded coordination path; ephemeral, rewritten per phase) ·
+                 runtime/ (gitignored, live data) · sessions/ + analysis/ (committed)
 harness/         the method — rules/, process/, patterns/, recipes/
 .claude/         thin Claude Code adapter
 CLAUDE.md        entry point

@@ -17,6 +17,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The real LLM path. Offline (stub) mode does not need this.
+llm = [
+    "anthropic>=0.40",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",

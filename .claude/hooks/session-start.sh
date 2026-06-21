@@ -11,3 +11,7 @@ if [ -n "$latest" ]; then
 else
   echo "No session report yet — open logs/sessions/YYYY-MM-DD-HHMMSS-<branch>.md before writing code."
 fi
+
+if [ -f logs/PLAN.md ]; then
+  echo "Current plan/tracker: logs/PLAN.md (read its Progress Tracker for where the phase stands)"
+fi

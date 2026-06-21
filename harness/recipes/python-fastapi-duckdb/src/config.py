@@ -1,43 +1,52 @@
-"""Settings — pydantic-settings, env prefix APP_. Cheap runtime tier by default.
+"""Settings — pydantic-settings, env prefix APPNAME_.
 
-Switching provider/model/DB is a config change here, never a code change
-(harness/patterns/model-and-providers.md). Every recipe imports get_settings().
+Switching provider/model/DB is a config change here, never a code change. The LLM
+defaults to a stub so a fresh copy runs offline with no API key. get_settings() is
+an lru_cached singleton — the one config accessor.
 """
+
 from functools import lru_cache
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="APP_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="APPNAME_",
+        env_file=".env",
+        extra="ignore",
+    )
 
-    # Runtime LLM (the product's model — cheap tier; see spec/tech-stack.md)
-    llm_provider: str = "google_genai"
-    llm_model: str = "gemini-2.5-flash"
-    llm_api_key: str = ""                       # APP_LLM_API_KEY — required for a real run
+    # App
+    env: str = "development"
+    host: str = "127.0.0.1"  # bind 0.0.0.0 in a container
+    port: int = 8000
 
-    # Persistence (the spine + domain metadata) — local-first SQLite -> Postgres at /deploy
-    database_url: str = "sqlite+aiosqlite:///./agent.db"
-    data_dir: str = "./data"                    # per-dataset DuckDB files live here
+    # LLM — leave as "stub" to run offline with no API key.
+    # Switch to "anthropic" and set APPNAME_ANTHROPIC_API_KEY to go live.
+    llm_provider: str = "stub"  # stub | anthropic
+    llm_model: str = "claude-sonnet-4-6"
+    anthropic_api_key: SecretStr = SecretStr("")
 
-    # Serving
-    port: int = 8001
+    # Persistence — the relational spine (SQLite via aiosqlite).
+    database_url: str = "sqlite+aiosqlite:///./appname.db"
 
-    # ReAct loop — 12 covers: list_datasets + up to 6 schema calls + execute_sql + chart + finish
-    max_iterations: int = 12
+    # DuckDB columnar event-store seam + checkpointer path live under here.
+    data_dir: str = "./data"
 
-    # run_sql safety caps (the agent's queries are read-only; these bound cost/blast-radius)
-    max_query_rows: int = 1000
-    query_timeout_s: float = 15.0
+    # CORS — a single configurable origin list (never mix "*" with explicit origins).
+    cors_origins: list[str] = ["http://localhost:3000"]
 
-    # Multi-turn checkpointer (Phase 3). False -> ephemeral InMemorySaver for the single-turn demo gate.
-    durability_enabled: bool = False
+    @property
+    def resolved_llm_provider(self) -> str:
+        return self.llm_provider.split("#")[0].strip()
 
-    # LLM cost per 1M tokens (for run/session cost tracking)
-    llm_input_cost_per_1m: float = 0.15   # Gemini 2.5 Flash input
-    llm_output_cost_per_1m: float = 0.60  # Gemini 2.5 Flash output
+    @property
+    def is_stub(self) -> bool:
+        return self.resolved_llm_provider == "stub"
 
 
 @lru_cache
-def get_settings() -> Settings:                 # cached singleton — the one config accessor
+def get_settings() -> Settings:
     return Settings()

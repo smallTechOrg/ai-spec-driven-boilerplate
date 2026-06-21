@@ -39,15 +39,16 @@ sense of the truth and corrects course.
 2. **Spec stays current.** Spec is continuously updated to reflect what the code and logs
    reveal. When they diverge, spec wins — fix the code, or amend the spec first.
 
-3. **One iteration, parallel steps.** An **iteration** delivers the *whole requirement*,
-   user-testable — the unit the user accepts (normally one per build). It is built from
+3. **One phase, parallel steps.** A **phase** delivers a *user-testable increment* — the
+   unit the user accepts, one acceptance boundary each. The ordered phases are the durable
+   roadmap in [spec/delivery-plan.md](../spec/delivery-plan.md). A phase is built from
    **steps**: ~10–15-min work-units, each one deliverable + one fast gate + one commit, run
    **in parallel** wherever independent. A step that cannot be described in one sentence is too
    large — split it. Speed comes from widening the parallel step front, not from spreading the
-   work across many user-facing iterations.
+   work across many user-facing phases.
 
 4. **Always runnable.** After every step the system must start and serve a request; at the
-   iteration boundary the whole requirement is testable. A build that is "almost working" is not
+   phase boundary the whole increment is testable. A build that is "almost working" is not
    working. Partial progress is committed only when a step's gate passes — never mid-step.
 
 
@@ -76,7 +77,7 @@ sense of the truth and corrects course.
 
 > Version-pinned **usage-specs** (API-shape guardrails: fastapi, langgraph, google-genai, …) are
 > a *project* artefact, not a method one — they live flat in [../harness/patterns/](../harness/patterns/)
-> and are established/edited as part of a feature request.
+> and are established/edited as part of a phase.
 
 ---
 

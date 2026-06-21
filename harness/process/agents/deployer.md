@@ -8,7 +8,8 @@ Ships the build — locally for demos, to the target environment for production.
 - Applies pre-deploy steps: migrations, config, build artefacts
 - Records the deploy result (URL, success/failure, errors) in the session report
 - Does not write new feature code — deployment only
-- **Marks never-run capabilities `UNVERIFIED`.** Any FR capability that was never exercised
+- **Marks never-run capabilities `UNVERIFIED`.** Any phase capability (per
+  `spec/delivery-plan.md` PN-ACn) that was never exercised
   end-to-end — typically a live-key path that only ran in stub mode, or whose live test
   SKIPPED — must be reported as `UNVERIFIED: <capability>`, **not** implied working. A real run
   shipped with the headline NL→SQL feature proven zero times (live test skipped, query path
@@ -17,7 +18,7 @@ Ships the build — locally for demos, to the target environment for production.
 
 ## Preconditions
 
-- Reviewer has signed off the iteration gate
+- Reviewer has signed off the phase gate
 - All gate tests pass
 
 ## Postconditions
@@ -28,6 +29,6 @@ Ships the build — locally for demos, to the target environment for production.
 ## Authority & boundaries
 
 - **Tools:** Read, Bash (deploy commands, migrations), Write (session report).
-- **May write:** deploy manifests/config, the deploy result, and the relevant row in the FR
-  `## Progress Tracker` in the FR.
+- **May write:** deploy manifests/config, the deploy result, and the relevant row in
+  `logs/PLAN.md` `## Progress Tracker`.
 - **Must not:** write feature code or alter `src/` logic — deployment only.

@@ -1,1 +1,1 @@
-"""DataChat — a conversational data-analysis agent (spec-driven harness build)."""
+"""appname — agent starter (spec-driven harness build)."""

@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# Databases / runtime artifacts (never commit from a fresh copy)
+*.db
+*.duckdb
+checkpoints.db
+test*.db
+data/
+
+# Env
+.env
+.env*.local
+
+# Node / Next.js (if a frontend is copied alongside)
+node_modules/
+.next/

@@ -1,8 +1,17 @@
+from collections.abc import AsyncIterator
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.config import get_settings
 from src.db.base import Base
 
+# Module-level engine/factory, created lazily by init_db() — NOT at import time.
+#
+# Footgun: if you build the engine at import time, it binds to whatever
+# database_url is set when the module is first imported, before tests get a
+# chance to point it at a throwaway DB. tests/conftest.py works around this by
+# monkeypatching AsyncSessionLocal after init_db() would have run, and stubbing
+# init_db() to a no-op. Keep these module-level and assigned in init_db().
 _engine = None
 AsyncSessionLocal: async_sessionmaker[AsyncSession] | None = None
 
@@ -21,6 +30,8 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
 
-async def get_session() -> AsyncSession:
+async def get_session() -> AsyncIterator[AsyncSession]:
+    """Yield a session bound to the live engine. Used by the example route."""
+    assert AsyncSessionLocal is not None, "init_db() must run before get_session()"
     async with AsyncSessionLocal() as session:
         yield session

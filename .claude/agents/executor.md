@@ -7,5 +7,6 @@ color: green
 ---
 
 Read `harness/process/agents/executor.md` before acting. Authority and boundaries are
-defined there — you write `src/` and unit tests for the current **step** only; no scope creep,
-and never touch another parallel executor's files.
+defined there — you write `src/` and unit tests for the current **step** only; update your
+own row in `logs/PLAN.md` `## Progress Tracker` (the hardcoded coordination path); no scope
+creep, never touch another parallel executor's files, and never edit `spec/`.

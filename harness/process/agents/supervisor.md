@@ -13,14 +13,23 @@ pipeline, owns the human channel, and is the only agent that can ask the user a 
   job, not the analyser's. On a signal it routes to the analyser / fix workflow.
 - Checks pre/postconditions at every handoff — blocks a stage if its inputs aren't ready
 - **Owns the scope-split gate.** When the planner flags a scope-overflow, the supervisor asks the
-  user (sole human channel) whether to split — keeping a **core that delights** and moving the
-  excess to a follow-up `proposed` FR the researcher authors. Default to *not* splitting (scope
-  DOWN first); split only when the core would otherwise be bloated. After the core ships and the
-  user has tested it, the supervisor surfaces each `proposed` FR for approval — on approval it
-  becomes `approved` and runs its own build; until then it never enters the pipeline.
+  user (sole human channel) whether to split — keeping a **core that delights** in the current
+  phase and deferring the excess to a **later phase in `spec/delivery-plan.md`**. Default to
+  *not* splitting (scope DOWN first); split only when the current phase would otherwise be
+  bloated. The deferred scope lives as a numbered later phase in `spec/delivery-plan.md` (with
+  its own PN-ACn criteria); it never enters the pipeline until the user accepts the current
+  phase and the supervisor opens that later phase.
+- **Owns the coordination file.** `logs/PLAN.md` is the single **hardcoded** coordination path —
+  every sub-agent opens this exact literal path without being told its name (it is the live
+  execution blackboard for the current phase: header + Step DAG + Progress Tracker + Phase
+  Acceptance). On opening a phase, the supervisor writes the session-log back-pointer into
+  `logs/PLAN.md`'s header and **confirms the planner has (re)written `logs/PLAN.md` for this
+  phase before dispatching any executor**. The durable phase roadmap lives separately in
+  `spec/delivery-plan.md`; the narrative tail + Latency Ledger live in the timestamped
+  `logs/sessions/<file>` (whose path the supervisor passes explicitly when it spawns each agent).
 - Holds the session report open and ensures each stage appends to it
 - **Invokes the analyser after every handoff back to the supervisor** — not only at the
-  iteration gate. Every time a sub-agent returns control, the analyser runs before the next step is
+  phase gate. Every time a sub-agent returns control, the analyser runs before the next step is
   dispatched. This makes the analyser a forcing function: each stage must leave behind what
   the analyser needs to read (logs, artefacts, session-report fields), or the very next
   analyser pass flags it as drift. Catching a missing artefact one handoff later is cheap;
@@ -47,8 +56,9 @@ the supervisor spawns a **swarm** — parallel agents that run at once and gathe
 Sequential-only is the exception (a true data dependency), not the default.
 
 Fan out in parallel:
-- **Intake** — research probes and `harness/patterns/` usage-spec reads run concurrently while the FR is drafted.
-- **Build** — independent **steps** of the one iteration run as parallel executors; the
+- **Intake** — research probes and usage-spec reads run concurrently while the phased spec
+  files (vision/architecture/data-model/api/ui/agent-graph/delivery-plan) are drafted.
+- **Build** — independent **steps** of the current phase run as parallel executors; the
   **frontend is a first-class step**, built alongside its backend data (never deferred to the end).
 - **Review** — one reviewer per dimension (correctness, security, gate-checklist, eval) in
   parallel; findings merge at the gate.

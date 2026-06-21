@@ -22,7 +22,7 @@
 <body>
   <main>
     {% if stub_mode %}
-    <div class="stub-banner">⚠ Stub mode — no real API calls. Set APPNAME_LLM_PROVIDER to enable live responses.</div>
+    <div class="stub-banner">⚠ Stub mode — no real API calls. Set APPNAME_LLM_PROVIDER=anthropic and APPNAME_ANTHROPIC_API_KEY to go live.</div>
     {% endif %}
     {% block content %}{% endblock %}
   </main>

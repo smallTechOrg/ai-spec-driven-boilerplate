@@ -1,39 +1,34 @@
 [project]
 name = "appname"
 version = "0.1.0"
-description = "FastAPI + LangGraph + DuckDB conversational data-analysis agent (re-homed recipe)"
-requires-python = ">=3.11"
+description = "FastAPI + LangGraph agent starter (DuckDB storage layer)"
+requires-python = ">=3.12"
 dependencies = [
-    # Persistence spine: SQLAlchemy async (metadata) + per-dataset DuckDB analytics files
-    "duckdb",
-    "sqlalchemy[asyncio]",
-    "aiosqlite",
-    # Serving
-    "fastapi",
-    "uvicorn[standard]",
-    "python-multipart",        # FastAPI UploadFile (multipart CSV/JSON upload)
-    # ReAct agent loop
-    "langgraph",
-    "langgraph-checkpoint-sqlite",
-    "langchain",
-    "langchain-core",
-    # Config
-    "pydantic",
-    "pydantic-settings",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20",
+    "duckdb>=1.0",
+    "pydantic-settings>=2.0",
+    "langgraph>=0.2",
+    "langchain-core>=0.3",
+    "langgraph-checkpoint-sqlite>=2.0",
+    "httpx>=0.27",
+    "structlog>=24.0",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
-# Real-run LLM provider (offline tests use FakeModel and need none of this)
-llm = [
-    "langchain-google-genai",
-]
-# Dev/test toolchain. Playwright drives the excluded e2e journey; httpx backs the e2e client.
 dev = [
-    "pytest",
-    "pytest-asyncio",
-    "ruff",
-    "httpx",
-    "playwright",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+    "httpx>=0.27",
+]
+# The real LLM path (provider=anthropic). Not needed to run green offline.
+llm = [
+    "anthropic>=0.40",
 ]
 
 [build-system]
@@ -44,10 +39,11 @@ build-backend = "hatchling.build"
 packages = ["src"]
 
 [tool.pytest.ini_options]
-# Run from the recipe root; the `src` package is importable without an install step.
-pythonpath = ["."]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-q"
-# The Playwright e2e journey needs a live UI + server; exclude it from the default unit run.
-norecursedirs = ["tests/e2e", "ui", ".venv"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

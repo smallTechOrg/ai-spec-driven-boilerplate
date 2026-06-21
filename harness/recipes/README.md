@@ -6,7 +6,7 @@ does not invent the scaffold from scratch. Recipes are the *proven code*; the
 [`../../harness/patterns/`](../../harness/patterns/) usage-spec files are the *API-shape
 guardrails* the executor reads before writing the domain seams a recipe leaves open. (Recipes
 are canonical method and stay in `harness/`; the usage-specs are a project artefact in `spec/`,
-established/edited as part of a feature request.)
+established/edited as part of a phase.)
 
 ## The three recipes
 

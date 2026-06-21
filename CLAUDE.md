@@ -16,9 +16,10 @@ sub-agents. You do not write `src/` or `spec/` directly. See
 2. Continue or open a session report in `logs/sessions/` (the SessionStart hook surfaces
    the latest one).
 3. Check spec readiness:
-   - `spec/features/` has no FR or CR files → no spec yet; run **/build** to author one.
-     Do not write application code yet.
-   - FR/CR files exist → read them, then proceed under the relevant workflow.
+   - `spec/delivery-plan.md` is still a placeholder → no spec yet; run **/build** to author
+     one. Do not write application code yet.
+   - The phased spec files are filled in → read `spec/` (vision, architecture, data-model,
+     api, ui, agent-graph, delivery-plan), then proceed under the relevant workflow.
 
 ## The four layers
 
@@ -30,6 +31,11 @@ sub-agents. You do not write `src/` or `spec/` directly. See
 | Awareness | `harness/`   | the reconcile loop |
 
 The first three are sources of truth; `harness/` is the method that keeps them reconciled.
+
+Live execution state (the current phase's step DAG + progress tracker) lives in `logs/PLAN.md`
+— the single hardcoded coordination path all sub-agents read/write. The durable phase roadmap
+lives in `spec/delivery-plan.md`; the narrative tail + latency ledger live in the timestamped
+`logs/sessions/` report.
 
 ## Workflows (skills)
 
@@ -54,5 +60,5 @@ Defined as Claude Code sub-agents in [.claude/agents/](.claude/agents/).
 - Spec before code — never change `src/` without a backing change in `spec/`.
 - Outcome is evidence — never claim a test passed without running it.
 - Commit and push are one action; stage specific files; PR before the first commit.
-- One iteration delivers the whole requirement, built as parallel steps; steps gate green, the
-  iteration gates hard, and the loop must close before you stop.
+- One phase delivers a user-testable increment, built as parallel steps; steps gate green, the
+  phase gates hard, and the loop must close before you stop.

@@ -29,22 +29,21 @@ override is a deliberate, recorded act, never a silent one.
    lives on a feature branch and reaches `main` only via a reviewed PR; open the PR
    before the first feature-branch commit. (See `git-and-delivery.md`.)
 
-6. **Steps gate green; the iteration gates hard.** The whole requirement ships in **one
-   iteration**, built as parallel **steps** (see `workflows/build.md` → Vocabulary).
+6. **Steps gate green; each phase gates hard.** A user-testable increment ships in **one
+   phase**, built as parallel **steps** (see `workflows/build.md` → Vocabulary).
    - A **step** is done when its fast gate (<30s) is green and the analyser sees no drift on
      handoff. Never wire a dependent step on top of a red step.
-   - The **iteration** is done only when the full reviewer checklist passes, evals are green,
+   - The **phase** is done only when the full reviewer checklist passes, evals are green,
      the tree is clean and pushed, and the session report is current. This heavy gate runs
-     **once**, on the converged whole — not per step.
+     **once per phase**, on the converged whole — not per step.
 
 7. **The loop must close before you stop.** Before ending any unit of work: spec ↔ src ↔
    logs reconcile (the drift check is clean), tests and evals pass, the tree is clean, the
    branch is pushed, and the session report in `logs/sessions/` is up to date.
 
 8. **Done means the user says done.** Tests passing and reviewer sign-off are necessary
-   but not sufficient. The **iteration** is complete only when the user has explicitly
-   accepted the delivered requirement — the one user-acceptance boundary. Never self-declare
-   done.
+   but not sufficient. Each **phase** is complete only when the user has explicitly
+   accepted it — the one user-acceptance boundary per phase. Never self-declare done.
 
 9. **Never act irreversibly without confirmation.** Deploy, delete, send email, write to
    a production DB, force-push — any action that cannot be undone requires explicit
@@ -61,7 +60,14 @@ override is a deliberate, recorded act, never a silent one.
     do not continue in a degraded state without telling the user, and do not ask via inline
     text they may not notice.
 
-12. **The session report is a live tail — write to it continuously, timestamps in three places only.**
+12. **The live files are written continuously.** `logs/PLAN.md` is the live coordination
+    file (the current-phase Step DAG + Progress Tracker + Phase Acceptance) — a single
+    hardcoded path every sub-agent reads/writes. The session report in `logs/sessions/`
+    is the live narrative tail (the per-run narrative + Latency Ledger). Both are kept
+    current as work happens, never reconstructed after the fact.
+
+    The session report is a live tail — write to it continuously, timestamps in three
+    places only.
 
     The Latency Ledger is the primary artifact. **Write a ledger row the moment a stage starts**
     (Start column) — not at the end. Fill End + Dur + Dominant cost on handoff. Every ~2 minutes

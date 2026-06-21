@@ -12,28 +12,42 @@ the analyser can audit.
 
 ## What goes where
 
-- **`spec/product/`** — WHAT the system does: behavior, users, data, APIs, UI.
-- **`spec/engineering/`** — HOW this build is done: chosen stack, code style, project rules.
-- **Not in the spec** — line-by-line implementation (that's `src/`), temporary
-  workarounds, or session notes (those go in `logs/sessions/`).
+`spec/` holds exactly the seven phased product-spec docs — nothing else:
+
+- **`spec/vision.md`** — WHY: the problem, users, success criteria (SC-N).
+- **`spec/architecture.md`** — the system shape, components, failure/recovery model.
+- **`spec/data-model.md`** — entities, schema, storage.
+- **`spec/api.md`** — the endpoint contract (contract-first across all phases).
+- **`spec/ui.md`** — what the interface IS, per phase.
+- **`spec/agent-graph.md`** — the agent/node graph and its state.
+- **`spec/delivery-plan.md`** — the durable phase roadmap: ordered phases, per-phase EARS
+  criteria (`PN-ACn`), inter-phase deps. The phasing IS the roadmap — there is no separate
+  ROADMAP file.
+- **Not in the spec** — line-by-line implementation (that's `src/`), the live per-phase
+  coordination state (that's `logs/PLAN.md`), or session notes (those go in `logs/sessions/`).
 
 ## When requirements change
 
-1. Write a **CR as a delta** (ADDED / MODIFIED / REMOVED) against the existing spec —
-   not a fresh spec. (`harness/process/templates/CR.md`.)
-2. Update `src/` to satisfy the delta.
-3. **Archive/merge:** when the CR lands, fold its delta back into the FR/spec baseline so
-   `spec/` reflects current reality, and mark the CR `done`.
-4. The analyser confirms `logs/` reconciles with the amended baseline.
+There is no CR/FR delta file and no archive step. The phased spec docs are the single
+baseline and are **edited in place**:
 
-### The archive/merge step is load-bearing
+1. The researcher (with reviewer + human sign-off) **edits the affected `spec/` doc(s)
+   directly** — add, modify, or remove the affected criteria, schema, endpoints, or screens.
+   New scope that lands beyond the current phase becomes a **named later phase in
+   `spec/delivery-plan.md`** (full `PN-ACn` EARS criteria), never a separate roadmap.
+2. The planner rewrites `logs/PLAN.md` for the affected phase; executors update `src/` to
+   satisfy the amended criteria.
+3. The analyser confirms `logs/` reconciles with the amended baseline.
+
+### Edit-in-place keeps the baseline true
 
 This is the step every competing SDD tool skips, and it is exactly where reconciliation
-breaks: if an applied CR is never merged into the baseline, `spec/` slowly stops describing
-the system, and "does the code match the spec?" becomes unanswerable. **A reconciliation
-rule with no enforced merge + check is just a wish.** The merge is mandatory, not optional;
-the analyser's drift check (see [observability.md](../patterns/observability.md)) verifies it
-held.
+breaks: if a change lands in `src/` with no backing edit in `spec/`, the spec slowly stops
+describing the system, and "does the code match the spec?" becomes unanswerable. **A
+reconciliation rule with no enforced spec edit + check is just a wish.** Every `src/` change
+needs a backing edit in the phased spec docs; the analyser's drift check (see
+[observability.md](../patterns/observability.md)) verifies it held — an applied change with
+no backing spec edit is the silent reconciliation break.
 
 
 ## Spec vs. implementation conflicts

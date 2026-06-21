@@ -2,7 +2,7 @@
 
 A UI that passes tests but doesn't delight is a failed delivery. The harness builds products,
 not proofs-of-concept. This file is the UX floor — every interface must clear it before the
-iteration gate, and the FR must specify the experience at this level of detail.
+phase gate, and `spec/ui.md` must specify the experience at this level of detail.
 
 The test: **could you demo this to a user who has never seen it and have them say "wow" in
 2 minutes?** If not, the quality bar is not met.
@@ -120,6 +120,6 @@ A UI step is not done when the component renders without crashing. It is done wh
 
 1. All four states (loading, empty, populated, error) are implemented and tested
 2. The component can be demoed in 2 minutes and produces a genuine reaction from a new viewer
-3. The golden-path demo script in the FR (see researcher.md) runs without the demonstrator
+3. The golden-path demo script in `spec/ui.md` (see researcher.md) runs without the demonstrator
    having to explain why something looks unfinished
 4. The reviewer has loaded the actual page in a browser (not just confirmed `curl :3000/` → 200)

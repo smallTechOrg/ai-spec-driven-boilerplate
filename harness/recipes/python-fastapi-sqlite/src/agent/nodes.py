@@ -1,4 +1,5 @@
 import json
+
 import structlog
 
 from src.agent.state import AgentState
@@ -23,8 +24,10 @@ Or signal completion:
 async def plan_action(state: AgentState) -> dict:
     client = get_llm_client()
     tools_desc = json.dumps(
-        [{"name": t.name, "description": t.description, "parameters": t.parameters}
-         for t in TOOL_REGISTRY.values()],
+        [
+            {"name": t.name, "description": t.description, "parameters": t.parameters}
+            for t in TOOL_REGISTRY.values()
+        ],
         indent=2,
     )
     messages = [
@@ -35,9 +38,8 @@ async def plan_action(state: AgentState) -> dict:
     try:
         plan = await client.complete(messages)
         return {
-            "tool_call_history": state.get("tool_call_history", []) + [
-                {"role": "assistant", "content": json.dumps(plan)}
-            ],
+            "tool_call_history": state.get("tool_call_history", [])
+            + [{"role": "assistant", "content": json.dumps(plan)}],
             "iterations": state.get("iterations", 0) + 1,
             "result": plan.get("result") if plan.get("tool") == "FINAL_ANSWER" else None,
         }
@@ -48,33 +50,43 @@ async def plan_action(state: AgentState) -> dict:
 
 async def invoke_tool(state: AgentState) -> dict:
     history = state.get("tool_call_history", [])
-    last = json.loads(history[-1]["content"])
+    try:
+        last = json.loads(history[-1]["content"])
+    except (IndexError, KeyError, json.JSONDecodeError) as exc:
+        return {"error": f"Malformed plan in history: {exc}"}
+
     tool_name = last.get("tool")
     params = last.get("parameters", {})
 
     tool = TOOL_REGISTRY.get(tool_name)
     if not tool:
-        # Recoverable — feed back to plan_action for self-correction
+        # Recoverable — feed back to plan_action for self-correction.
         tool_result = f"Unknown tool: {tool_name!r}. Available: {list(TOOL_REGISTRY)}"
     else:
         try:
+            # Tools fail soft — return a string, never raise.
             tool_result = await tool.handler(**params)
         except Exception as exc:
             tool_result = f"Tool error: {exc}"
 
     log.info("tool_invoked", tool=tool_name, result_len=len(str(tool_result)))
     return {
-        "tool_call_history": history + [
-            {"role": "tool", "content": str(tool_result)}
-        ]
+        "tool_call_history": history + [{"role": "tool", "content": str(tool_result)}]
     }
 
 
 async def finalize(state: AgentState) -> dict:
-    log.info("run_complete", run_id=state["run_id"], result_len=len(state.get("result", "")))
+    result = state.get("result")
+    result_len = len(result) if isinstance(result, str) else 0
+    log.info("run_complete", run_id=state["run_id"], result_len=result_len)
     return {}
 
 
 async def handle_error(state: AgentState) -> dict:
-    log.error("run_failed", run_id=state["run_id"], error=state.get("error"), iterations=state.get("iterations"))
+    log.error(
+        "run_failed",
+        run_id=state["run_id"],
+        error=state.get("error"),
+        iterations=state.get("iterations"),
+    )
     return {}

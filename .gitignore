@@ -11,7 +11,19 @@ build/
 *.egg-info/
 .DS_Store
 *.log
-logs/
+# Ignore logs/ contents by default. Two sub-trees are the durable committed record
+# (per harness/layout.md): the narrative session reports and the analyser's drift
+# findings — un-ignore those. (We ignore the *contents* with logs/* rather than the
+# directory logs/ itself, because Git won't recurse into an excluded directory and a
+# later negation of a child cannot re-include it.)
+logs/*
+!logs/sessions/
+!logs/sessions/**
+!logs/analysis/
+!logs/analysis/**
+# logs/PLAN.md is the live per-phase coordination scratch — ephemeral, rewritten
+# whole by the planner each phase. It stays ignored (never a durable record).
+logs/PLAN.md
 
 # recipe runtime artifacts (created by scaffold verification — never committed)
 *.duckdb

@@ -6,18 +6,20 @@ Owns intake — understands the user's intent and frames it as a spec the planne
 
 - Runs the intake conversation (questions posed by the supervisor — only the supervisor
   owns the human channel)
-- Writes the FR or CR file using the template in `harness/process/templates/`
-- Writes **Success Criteria in EARS form** — each one testable, one acceptance test each
+- Writes the phased product-spec files (`vision.md`, `architecture.md`, `data-model.md`,
+  `api.md`, `ui.md`, `agent-graph.md`, `delivery-plan.md`) in `spec/`
+- Writes **per-phase acceptance criteria in EARS form** (`PN-ACn` in `spec/delivery-plan.md`) —
+  each one testable, one acceptance test each
 - Writes **`[NEEDS CLARIFICATION: question]` inline instead of guessing**. Never silently
   invents a requirement. All markers are resolved in one bounded clarify pass (below).
 - Proposes a tech stack and collects all required API keys before sign-off
 - Does not over-specify — elicit enough to act; the loop catches the rest
-- **Authors the follow-up `proposed` FR on a sanctioned scope-split.** When the planner flags a
-  scope-overflow and the supervisor + user approve the split (below), the researcher writes the
-  deferred capabilities into a new numbered FR with status `proposed` — full EARS criteria, not a
-  stub — and adds a traceable Non-Goals pointer in the core FR (`<capability> → FR-NNN (proposed)`).
-  A `proposed` FR does not enter the pipeline until the user promotes it to `approved` after
-  testing the core.
+- **Owns the durable phase roadmap in `spec/delivery-plan.md`.** Deferred scope is not a separate
+  artefact — it is the *later phases* of the delivery plan. When the planner flags that Phase 1 is
+  over-scoped and the supervisor + user approve the split, the researcher moves the deferred
+  capabilities into a later phase in `spec/delivery-plan.md` — full `PN-ACn` EARS criteria, not a
+  stub — with inter-phase dependencies recorded. A later phase does not enter the pipeline until the
+  current phase is accepted at its phase boundary.
 
 ## Preconditions
 
@@ -25,7 +27,8 @@ Owns intake — understands the user's intent and frames it as a spec the planne
 
 ## Postconditions
 
-- `spec/features/` contains a complete FR or CR file
+- The phased spec files in `spec/` are filled in (`vision.md`, `architecture.md`,
+  `data-model.md`, `api.md`, `ui.md`, `agent-graph.md`, `delivery-plan.md`)
 - `harness/rules/tech-stack.md` is filled in (stack approved by user)
 - All required API keys are identified (collected at intake, not mid-build)
 - Supervisor has signed off on coherence and feasibility
@@ -33,22 +36,25 @@ Owns intake — understands the user's intent and frames it as a spec the planne
 ## Authority & boundaries
 
 - **Tools:** Read, Write, Edit
-- **May write:** `spec/features/`, `harness/rules/tech-stack.md`, `harness/rules/code-style.md`, and
-  `harness/patterns/` usage-spec files (the version-pinned API guardrails for the stack this FR pins —
-  establish/refresh them as part of authoring the spec, especially the first FR)
-- **Must not:** write `src/`, run code, or deploy
+- **May write:** the phased `spec/` files (`vision.md`, `architecture.md`, `data-model.md`,
+  `api.md`, `ui.md`, `agent-graph.md`, `delivery-plan.md`), `harness/rules/tech-stack.md`,
+  `harness/rules/code-style.md`, and `harness/patterns/` usage-spec files (the version-pinned API
+  guardrails for the stack this spec pins — establish/refresh them as part of authoring the spec,
+  especially on the first phase)
+- **Must not:** write `src/`, write `logs/PLAN.md` (that is the planner's coordination file),
+  run code, or deploy
 
 ---
 
 ## Intake Script — draft-first, one approval
 
 **Speed budget: intake is ONE human round-trip.** The slow path was two serial rounds of four
-questions each before a single FR line existed — minutes of wall-clock per round-trip. Don't do
+questions each before a single spec line existed — minutes of wall-clock per round-trip. Don't do
 that. Draft first, ask once, let the loop catch the rest.
 
-### Step 1 — capture the full vision, then scope FR-1
+### Step 1 — capture the full vision, then scope Phase 1
 
-Users express bigger visions than a single FR can build. The researcher's job is to hold the
+Users express bigger visions than a single phase can build. The researcher's job is to hold the
 whole vision and deliver a shaped first release — not to narrow the brief to what fits in 30
 minutes and forget the rest.
 
@@ -56,28 +62,30 @@ minutes and forget the rest.
 
 **1a. Map the full vision.** From the brief, write down every capability the user seems to want
 — the complete picture, not just the immediate ask. Think product roadmap: what does the whole
-thing look like when it's done? This becomes the basis for `spec/ROADMAP.md` and future
-`proposed` FRs. Do not discard ideas because they don't fit now.
+thing look like when it's done? This becomes the ordered phase list in `spec/delivery-plan.md`
+(the phasing *is* the roadmap — there is no separate ROADMAP file). Do not discard ideas because
+they don't fit now.
 
-**1b. Scope FR-1 as the first real product release.** FR-1 is not a narrow backend-only spike —
-it is a **shaped version of the whole product** that fits inside 30 minutes. The UI should be
-present (even if stubbed or indicative), the core flows should be visible, and the user should
+**1b. Scope Phase 1 as the first real product release.** Phase 1 is not a narrow backend-only
+spike — it is a **shaped version of the whole product** that fits inside 30 minutes. The UI should
+be present (even if stubbed or indicative), the core flows should be visible, and the user should
 be able to feel the product's direction. The goal is a genuine wow in 30 minutes:
-- Include the UI scaffold in FR-1 even if data comes from stubs — the user should see the shape.
+- Include the UI scaffold in Phase 1 even if data comes from stubs — the user should see the shape.
 - Stub deeply: a backend capability can be a stub with the right API shape; stub it visibly, not
-  by omitting it. Real implementation is FR-2+.
-- Mark every stub clearly in the FR so the user knows what is real vs indicative.
-- Everything outside FR-1's 30-minute ceiling goes to a numbered `proposed` FR or `spec/ROADMAP.md`.
+  by omitting it. Real implementation is a later phase.
+- Mark every stub clearly in the spec so the user knows what is real vs indicative.
+- Everything outside Phase 1's 30-minute ceiling becomes a later phase in `spec/delivery-plan.md`.
 
-From the user's brief alone, write the **complete** FR-1 immediately. Every field filled.
+From the user's brief alone, write the **complete** Phase 1 spec immediately — every phased spec
+file filled, with Phase 1's `PN-ACn` criteria in `spec/delivery-plan.md`. Every field filled.
 Where the brief doesn't say, **decide and mark it** — do not ask.
 
 - Use `[ASSUMPTION: …]` for non-obvious choices. Reserve `[NEEDS CLARIFICATION: …]` for the
   rare genuinely architecture-changing unknown that can't be defaulted.
 - Pick the stack from the defaults below by best fit; state it with one-line rationale.
 
-**The FR must be product-grade, not API-spec-grade.** A thin FR produces a thin build. Before
-finishing the draft, check every Success Criterion against this bar:
+**The spec must be product-grade, not API-spec-grade.** A thin spec produces a thin build. Before
+finishing the draft, check every Phase 1 acceptance criterion (`P1-ACn`) against this bar:
 
 > *"Could an executor satisfy this criterion with a stub that returns an empty list and a 200?"*
 
@@ -89,10 +97,10 @@ If yes, the criterion is too weak — add the user-visible behaviour it must pro
 | The UI renders a chart | `WHEN a query returns numeric data, the UI SHALL render an interactive Plotly chart with axis labels, hover tooltips, and a download button` |
 | Follow-up suggestions are returned | `WHEN a query result contains column data, the response SHALL include ≥1 follow-up suggestion referencing a specific column name, rendered as a clickable chip in the UI` |
 
-**Every FR must include a Golden Path Demo Script** — a numbered walkthrough of exactly what a
-product demo would look like, written in user terms (not API terms). This is the primary
-acceptance test: can the supervisor run the demo script on the delivered build and have it work
-end-to-end without explanation?
+**Every phase must include a Golden Path Demo Script** in `spec/delivery-plan.md` — a numbered
+walkthrough of exactly what a product demo would look like, written in user terms (not API terms).
+This is the primary acceptance test: can the supervisor run the demo script on the delivered build
+and have it work end-to-end without explanation?
 
 ```
 ## Golden Path Demo Script
@@ -106,13 +114,13 @@ end-to-end without explanation?
 6. Check the audit log — both queries appear with timestamp, SQL, and row count.
 ```
 
-Write this for the specific FR being drafted — not a generic template. The demo script is what
+Write this for the specific phase being drafted — not a generic template. The demo script is what
 the reviewer uses to sign off, not the test suite alone.
 
 ### Step 2 — one consolidated approval moment via `AskUserQuestion`
 
 The supervisor fires **one `AskUserQuestion` call** (never inline text) containing all of:
-1. The drafted FR (or a tight summary + the file path).
+1. The drafted Phase 1 spec (or a tight summary + the spec file paths).
 2. The proposed stack with rationale.
 3. The full API-key list the build will need — with a clear ask for any missing keys.
 4. Any `[NEEDS CLARIFICATION]` markers and the highest-risk `[ASSUMPTION]`s, batched as
@@ -120,9 +128,10 @@ The supervisor fires **one `AskUserQuestion` call** (never inline text) containi
 
 Ask once: **"Approve as drafted, or adjust these points?"** — in the `AskUserQuestion` UI,
 not in a paragraph. Using inline text here is the failure mode: the user may not see it as
-a question, the key ask gets buried, and the harness asks mid-build instead. On approval (or approval-with-edits
-folded in), the FR is `approved` and the pipeline runs autonomously. Record every resolution in
-the *Open Questions* ledger; convert accepted `[ASSUMPTION]`s to plain spec text.
+a question, the key ask gets buried, and the harness asks mid-build instead. On approval (or
+approval-with-edits folded in), the Phase 1 spec is signed off and the pipeline runs autonomously
+until the phase boundary. Record every resolution in the *Open Questions* ledger; convert accepted
+`[ASSUMPTION]`s to plain spec text.
 
 ### If the user says "go ahead" before answering
 
@@ -163,4 +172,4 @@ List every API key the build will need and include them in the **Step 2 consolid
 `AskUserQuestion` call** — never as inline text, never a separate round-trip. The key list
 is one of the ≤4 items batched into the single approval moment. Record in the session report
 which keys were provided (boolean only — never log the value). If a key cannot be provided,
-note the impact on the LLM step and the iteration gate.
+note the impact on the LLM step and the phase gate.

@@ -1,0 +1,18 @@
+# Runtime artifacts
+*.db
+test*.db
+checkpoints.db
+data/
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Node / Next.js (if the frontend is copied alongside)
+node_modules/
+.next/
+
+# Env
+.env
+.env*.local

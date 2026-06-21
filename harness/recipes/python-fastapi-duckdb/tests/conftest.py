@@ -1,46 +1,54 @@
-"""Test harness — same async engine as prod, throwaway DB, fresh tables per test.
-
-Set APP_DATABASE_URL + APP_DATA_DIR BEFORE importing src.db (the engine is built at import time).
-FakeModel drives the ReAct loop offline (no API key) — harness/patterns/react-agent.md.
-"""
 import os
 import tempfile
 
-os.environ["APP_DATABASE_URL"] = "sqlite+aiosqlite:///./test_agent.db"
-os.environ.setdefault("APP_DATA_DIR", tempfile.mkdtemp(prefix="datachat_test_"))
+import pytest
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-import pytest  # noqa: E402
-import pytest_asyncio  # noqa: E402
+import src.db.models  # noqa: F401  (register tables on Base.metadata before create_all)
+import src.db.session as _session_module
+from src.config import get_settings
+from src.db.base import Base
 
-import src.domain  # noqa: E402,F401 — register domain tables on Base before create_all
-from src.db import Base, engine  # noqa: E402
 
+@pytest.fixture(autouse=True)
+def _offline_kill_switch():
+    """Force the LLM into stub mode and point the DuckDB seam at a temp dir.
 
-@pytest_asyncio.fixture(autouse=True)
-async def _fresh_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    Guarantees the suite never calls a network API and never writes a stray
+    events.duckdb into the repo. SQLite is the production driver, so the db_session
+    fixture below exercises the real async engine on the real driver.
+    """
+    os.environ["APPNAME_LLM_PROVIDER"] = "stub"
+    os.environ["APPNAME_DATA_DIR"] = tempfile.mkdtemp(prefix="appname_test_")
+    get_settings.cache_clear()
+    assert get_settings().resolved_llm_provider == "stub"
     yield
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-
-class FakeModel:
-    """Scripted, no-key model: returns each scripted message in turn, clamping at the last."""
-
-    def __init__(self, scripted):
-        self.s = list(scripted)
-        self.i = 0
-
-    def bind_tools(self, tools):
-        return self
-
-    async def ainvoke(self, messages):
-        m = self.s[min(self.i, len(self.s) - 1)]
-        self.i += 1
-        return m
+    get_settings.cache_clear()
 
 
 @pytest.fixture
-def FakeModelCls():
-    return FakeModel
+async def db_session(monkeypatch, tmp_path) -> AsyncSession:
+    """A fresh, throwaway SQLite DB per test via the real async engine.
+
+    Yields a session bound to that DB and swaps the app's ``AsyncSessionLocal`` so
+    request handlers use the same store.
+    """
+    db_url = f"sqlite+aiosqlite:///{tmp_path}/appname_test.db"
+    engine = create_async_engine(db_url, echo=False)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    monkeypatch.setattr(_session_module, "AsyncSessionLocal", factory)
+
+    async def _noop():
+        pass
+
+    monkeypatch.setattr(_session_module, "init_db", _noop)
+
+    async with factory() as session:
+        yield session
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()

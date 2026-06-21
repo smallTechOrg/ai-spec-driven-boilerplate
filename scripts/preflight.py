@@ -75,9 +75,9 @@ check(".env file exists",   condition=(ROOT / ".env").exists())
 
 print()
 
-# --- API keys (read from spec/rules/tech-stack.md to know what's required) ---
+# --- API keys (read from spec/architecture.md to know what's required) ---
 # Default required keys for a Python + LangGraph + FastAPI build.
-# Update this list to match your project's spec/rules/tech-stack.md.
+# Update this list to match your project's spec/architecture.md.
 print("API keys (edit this script to match your project):")
 warn("LLM key present",  condition=any(
     _env_key_set(k) for k in ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"]

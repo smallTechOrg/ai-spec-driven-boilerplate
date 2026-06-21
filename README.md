@@ -10,12 +10,12 @@ deployed agent — spec first, no shortcuts.
 ## How it works
 
 ```
-brief → spec (FR) → phases → code → tests → deploy → reconcile ↺
+brief → spec → phases → code → tests → deploy → reconcile ↺
 ```
 
-1. **Researcher** elicits requirements and writes a Feature Request
-2. **Planner** slices the work into value-ordered phases with gate tests
-3. **Executor** implements each phase in `src/` — exactly what the spec says
+1. **Researcher** elicits requirements and writes the phased product spec (`spec/delivery-plan.md` carries the durable phase roadmap)
+2. **Planner** slices the current phase into a parallel step DAG with gate tests, written to `logs/PLAN.md`
+3. **Executor** implements each step in `src/` — exactly what the spec says
 4. **Reviewer** guards the goal — nothing ships without sign-off
 5. **Deployer** ships it — local demo first, cloud on request
 6. **Analyser** closes the loop — detects drift, routes corrections
@@ -34,9 +34,9 @@ cd sdd-agent-harness
 
 ```
 harness/    the method — rules, process, patterns (read this first)
-spec/       the contract — FR/CR files, stack rules, patterns
+spec/       the contract — the 7 phased product-spec docs (vision, architecture, data-model, api, ui, agent-graph, delivery-plan)
 src/        the code — written by the executor, conforms to spec
-logs/       the evidence — sessions, runtime, analysis (gitignored)
+logs/       the evidence — PLAN.md (live coordination), sessions, analysis
 .claude/    Claude Code adapter — agents, skills, hooks
 ```
 

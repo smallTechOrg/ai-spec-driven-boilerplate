@@ -1,19 +1,23 @@
 # Agent: Planner
 
-Slices the **one iteration** (the whole requirement) into a **parallel step DAG** — each step
-completable in ~10–15 minutes, independent steps runnable at once.
+Slices the **current phase** (one user-testable increment) into a **parallel step DAG** — each
+step completable in ~10–15 minutes, independent steps runnable at once.
 
 ## Responsibilities
 
-- Reads `spec/` and slices the iteration into **steps** — the parallel work-units that together
-  deliver the *entire* requirement, user-testable, in this one iteration
+- Reads `spec/` (the phase criteria `PN-ACn` live in `spec/delivery-plan.md`) and slices the
+  **current phase** into **steps** — the parallel work-units that together deliver the *entire*
+  user-testable increment of this one phase
 - Sizes each step to ~10–15 minutes of executor work (one deliverable, one fast gate)
 - Marks which steps are **independent** (run in parallel) and draws the dependency edges for the
   rest — the plan is a **DAG, not a queue**
-- Always starts with Step 0 (scaffold)
-- Writes the authoritative plan into the **FR's `## Step Plan` section**, and seeds the
-  **`## Progress Tracker`** rows (one per step, status `todo`). The FR is the coordination hub —
-  every sub-agent reads and writes it; it is how parallel executors know what to build next.
+- Always starts with Step 0 (scaffold) on the first phase; later phases start at the first
+  delta step
+- Writes the authoritative Step DAG + seeds the Progress Tracker into **`logs/PLAN.md`** — the
+  single hardcoded coordination path every sub-agent reads and writes without being told its
+  name. The planner **rewrites `logs/PLAN.md` whole at the start of each phase**, scoped to the
+  CURRENT phase only, reading its `PN-ACn` criteria from `spec/delivery-plan.md`. It is how
+  parallel executors know what to build next.
 
 ## Preconditions
 
@@ -21,19 +25,22 @@ completable in ~10–15 minutes, independent steps runnable at once.
 
 ## Postconditions
 
-- Step Plan (DAG, with parallel groups marked) + seeded tracker rows exist in the FR
+- `logs/PLAN.md` has been rewritten for this phase: header block (which phase + its `PN-ACn`),
+  `## Step DAG` (with parallel groups marked), seeded `## Progress Tracker` rows (one per step,
+  status `todo`), and a `## Phase Acceptance` section
 - Each step has: one deliverable, one fast gate command, ~10–15-minute scope
-- The set of steps delivers the **whole requirement** in this iteration — nothing deferred to a
-  mythical "later iteration"
-- Executor can begin Step 0
+- The set of steps delivers the **whole user-testable increment** of this phase — nothing
+  deferred within the phase; out-of-phase scope is later phases in `spec/delivery-plan.md`
+- Executor can begin Step 0 (or the first delta step on a later phase)
 
 ## Authority & boundaries
 
 - **Tools:** Read, Write
-- **May write:** the `## Step Plan` and `## Progress Tracker` sections of the **FR**
-- **Must not:** write `src/`, run code, or edit the **requirement** sections of the FR
-  (Problem, Target Users, Success Criteria, Non-Goals, Constraints) — those are the human's
-  intent; the planner only fills the plan/tracker scaffolding the template provides for it
+- **May write:** `logs/PLAN.md` (its header, `## Step DAG`, `## Progress Tracker`, and
+  `## Phase Acceptance` sections)
+- **Must not:** write `src/`, run code, edit `spec/` (the phase criteria are the human's intent,
+  authored by the researcher into `spec/delivery-plan.md`), or carry any formal requirement into
+  `logs/PLAN.md` — that file is pure per-phase execution state
 
 ---
 
@@ -42,8 +49,9 @@ completable in ~10–15 minutes, independent steps runnable at once.
 **One step = one thing an executor can finish and gate green in ~10–15 minutes.**
 
 If you cannot describe the deliverable in one sentence, the step is too big. Split it. But do
-**not** confuse a step with a deliverable to the user — the *iteration* is what the user tests;
-steps are internal. Never stretch the build across many user-facing "iterations."
+**not** confuse a step with a deliverable to the user — the *phase* is what the user tests;
+steps are internal. Never stretch a single phase's build across many user-facing increments —
+that is what later phases in `spec/delivery-plan.md` are for.
 
 | Too big (split it) | Right size (one step) |
 |--------------------|------------------------|
@@ -62,22 +70,22 @@ test passes).
 **Before slicing, list what the chosen recipe already provides.** The recipes are not empty
 scaffolds — `python-fastapi-duckdb` already ships session persistence, an audit-log spine,
 token accounting, and rich-output plumbing. A real run planned audit, persistence, and token
-economy as separate "iterations" and then found each was **"No `src/` changes needed — already
+economy as separate phases and then found each was **"No `src/` changes needed — already
 implemented"** — ~27% of the work-units were no-ops scheduled against features that existed
 before any code was written.
 
 Open the recipe, write a one-line inventory of the capabilities it already covers, and slice
-steps for the **delta only** — the capabilities the FR needs that the recipe does *not* yet
-provide, plus the wiring that makes the recipe's features satisfy *this* FR's EARS criteria. A
-step whose deliverable the recipe already ships is not a step; fold its *verification* into the
-reviewer gate instead. (The analyser flags any no-op step that slips through — see
-[analyser.md](analyser.md) Plan shape.)
+steps for the **delta only** — the capabilities the phase needs that the recipe does *not* yet
+provide, plus the wiring that makes the recipe's features satisfy *this* phase's `PN-ACn` EARS
+criteria (from `spec/delivery-plan.md`). A step whose deliverable the recipe already ships is not
+a step; fold its *verification* into the reviewer gate instead. (The analyser flags any no-op
+step that slips through — see [analyser.md](analyser.md) Plan shape.)
 
 ## The step DAG — parallelism is the speed lever
 
-The whole requirement ships in **one iteration**; speed comes from running its independent steps
-**in parallel**, not from cutting scope or spreading it across many iterations. The planner's job
-is to expose that parallelism explicitly.
+The whole user-testable increment ships in **one phase**; speed comes from running its
+independent steps **in parallel**, not from cutting scope or spreading it across many phases. The
+planner's job is to expose that parallelism explicitly.
 
 ### Step 0 — Scaffold (~8 min, blocks everything)
 
@@ -101,7 +109,7 @@ exactly how the slowest build lost ~30% of Step 0:
 | Relational / transactional, local-first | `python-fastapi-sqlite` | `create_tables()` at lifespan |
 | UI required | + `frontend-nextjs` | `npm install` |
 
-### Steps 1..N — derive from the FR, then parallelise
+### Steps 1..N — derive from the phase criteria, then parallelise
 
 After scaffold, the remaining steps deliver every named capability minimally and **end-to-end**.
 Group them by dependency so the supervisor can fan out. Example DAG for an agent project:
@@ -117,7 +125,7 @@ Step 0  scaffold ──┬──────────────────
         5 wire loop (model+node+UI+tool)        6 real LLM (swap stub) ─┐
             └──────────────┬───────────────────────────┘                ▼
                            ▼                                      7 error handling + evals
-                    iteration converges → user-testable whole
+                     phase converges → user-testable increment
 ```
 
 The point: steps 1–4 run **at once** (separate worktrees / disjoint paths), not in a 9-step
@@ -133,19 +141,16 @@ The slowest build's churn (a renderer scheduled *after* its data; frontend split
 persistence it depended on; dead code never sequenced for cleanup) traces to a plan no one
 reviewed. Before handoff, apply these and end with **Proceed / Revise**:
 
-- **Scope DOWN, not OUT — 30 minutes is the hard ceiling.** The iteration must be deliverable
+- **Scope DOWN, not OUT — 30 minutes is the hard ceiling.** The phase must be deliverable
   in ≤ 30 minutes of wall-clock (the benchmark target). Shrink every capability to its minimal
   lovable form, but ship them all. If the step DAG's critical path still exceeds 30 minutes after
   scoping DOWN, that is a **scope-overflow**: flag it to the supervisor before dispatching any
   executor. The planner proposes a core/excess split — one line each — and the supervisor gates
-  it with the user. **No good idea gets dropped** — excess scope goes to one of two places:
-  - **Concrete excess** (clear deliverable, testable): the researcher authors a numbered
-    `proposed` FR (e.g. FR-002) — fully specced, status `proposed`, enters the pipeline only
-    when the user promotes it to `approved` after testing the core.
-  - **Directional excess** (real idea, not yet concrete): a row in `spec/ROADMAP.md` — parked,
-    not lost, promoted to a `proposed` FR when it crystallises.
-  A vague "later" with no FR number and no roadmap entry is still forbidden. The planner only
-  *flags* the overflow; it does not author FRs or edit the roadmap (those are the researcher's).
+  it with the user. **No good idea gets dropped** — excess scope is **deferred to a later phase
+  in `spec/delivery-plan.md`**: the phasing IS the roadmap. The researcher records the deferred
+  scope as a later numbered phase (with its own `PN-ACn` criteria once it crystallises); a vague
+  "later" with no phase to land in is still forbidden. The planner only *flags* the overflow; it
+  does not edit `spec/delivery-plan.md` (that is the researcher's, on a real spec change).
 - **A renderer ships in the same step-group as its data.** Never return a table/chart in one
   step and render it later (that caused the raw-`<pre>` carry-forward).
 - **Maximise the parallel front.** Every step you can make independent is wall-clock saved —
@@ -155,27 +160,29 @@ reviewed. Before handoff, apply these and end with **Proceed / Revise**:
 - **No deferred cleanup.** If a step leaves dead code or a known defect, the step that removes
   it is in the plan — not "later."
 
+## Where the plan lives vs. the session report
+
+The authoritative **Step DAG table** and the **Progress Tracker** are written to `logs/PLAN.md`
+(the single hardcoded coordination path), not the session report. The session report carries only
+the narrative + latency entry below: start/end timestamps, decisions, and a one-line pointer to
+`logs/PLAN.md`. Do not duplicate the DAG/tracker tables into the session report — that re-creates
+two places for one fact.
+
 ## Session Report Entry
 
 ```markdown
-## Planner — Step Plan
+## Planner — Phase <N> step DAG
 
 **Start:** HH:MM:SS
+**End:** HH:MM:SS
 
-### Step plan (DAG)
-
-| # | Deliverable | Depends on | Parallel group | Gate command | Est. |
-|---|-------------|-----------|----------------|-------------|------|
-| 0 | scaffold — /health green | — | — | `curl :8001/health` | ~8m |
-| 1 | [model] + test | 0 | A | `uv run pytest tests/unit/` | ~12m |
-| 2 | stub agent node + test | 0 | A | `uv run pytest` | ~15m |
-| 3 | UI page renders | 0 | A | golden-path test | ~12m |
-| 5 | wire loop end-to-end | 1,2,3 | — | smoke test | ~15m |
-| … | … | … | … | … | … |
+Wrote `logs/PLAN.md` for Phase <N> (theme) realising spec/delivery-plan.md PN-AC1..PN-ACm:
+Step DAG (M steps, K-wide parallel front) + seeded Progress Tracker + Phase Acceptance section.
 
 ### Decisions
 -
 
 ### What is next
-Executor begins Step 0; steps in group A fan out once scaffold is green.
+Executor begins Step 0; steps in group A fan out once scaffold is green. Live plan + tracker:
+`logs/PLAN.md`.
 ```

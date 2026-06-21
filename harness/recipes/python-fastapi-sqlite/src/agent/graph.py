@@ -1,7 +1,8 @@
 from langgraph.graph import END, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
-from src.agent.state import AgentState
 from src.agent.nodes import finalize, handle_error, invoke_tool, plan_action
+from src.agent.state import AgentState
 
 MAX_ITERATIONS = 25
 
@@ -16,7 +17,7 @@ def _route(state: AgentState) -> str:
     return "invoke_tool"
 
 
-def build_graph() -> StateGraph:
+def build_graph() -> CompiledStateGraph:
     g = StateGraph(AgentState)
 
     g.add_node("plan_action", plan_action)
@@ -26,11 +27,15 @@ def build_graph() -> StateGraph:
 
     g.set_entry_point("plan_action")
 
-    g.add_conditional_edges("plan_action", _route, {
-        "invoke_tool": "invoke_tool",
-        "finalize": "finalize",
-        "handle_error": "handle_error",
-    })
+    g.add_conditional_edges(
+        "plan_action",
+        _route,
+        {
+            "invoke_tool": "invoke_tool",
+            "finalize": "finalize",
+            "handle_error": "handle_error",
+        },
+    )
 
     g.add_edge("invoke_tool", "plan_action")
     g.add_edge("finalize", END)

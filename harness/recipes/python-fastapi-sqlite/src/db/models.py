@@ -2,6 +2,10 @@
 
 Schema is bootstrapped via ``Base.metadata.create_all`` in ``init_db`` — no
 migrations are shipped. Add Alembic when you need schema evolution.
+
+``Run`` is the generic example schema: one row per agent run. The example route
+persists it so the persistence layer is demonstrably live. Replace or extend it
+with your project's models.
 """
 
 from datetime import datetime

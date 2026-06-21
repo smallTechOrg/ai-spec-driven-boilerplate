@@ -2,7 +2,7 @@
 
 **Started:** YYYY-MM-DD HH:MM  
 **Branch:** feature/...  
-**FR/CR:** FR-NNN — [title]
+**Phase:** Phase N — [theme]
 
 > **This report is a live tail, not a retrospective.** Write to it continuously — every ~2
 > minutes during active work. A reader watching this file should be able to see what is
@@ -19,10 +19,12 @@
 
 ---
 
-## FR reference
+## Plan reference
 
-> Step Plan + Progress Tracker live in the FR — the coordination hub all agents read and write.
-> **FR:** `spec/features/FR-NNN.md`
+> Step DAG + Progress Tracker live in `logs/PLAN.md` — the single hardcoded coordination path
+> all sub-agents read and write (rewritten whole per phase). This report holds the narrative
+> tail + Latency Ledger only; the durable phase roadmap lives in `spec/delivery-plan.md`.
+> **Plan:** `logs/PLAN.md`  •  **Spec:** `spec/delivery-plan.md` Phase N
 
 ---
 
@@ -52,17 +54,7 @@
 
 ---
 
-## Progress Tracker
-
-> Everyone updates their row on handoff. Status: `todo → in-progress → gate-green → accepted`.
-> `accepted` only when the user accepts the whole at the iteration boundary.
-
-| Step | Status | Gate result | Reviewer | Dominant cost |
-|------|--------|-------------|----------|---------------|
-| 0 | todo | — | — | — |
-
----
-
+<!-- ── Step DAG + Progress Tracker live ONLY in logs/PLAN.md — do not duplicate them here. ── -->
 <!-- ── Each stage appends a section below. FIRST tool call = append Start: to ledger. ── -->
 
 ## [Stage / Step N] — [Agent]
@@ -99,7 +91,7 @@ $ <command>
 
 ---
 
-<!-- ── End-of-session rollup — written once when the iteration closes. ── -->
+<!-- ── End-of-session rollup — written once when the phase closes. ── -->
 
 ## Harness Feedback — dogfood rollup
 
@@ -115,9 +107,9 @@ $ <command>
 
 | Metric | Value | Target |
 |--------|-------|--------|
-| Brief → FR approved | | ≤ 3 min |
-| FR approved → Step 0 green | | ≤ 5 min |
-| Brief → iteration delivered | | ≤ 30 min |
+| Brief → phase plan approved | | ≤ 3 min |
+| Plan approved → Step 0 green | | ≤ 5 min |
+| Brief → phase delivered | | ≤ 30 min |
 | Human round-trips | | ≤ 2 |
 | Parallel-step front (max in flight) | | ≥ 3 |
 | Slowest single stage | | (trend) |

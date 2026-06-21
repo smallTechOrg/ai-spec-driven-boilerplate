@@ -1,0 +1,6 @@
+# Recipe-local ignore — travels with a copy of this directory.
+node_modules/
+.next/
+out/
+*.log
+.env*.local

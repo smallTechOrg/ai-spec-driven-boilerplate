@@ -1,88 +1,120 @@
-# Recipe: python-fastapi-duckdb
+# python-fastapi-duckdb
 
-A **conversational data-analysis agent** — ask a natural-language question about a CSV/JSON
-dataset and get a grounded answer (plus an optional chart spec), produced by a ReAct tool loop
-that writes and runs read-only SQL against your data.
+A generic, domain-neutral **agent starter** — FastAPI + LangGraph + a **DuckDB
+columnar storage seam** alongside the SQLite relational spine. It runs **green out
+of the box** from a fresh copy: no server to stand up, no API key. The LLM defaults
+to a stub and persistence is local files.
 
-**Stack:** FastAPI (serving + SSE token streaming) · LangGraph (the ReAct agent loop) ·
-DuckDB (per-dataset analytical SQL) · SQLAlchemy async + SQLite (the metadata spine, runs,
-spans, messages) · pydantic-settings (`APP_`-prefixed config) · LangChain `init_chat_model`
-(provider-agnostic LLM accessor — default `google_genai` / `gemini-2.5-flash`).
+This recipe and **python-fastapi-sqlite** share ONE packaged layout — they differ
+ONLY in `src/db/` (this one adds a generic DuckDB event-store seam) and the one
+example write to that store. Everything else (`src/api/`, `src/agent/`,
+`src/integrations/`) is the same shape.
 
-The agent only ever issues **read-only** SQL (guardrails reject mutating statements), with row
-and timeout caps. Every run records spans you can inspect at `/traces`.
+The executor copies this into `src/`, `tests/`, and the project root, then adapts
+it to the spec. **Delete this recipe directory after copying.**
 
-> Source: re-homed from `feature/datachat-2026-06-19`, stamped 2026-06-22.
+---
 
-## Why it's green out of the box
+## What's here
 
-It runs **fully offline with no API key**:
-- The unit/integration suite drives the agent loop with an in-process `FakeModel` (no network).
-- The server boots without a key — `/health` returns 200, the agent graph is simply not built
-  until a key is present.
-- The three **real-run** tests (live LLM) skip themselves automatically when `APP_LLM_API_KEY`
-  is empty. Provide a funded key and they run.
+```
+pyproject.toml          uv project — deps, pytest config, ruff
+.env.example            APPNAME_ settings — stub LLM, SQLite spine, DuckDB seam, port 8000
+.gitignore              keeps *.db / *.duckdb / data/ / .env out of git
 
-## Prerequisites
+src/
+  config.py             pydantic-settings — APPNAME_ prefix, SecretStr, stub flag
+  __main__.py           uvicorn entry point — host/port from settings
+  api/
+    app.py              FastAPI app factory + lifespan (init_db) + configurable CORS
+    health.py           GET /health — env, provider, stub_mode
+    ui.py               GET / chat UI + POST /run no-JS form fallback
+    routes.py           POST /api/run — JSON contract {ok, data:{result, run_id}}
+    run.py              run_agent — graph -> echo -> persist Run -> DuckDB event
+    templates/          base.html + index.html (stub banner, four UI states)
+  agent/
+    state.py            AgentState TypedDict (plain list — no add_messages reducer)
+    graph.py            LangGraph ReAct graph — plan_action ↺ invoke_tool -> finalize
+    nodes.py            plan_action, invoke_tool, finalize, handle_error
+    tools.py            Tool registry + the echo [REPLACE ME] example tool
+    observability.py    span() context manager (structured-log span)
+  db/                   THE storage layer (the only thing that differs from sqlite)
+    base.py             DeclarativeBase
+    models.py           example Run model (id, input, result, created_at)
+    session.py          async engine + AsyncSessionLocal + init_db()
+    duck.py             generic DuckDB event-store seam (one columnar events table)
+  integrations/
+    llm.py              thin LLMClient — routes stub | anthropic
+    _anthropic.py       the real provider (anthropic SDK, claude-sonnet-4-6)
+    stubs/llm.py        stub LLM — echo then FINAL_ANSWER, no key needed
 
-- Python ≥ 3.11
-- [uv](https://docs.astral.sh/uv/) (package/venv manager)
-- A Google Gemini API key — **only** for a real LLM run; not needed for tests or `/health`.
+tests/
+  conftest.py           offline kill-switch + throwaway SQLite + temp DuckDB dir
+  unit/
+    test_health.py      GET /health -> 200, stub_mode True
+    test_agent_loop.py  full stub ReAct loop via the echo tool
+    test_run_api.py     POST /api/run -> {ok, data} and a persisted Run row
+    test_models.py      Run create+read on SQLite; one DuckDB event write/read
+```
+
+## The example capability (REPLACE ME)
+
+A single trivial tool, `echo(text) -> "echo: {text}"`, is the ONLY registered tool
+(`src/agent/tools.py`, clearly marked `[REPLACE ME]`). The stub LLM
+(`src/integrations/stubs/llm.py`) drives it end to end: first call invokes `echo`
+with the user input, then — once one tool result is in history — returns a generic
+`FINAL_ANSWER`. This makes the full wiring visible
+(UI -> API -> graph -> echo tool -> stub LLM -> SQLite persistence -> DuckDB event
+-> response) while being obviously a placeholder. Swap the echo tool + stub for your
+real capability without rewiring the slice.
+
+## The storage layer (what differs from the sqlite recipe)
+
+`src/db/session.py` bootstraps the SQLite spine (the `runs` table) AND the DuckDB
+seam. `src/db/duck.py` is a tiny generic event store: one columnar `events` table,
+`append_event` / `read_events`. The example route writes the echo result there to
+demonstrate the DuckDB storage layer — there is no file upload, no SQL generation,
+no schema introspection. `[REPLACE ME]` it with your real columnar workload.
 
 ## Quickstart
 
 ```bash
-# 1. install (runtime + dev/test toolchain)
 uv sync --extra dev
-
-# 2. config — copy the template; leave APP_LLM_API_KEY blank to stay offline,
-#    or paste a Gemini key for real runs.
-cp .env.example .env
-
-# 3. run the tests (offline, no key, no network — FakeModel drives the loop)
-uv run pytest
-
-# 4. start the server
-uv run python -m src
-# open http://localhost:8001  (no-JS chat UI; /traces shows the run timeline)
+cp .env.example .env          # defaults run offline: SQLite + DuckDB + stub LLM, no key
+uv run python -m src          # serves on 127.0.0.1:8000
+curl http://localhost:8000/health        # {"status":"ok","stub_mode":true,...}
+# open http://localhost:8000  -> chat UI with a visible stub banner
 ```
 
-Add `--extra llm` to `uv sync` when you want the real provider SDK (`langchain-google-genai`)
-installed for live runs.
+The real LLM path is optional: `uv sync --extra llm`, then set
+`APPNAME_LLM_PROVIDER=anthropic` and `APPNAME_ANTHROPIC_API_KEY` in `.env`.
+Switching provider/model/DB is a config change, never a code change.
 
-### Key routes
-- `GET  /health` — liveness (200 offline)
-- `POST /runs` — full run; returns `answer`, `run_id`, `thread_id`, `chart_spec`
-- `POST /runs/stream` — same run as an SSE token stream
-- `POST /upload`, `POST /datasets`, `POST /datasets/{id}/files` — ingest CSV/JSON
-- `GET  /datasets`, `GET /datasets/{id}` — list / inspect schema
-- `GET  /traces` — self-contained run + span timeline
+## Rename the project
 
-## The gate (real run, needs a funded key)
+ONE placeholder token renames the whole project with a single find-replace:
 
-End-to-end proof that a real run completes, the outcome + trajectory evals pass, and traces are
-visible. Requires `APP_LLM_API_KEY` in `.env`:
+- `appname` (lowercase) — the project/package/distribution name. Appears in
+  `pyproject.toml` `[project].name`, FastAPI `title`, the Jinja `<title>`/`<h1>`.
+- `APPNAME` (uppercase) — the env-var prefix ONLY (`.env.example` and
+  `pydantic-settings` `env_prefix="APPNAME_"`).
 
 ```bash
-./scripts/demo_gate.sh            # defaults to port 8001
-# prints "DEMO GATE PASS" on success
+# from the project root, after copying the recipe in:
+grep -rl 'appname\|APPNAME' . | xargs sed -i '' 's/APPNAME/MYAPP/g; s/appname/myapp/g'   # macOS
+# linux: sed -i 's/APPNAME/MYAPP/g; s/appname/myapp/g'
 ```
 
-The same real-run check is also available in-process as `tests/test_demo_gate.py` (skipped
-without a key).
+Then delete this recipe directory.
 
-## Configuration
+## Gate
 
-All settings are `APP_`-prefixed environment variables (see `src/config.py` and `.env.example`).
-Switching LLM provider/model or the database is a **config change, never a code change** — only
-`APP_LLM_PROVIDER` / `APP_LLM_MODEL` / `APP_DATABASE_URL` move.
-
-## Layout
-
+```bash
+uv run pytest -q && uv run ruff check
+# green offline — SQLite + DuckDB, stub LLM, no key, no network
 ```
-src/            the agent package (config, db, domain, duck, graph, runner, server, tools, …)
-tests/          offline unit + integration suite (FakeModel); tests/e2e/ is Playwright, excluded
-scripts/        demo_gate.sh — the real-run gate
-pyproject.toml  deps + pytest config (e2e excluded from the default run)
-.env.example    APP_-prefixed config template (no secrets)
-```
+
+---
+
+_stamped 2026-06-22 — fastapi>=0.115, langgraph>=0.2, langchain-core>=0.3,_
+_sqlalchemy[asyncio]>=2.0, duckdb>=1.0, pydantic-settings>=2.0, python>=3.12_

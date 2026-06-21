@@ -13,17 +13,20 @@ class Settings(BaseSettings):
 
     # App
     env: str = "development"
-    port: int = 8001
+    host: str = "127.0.0.1"   # bind 0.0.0.0 inside a container
+    port: int = 8000
 
-    # LLM
-    llm_provider: str = "stub"   # stub | openai | anthropic | gemini
-    llm_model: str = ""
-    openai_api_key: SecretStr = SecretStr("")
+    # CORS — explicit origin list, never mix "*" with named origins.
+    cors_origins: list[str] = ["http://localhost:3000"]
+
+    # LLM — leave provider as "stub" to run offline with no API key.
+    # Switch to "anthropic" and set the key to go live (needs the `llm` extra).
+    llm_provider: str = "stub"   # stub | anthropic
+    llm_model: str = "claude-sonnet-4-6"
     anthropic_api_key: SecretStr = SecretStr("")
-    gemini_api_key: SecretStr = SecretStr("")
 
     # Database — local-first relational store (SQLite via aiosqlite).
-    database_url: str = "sqlite+aiosqlite:///./app.db"
+    database_url: str = "sqlite+aiosqlite:///./appname.db"
 
     @property
     def resolved_llm_provider(self) -> str:

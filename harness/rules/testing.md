@@ -4,7 +4,7 @@
 
 A unit of work is not done until its tests pass. Tests are everyone's job — but the
 **reviewer validates them and holds the highest bar**. Run the full suite before marking
-the iteration complete. Show the output.
+the phase complete. Show the output.
 
 ## Verification is the executable goal
 
@@ -15,7 +15,7 @@ satisfy it and writes unit tests for its own code.
 ## Gate law — two gates, at two altitudes
 
 Quality stays high *and* fast by gating at two levels: a cheap gate per **step**, a hard gate
-once per **iteration**.
+once per **phase**.
 
 **Step gate (fast, every step):** a step is complete only when ALL hold —
 1. Its code is committed and pushed.
@@ -24,7 +24,7 @@ once per **iteration**.
 
 Never wire a dependent step on top of a red step.
 
-**Iteration gate (hard, once, on the converged whole):** the iteration is complete only when
+**Phase gate (hard, once, on the converged whole):** the phase is complete only when
 ALL hold —
 1. The applicable **hard gates** (below) pass.
 2. The working tree is clean and pushed.
@@ -33,11 +33,11 @@ ALL hold —
 5. `spec ↔ src ↔ logs` reconcile — the drift check is clean.
 6. The user has accepted the delivered requirement.
 
-Never mark the iteration complete if any hard gate is red.
+Never mark the phase complete if any hard gate is red.
 
 ## The hard gates
 
-The fixed checks the **iteration gate** must satisfy *where applicable* — the planner does not
+The fixed checks the **phase gate** must satisfy *where applicable* — the planner does not
 re-invent these, it selects which apply:
 
 | Gate | Applies when | What it asserts |
@@ -49,7 +49,7 @@ re-invent these, it selects which apply:
 | Live-UI (frontend) | any browser UI | the **UI origin** is started (`npm run start`, not just `npm run build`) and `GET http://localhost:3000/` returns 200 with an **expected rendered DOM string** in the body. `npm run build` passing is necessary, not sufficient — it prerenders, it does not exercise the request path where SSR browser-API crashes ([C-SSR-BROWSER-API]) surface. Curl the **frontend** port, never the backend, for this line. |
 | Stub banner | any UI in stub mode | a visible banner marks stubbed output so no viewer mistakes it for real AI |
 | Eval threshold | any agent-behaviour change | `evals/` golden cases pass at threshold (see below) |
-| README current | the iteration gate | every README command works as written from the stated directory |
+| README current | the phase gate | every README command works as written from the stated directory |
 
 ## Evals — behaviour, not just plumbing
 

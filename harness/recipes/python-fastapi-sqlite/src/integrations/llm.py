@@ -5,7 +5,12 @@ from src.integrations.stubs.llm import StubLLMClient
 
 
 class LLMClient:
-    """Thin async LLM client. Swap the provider without changing call sites."""
+    """Thin async LLM client. Swap the provider without changing call sites.
+
+    Default provider is ``stub`` — no API key, fully offline. Set
+    ``APPNAME_LLM_PROVIDER=anthropic`` (and ``APPNAME_ANTHROPIC_API_KEY``) to go
+    live; that path needs the optional ``llm`` extra installed (``anthropic`` SDK).
+    """
 
     async def complete(self, messages: list[dict]) -> dict[str, Any]:
         settings = get_settings()
@@ -14,19 +19,15 @@ class LLMClient:
         if provider == "stub":
             return await StubLLMClient().complete(messages)
 
-        if provider == "openai":
-            from src.integrations._openai import OpenAIClient
-            return await OpenAIClient().complete(messages)
-
         if provider == "anthropic":
+            # Imported lazily so the offline path never needs the `anthropic` SDK.
             from src.integrations._anthropic import AnthropicClient
+
             return await AnthropicClient().complete(messages)
 
-        if provider == "gemini":
-            from src.integrations._gemini import GeminiClient
-            return await GeminiClient().complete(messages)
-
-        raise ValueError(f"Unknown LLM provider: {provider!r}")
+        raise ValueError(
+            f"Unknown LLM provider: {provider!r}. Use 'stub' or 'anthropic'."
+        )
 
 
 _client: LLMClient | None = None

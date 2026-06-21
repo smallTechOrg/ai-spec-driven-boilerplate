@@ -11,9 +11,9 @@ All times are wall-clock, sourced from the per-stage start/end timestamps (non-n
 
 | Metric | Target | Stretch |
 |--------|--------|---------|
-| Brief → FR approved | ≤ 3 min | ≤ 90 s |
-| FR approved → Step 0 green (`/health` 200) | ≤ 5 min | ≤ 2 min |
-| Brief → iteration delivered (user-testable) | ≤ 30 min | ≤ 15 min |
+| Brief → spec approved | ≤ 3 min | ≤ 90 s |
+| Spec approved → Step 0 green (`/health` 200) | ≤ 5 min | ≤ 2 min |
+| Brief → phase delivered (user-testable) | ≤ 30 min | ≤ 15 min |
 | Human round-trips | ≤ 2 (intake + acceptance) | 1 |
 | Parallel-step front (max steps in flight at once) | ≥ 3 | ≥ 5 |
 
@@ -24,9 +24,9 @@ step, and the critical-path length (longest dependency chain in the step DAG).
 
 | Item | Pass condition |
 |------|----------------|
-| Spec gate | FR passed the pre-code reviewer gate with no unresolved `[NEEDS CLARIFICATION]` |
-| Iteration hard-gate | the full [testing.md](../rules/testing.md) hard gates passed on the converged whole |
-| First-pass review | iteration gate passed on the **first** reviewer pass (a re-bounce counts against quality) |
+| Spec gate | the spec passed the pre-code reviewer gate with no unresolved `[NEEDS CLARIFICATION]` |
+| Phase hard-gate | the full [testing.md](../rules/testing.md) hard gates passed on the converged whole |
+| First-pass review | phase gate passed on the **first** reviewer pass (a re-bounce counts against quality) |
 | Evals | agent-behaviour evals passed at threshold (binary PASS/FAIL) |
 | Production driver | tests ran on the shipped store (SQLite/DuckDB), not a substitute |
 | README true | every README command works as written from the stated directory |

@@ -28,7 +28,7 @@ or source file stamped with a date is a bug, not a log.
 
 ## Preconditions
 
-- The step plan (DAG) exists in the FR; this step's dependencies are green
+- The step DAG exists in `logs/PLAN.md`; this step's dependencies are green
 - `spec/` is signed off
 - This executor owns its files exclusively — no other parallel executor touches them
   (partition by path; separate worktree if writers would collide)
@@ -37,13 +37,14 @@ or source file stamped with a date is a bug, not a log.
 
 - `src/` implements the current step; its fast gate command passes (green)
 - Unit tests exist and pass; the build runs offline (no API key required for the gate)
-- This step's row in the FR `## Progress Tracker` updated as control hands back
+- This step's row in `logs/PLAN.md` `## Progress Tracker` updated as control hands back
 
 ## Authority & boundaries
 
 - **Tools:** Read, Edit, Write, Bash (run tests, start server).
-- **May write:** `src/` and unit tests for the **current step**, and its own row in the
-  FR `## Progress Tracker` (status + gate-output ref) as it hands back to the supervisor.
-- **Must not:** exceed the current step, touch another parallel executor's files, edit any FR
-  section other than its tracker row, or sign off its own work — the reviewer is a separate
-  authority, and user acceptance happens once, at the iteration boundary.
+- **May write:** `src/` and unit tests for the **current step**, and its own row in
+  `logs/PLAN.md` `## Progress Tracker` (status + gate-output ref) as it hands back to the supervisor.
+- **Must not:** exceed the current step, touch another parallel executor's files, edit any
+  `logs/PLAN.md` section other than its own tracker row, edit `spec/` at all, or sign off its
+  own work — the reviewer is a separate authority, and user acceptance happens once, at the
+  phase boundary.

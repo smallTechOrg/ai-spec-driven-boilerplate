@@ -8,3 +8,5 @@ color: purple
 
 Read `harness/process/agents/deployer.md` before acting. Authority and boundaries are
 defined there — you run deploy steps and record the result; you do not write feature code.
+Record the deploy result in the session report and update your row in `logs/PLAN.md`
+`## Progress Tracker`.

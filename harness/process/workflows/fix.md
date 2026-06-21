@@ -15,11 +15,14 @@ sledgehammer on a one-line bug. Route by size:
 
 | Change size | Path |
 |-------------|------|
-| One-line / obvious / single-file, no behaviour change to spec | **Light path:** a thin CR (delta only) + the single gate that proves it + one reviewer line. Skip the full pipeline. |
+| One-line / obvious / single-file, no behaviour change to spec | **Light path:** the single gate that proves it + one reviewer line, tracked as one step in `logs/PLAN.md`. Skip the full pipeline. |
 | Touches ≥3 files or both spec and src, or changes documented behaviour | **Full path** below (analyser → planner → … ↺) |
 
-Either way the CR is a **delta** and folds back into the spec baseline when it lands (the
-archive/merge step in [spec-driven.md](../../rules/spec-driven.md)). Never skip the merge.
+Either way: if the fix changes documented behaviour, edit the affected `spec/` file in place
+first (no `src/` change without a backing spec edit — see
+[spec-driven.md](../../rules/spec-driven.md)). The fix's step DAG + progress are tracked in
+`logs/PLAN.md` (the single hardcoded coordination path); the narrative + latency live in the
+timestamped session report.
 
 ## When to use
 
@@ -41,8 +44,9 @@ diagnosis: what is broken, where, and why. Routes to the planner with a scoped b
 
 ### 2. planner — scope the fix
 
-Slices the fix into the smallest change that restores the gate. Records the fix plan in
-the session report.
+Slices the fix into the smallest change that restores the gate. Rewrites `logs/PLAN.md`
+with the fix's step DAG + a seeded progress tracker (scoped to this fix); records the
+narrative in the session report.
 
 ### 3. executor — make the fix
 
@@ -59,5 +63,6 @@ Re-deploys the corrected build.
 
 ### 6. analyser — confirm closure
 
-Re-reads `logs/` after the fix. Confirms `src ↔ logs` reconcile. Exits if resolved;
-loops if new drift appears.
+Re-reads `logs/` after the fix. Confirms `src ↔ logs` reconcile and that any behaviour
+change is backed by an in-place `spec/` edit (no orphaned `src/` change). Updates the
+`logs/PLAN.md` progress tracker. Exits if resolved; loops if new drift appears.

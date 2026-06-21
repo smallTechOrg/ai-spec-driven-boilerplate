@@ -23,7 +23,9 @@ Not for new features or bug fixes — those start at **build** or **fix**.
 ### 1. planner — plan the deployment
 
 Defines the deployment steps: target environment, config changes, migration steps,
-rollback plan. Records in the session report.
+rollback plan. Rewrites `logs/PLAN.md` (the single hardcoded coordination path) with the
+deployment step DAG + a seeded progress tracker; records the narrative in the session
+report.
 
 ### 2. executor — prepare
 
@@ -38,9 +40,10 @@ the target config. Signs off before the deployer runs.
 ### 4. deployer — ship
 
 Executes the deployment to the target environment. Records the result (success, URL,
-errors) in the session report.
+errors) in the session report and updates its row in `logs/PLAN.md` ## Progress Tracker.
 
 ### 5. analyser — confirm
 
-Reads runtime logs from the deployed environment. Confirms the outcome matches the spec.
+Reads runtime logs from the deployed environment. Confirms the outcome matches the phase
+criteria in `spec/delivery-plan.md` (PN-ACn). Updates the `logs/PLAN.md` progress tracker.
 Flags any post-deploy drift for the fix workflow.

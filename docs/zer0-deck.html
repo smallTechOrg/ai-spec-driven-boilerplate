@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Zer0 — design deck</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121821; --ink:#e7edf3; --muted:#93a1b0;
+    --accent:#5ad1c8; --accent2:#9b8cff; --warn:#ffcf6b; --line:#243040;
+    --good:#7ee787;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .deck{height:100%;display:flex;align-items:center;justify-content:center}
+  .slide{display:none;max-width:980px;width:92%;padding:6px 8px;animation:fade .25s ease}
+  .slide.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  h1{font-size:46px;margin:.1em 0 .15em;letter-spacing:-.5px}
+  h2{font-size:30px;margin:.1em 0 .5em;letter-spacing:-.3px}
+  h2 .k{color:var(--accent)}
+  p,li{color:var(--ink)}
+  .sub{color:var(--muted);font-size:18px;margin-top:0}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .card h3{margin:.1em 0 .35em;font-size:18px}
+  .card.k h3{color:var(--accent)}
+  .pill{display:inline-block;font-size:12px;color:var(--bg);background:var(--accent);
+    border-radius:999px;padding:2px 10px;font-weight:700;letter-spacing:.3px}
+  .pill.alt{background:var(--accent2)}
+  .pill.warn{background:var(--warn)}
+  .pill.good{background:var(--good)}
+  table{width:100%;border-collapse:collapse;margin:.4em 0}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;font-size:15px}
+  th{color:var(--accent);font-weight:600}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
+  .loop{font-family:ui-monospace,monospace;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:16px;color:var(--accent);white-space:pre;font-size:15px;text-align:center}
+  .muted{color:var(--muted)}
+  .rec{color:var(--good);font-weight:600}
+  ul{margin:.3em 0 .3em 1.1em;padding:0}
+  li{margin:.18em 0}
+  .nav{position:fixed;bottom:14px;left:0;right:0;display:flex;gap:14px;justify-content:center;
+    align-items:center;color:var(--muted);font-size:13px}
+  .nav button{background:var(--panel);color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:6px 12px;cursor:pointer;font-size:14px}
+  .nav button:hover{border-color:var(--accent)}
+  .bar{position:fixed;top:0;left:0;height:3px;background:var(--accent);transition:width .2s}
+  .tag{font-size:12px;color:var(--muted);position:fixed;top:12px;right:16px}
+  .q{border-left:3px solid var(--accent2);padding-left:12px;margin:10px 0}
+  .opt{font-size:14px}
+  small{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="bar" id="bar"></div>
+<div class="tag" id="tag"></div>
+<div class="deck" id="deck">
+
+  <!-- 1 -->
+  <section class="slide active">
+    <p class="pill">design deck · 2026-06-21</p>
+    <h1>Zer0</h1>
+    <p class="sub">A four-layer coding-agent harness. Zero-shot from intent to a working
+    system — the empty ground a build takes form from.</p>
+    <div class="loop">spec (goal) → src (action) → logs (outcome) → harness reconciles → spec …</div>
+    <p class="muted">What this deck is: the theory, what's already built (PR
+    <code>restructure/zer0</code>), the open questions with my recommendations, and the
+    academic way forward. Arrow keys / Space to move.</p>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide">
+    <h2>The thesis</h2>
+    <p>Most "AI builds your app" tools generate code and stop. Zer0's claim:
+    <b>a build is not done when the code runs — it's done when the outcome matches the
+    goal, and you can prove they reconcile.</b></p>
+    <div class="grid g2">
+      <div class="card k"><h3>Three sources of truth</h3>
+        <p><code>spec/</code> = the goal · <code>src/</code> = the action ·
+        <code>logs/</code> = the outcome. Each is true about the system from a different
+        angle.</p></div>
+      <div class="card k"><h3>One practice over them</h3>
+        <p><code>harness/</code> is mindfulness — it checks goal vs action vs outcome and
+        adjusts. A verb, not an artifact.</p></div>
+    </div>
+    <p class="muted">Agent-agnostic by design: <code>harness/</code> is the protocol;
+    <code>.claude/</code> is just the binding to one runtime.</p>
+  </section>
+
+  <!-- 3 -->
+  <section class="slide">
+    <h2>The philosophy <span class="k">— four layers, one loop</span></h2>
+    <table>
+      <tr><th>Layer</th><th>Holds</th><th>Question</th><th>Mind</th></tr>
+      <tr><td><code>spec/</code></td><td>the goal</td><td>what should it be?</td><td>intention</td></tr>
+      <tr><td><code>src/</code></td><td>the action</td><td>what is it?</td><td>doing</td></tr>
+      <tr><td><code>logs/</code></td><td>the outcome</td><td>what does it do?</td><td>result</td></tr>
+      <tr><td><code>harness/</code></td><td>mindfulness</td><td>outcome = goal? adjust.</td><td>awareness</td></tr>
+    </table>
+    <div class="loop">  spec ──▶ src ──▶ logs
+   ▲                 │
+   └──── harness ◀───┘
+   observe drift, adjust goal or action</div>
+    <p class="muted">Drift table: <code>spec≠src</code> → fix code · <code>src≠logs</code>
+    → fix bug · <code>logs≠spec</code> → fix code, or amend the goal if the goal was wrong.</p>
+  </section>
+
+  <!-- 4 -->
+  <section class="slide">
+    <h2>The team <span class="k">— always-on roles</span></h2>
+    <div class="grid g2">
+      <div class="card"><h3>manager <small>· main session</small></h3>
+        Coordinates the team, holds the whole picture, owns the human gate and adjustments.</div>
+      <div class="card"><h3>designer <small>· the goal</small></h3>
+        Turns your prompts into a complete spec (line-level), designs UX. PM + UX + author.</div>
+      <div class="card"><h3>engineer <small>· the action</small></h3>
+        Feasibility on every draft, then builds to the approved spec — no more, no less.</div>
+      <div class="card"><h3>qa <small>· the bar</small></h3>
+        Reviews spec & code, owns tests AND the end-user's goals. "Nothing gets past qa."</div>
+      <div class="card" style="grid-column:1/3"><h3>analyst <small>· the outcome → the loop</small></h3>
+        Always observing logs, traces, tests, timings, and <i>your</i> prompts &
+        frustrations. Feeds reality back to everyone; proposes spec amendments when the
+        goal itself is wrong. This role <b>is</b> the feedback loop.</div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="slide">
+    <h2>Mechanisms <span class="k">— harness canonical, .claude thin</span></h2>
+    <table>
+      <tr><th>Concept</th><th>Source of truth</th><th>Claude Code adapter</th></tr>
+      <tr><td>Rules</td><td><code>harness/rules/</code></td><td><code>.claude/rules/harness.md</code> (auto-load)</td></tr>
+      <tr><td>Method</td><td><code>harness/method/</code></td><td>referenced by <code>CLAUDE.md</code></td></tr>
+      <tr><td>Roles</td><td><code>harness/roles/</code></td><td><code>.claude/agents/</code> (thin pointers)</td></tr>
+      <tr><td>Workflows</td><td><code>harness/workflows/</code></td><td><code>.claude/skills/</code> build·fix·deploy</td></tr>
+      <tr><td>Enforcement</td><td><code>harness/rules/</code></td><td><code>.claude/hooks/</code> push-after-commit</td></tr>
+    </table>
+    <p class="muted">Pattern from Claude Code best-practice: <b>Command → Agent → Skill</b>,
+    sub-agents for context isolation, hooks for what must be mechanical, lean
+    <code>CLAUDE.md</code> (&lt;200 lines).</p>
+  </section>
+
+  <!-- 6 -->
+  <section class="slide">
+    <h2>The build lifecycle</h2>
+    <div class="loop">INTAKE ─▶ BUILD ─▶ RECONCILE ─▶ SHIP
+(designer)  (engineer)  (analyst)   (manager)</div>
+    <ul>
+      <li><b>Intake</b> — designer interviews you <i>as long as it takes, to the line
+        level</i>; engineer checks feasibility on each draft. Gate = completeness
+        checklist passes <b>and</b> designer + engineer + qa sign off. The one human gate.</li>
+      <li><b>Build</b> — phases sliced <b>by end-user value</b>, derived per spec; each runs
+        end-to-end and passes its test before the next.</li>
+      <li><b>Reconcile</b> — analyst checks outcome vs goal at every gate; writes
+        <code>logs/analysis/</code>; proposes spec amendments when the goal was wrong.</li>
+      <li><b>Ship</b> — finalize the PR; deploy is a later phase (Render default).</li>
+    </ul>
+  </section>
+
+  <!-- 7 -->
+  <section class="slide">
+    <h2>What's built in this PR <span class="k">— restructure/zer0</span></h2>
+    <div class="grid g2">
+      <div class="card"><h3><span class="pill good">done</span> harness/</h3>
+        philosophy + README, 5 rules, method (lifecycle·reconcile·layout), 5 roles, 5
+        workflows. The agent-agnostic source of truth.</div>
+      <div class="card"><h3><span class="pill good">done</span> .claude/ adapter</h3>
+        settings + push-after-commit hook, rules auto-load shim, 4 thin agents, 3 skills
+        (build·fix·deploy).</div>
+      <div class="card"><h3><span class="pill good">done</span> layers</h3>
+        <code>spec/</code> (editable stack defaults), <code>logs/</code>
+        (sessions·runtime·analysis), <code>src/</code> scaffold, lean root docs.</div>
+      <div class="card"><h3><span class="pill good">done</span> cleanup</h3>
+        Dropped <code>.github/</code>, <code>AGENTS.md</code>, old commands & 8 old agents;
+        <code>reports/ → logs/</code>; method out of <code>spec/engineering/</code>.</div>
+    </div>
+    <p class="muted">Resume point + full decision log: <code>logs/sessions/2026-06-21-restructure-zer0.md</code></p>
+  </section>
+
+  <!-- 8 -->
+  <section class="slide">
+    <h2>Open question 1–4 <span class="k">(my picks in green)</span></h2>
+    <div class="q"><b>1. Phase model depth.</b> Locked: designer derives per spec,
+      user-value-first. <span class="opt">Add a short <i>phasing heuristics</i> doc
+      (minimal slice · gate per phase · value order) vs. leave fully freeform.</span>
+      <div class="rec">→ Ship the short heuristics doc. Guidance without a rigid list.</div></div>
+    <div class="q"><b>2. "Always-on" vs Claude's invoke model.</b> Agents are invoked, not
+      daemons. <span class="opt">Standing mandate in playbooks + analyst invoked at every
+      gate + a Stop/PostToolUse hook later, vs. literal background loop.</span>
+      <div class="rec">→ Standing mandate now; add an analyst hook once a build exists to test it.</div></div>
+    <div class="q"><b>3. Spec-completeness checklist.</b> The intake gate needs concrete
+      items. <span class="opt">Define an explicit checklist (every product file present,
+      no placeholders, each capability testable, data model closed, …).</span>
+      <div class="rec">→ Yes — write <code>harness/method/spec-checklist.md</code>; qa runs it.</div></div>
+    <div class="q"><b>4. logs/runtime schema.</b> <span class="opt">Structured JSON
+      (structlog) with named events the analyst can parse, vs. freeform.</span>
+      <div class="rec">→ Structured JSON events; the analyst depends on it being parseable.</div></div>
+  </section>
+
+  <!-- 9 -->
+  <section class="slide">
+    <h2>Open question 5–8</h2>
+    <div class="q"><b>5. MCP / <code>.mcp.json</code>.</b> External tool servers (browser,
+      DB, search) for agents. <div class="rec">→ Defer until a real build needs one; keep
+      the core minimal ("generate only what's needed").</div></div>
+    <div class="q"><b>6. Package Zer0 as an installable Claude Code plugin.</b> Strongest
+      distribution/"protocol" story. <div class="rec">→ Yes, but later — after we dogfood it
+      on one real build and the shape settles.</div></div>
+    <div class="q"><b>7. <code>spec/product/</code> templates.</b> Still old
+      <code>&lt;!-- FILL IN --&gt;</code> shape. <div class="rec">→ Re-align wording to the
+      Zer0 roles/loop; keep them human-authored templates.</div></div>
+    <div class="q"><b>8. <code>preflight.sh</code> / <code>reset.sh</code> + repo rename.</b>
+      <div class="rec">→ Move scripts to <code>harness/scripts/</code> (or drop if stale);
+      run <code>gh repo rename zer0</code> at merge (deferred to not break the live session).</div></div>
+  </section>
+
+  <!-- 10 -->
+  <section class="slide">
+    <h2>Deeper questions <span class="k">— worth your call</span></h2>
+    <ul>
+      <li><b>Dual audience.</b> The designer should sense whether it's talking to a
+        non-coder or a senior engineer and adjust question depth & vocabulary. How explicit
+        do we make that? <span class="rec">Rec: a short "read the user" note in the designer
+        playbook + the analyst tracking confusion signals.</span></li>
+      <li><b>Cross-session learning.</b> Should the analyst persist learnings (recurring
+        frustrations, what worked) across builds — a memory the team reads next time?
+        <span class="rec">Rec: yes — <code>logs/analysis/</code> as the durable record, summarized into the spec.</span></li>
+      <li><b>Human authorship depth.</b> You said intake can go line-by-line. Do we want a
+        "fill the spec yourself" fast path for power users alongside the interview?
+        <span class="rec">Rec: support both — interview by default, template edit for experts.</span></li>
+      <li><b>Reconcile cadence in practice.</b> Every gate is the floor; should the analyst
+        also react mid-phase on error spikes? <span class="rec">Rec: yes, signal-driven.</span></li>
+    </ul>
+  </section>
+
+  <!-- 11 -->
+  <section class="slide">
+    <h2>Academic grounding</h2>
+    <p class="sub">Zer0 is a synthesis, not an invention. Position it against the literature.</p>
+    <div class="grid g2">
+      <div class="card"><h3>Specification-driven development</h3>
+        The spec is the contract; code conforms; drift is measurable. Zer0's
+        <code>spec ↔ src</code> check.</div>
+      <div class="card"><h3>Closed-loop control / OODA</h3>
+        Observe–orient–decide–act over goal/action/outcome. Zer0's
+        <code>reconcile</code> is a control loop; <code>logs/</code> is the sensor.</div>
+      <div class="card"><h3>Agentic software engineering</h3>
+        Multi-agent role decomposition, context isolation, verifier/critic patterns —
+        Zer0's team + qa/analyst as adversarial verifiers.</div>
+      <div class="card"><h3>Claude Code operating practices</h3>
+        Sub-agents, skills, hooks, lean memory; harness-enforced behavior over prose.</div>
+    </div>
+    <p class="muted">Next: a short whitepaper (seed = <code>harness/philosophy.md</code>)
+    with real citations; frame Zer0 as "control theory for spec-driven agentic builds."</p>
+  </section>
+
+  <!-- 12 -->
+  <section class="slide">
+    <h2>The best way forward <span class="k">— recommended path</span></h2>
+    <ol>
+      <li><span class="pill">1</span> <b>Merge this PR</b> (review the diff; the harness is
+        self-consistent and dogfoods its own rules).</li>
+      <li><span class="pill">2</span> <b>Add the four small docs</b> from the open
+        questions: spec-checklist, phasing-heuristics, logs/runtime schema, designer
+        "read-the-user" note.</li>
+      <li><span class="pill alt">3</span> <b>Dogfood once.</b> Run a real
+        <code>/build</code> end-to-end (a small agent) and let the analyst record where the
+        harness helps or rubs. Reality &gt; theory.</li>
+      <li><span class="pill alt">4</span> <b>Tighten from the analysis</b>, then
+        <b>rename the repo</b> and <b>package as a plugin</b>.</li>
+      <li><span class="pill warn">5</span> <b>Write the whitepaper</b> and open-source with
+        the deck + a worked example.</li>
+    </ol>
+    <p class="muted">Principle throughout: generate only what's needed; let the loop —
+    not opinion — tell us what to add next.</p>
+  </section>
+
+  <!-- 13 -->
+  <section class="slide">
+    <h1>Good night 🌙</h1>
+    <p class="sub">Branch <code>restructure/zer0</code> + PR are up. Resume exactly at
+    <code>logs/sessions/2026-06-21-restructure-zer0.md</code> → "Pending / open".</p>
+    <p>Nothing here is locked — every open question above is yours to answer when you wake.
+    The harness already runs on its own rules.</p>
+    <p class="muted">— built autonomously, &lt;1 hour, per your note.</p>
+  </section>
+
+</div>
+
+<div class="nav">
+  <button onclick="go(-1)">‹ Prev</button>
+  <span id="count"></span>
+  <button onclick="go(1)">Next ›</button>
+</div>
+
+<script>
+  const slides=[...document.querySelectorAll('.slide')];
+  let i=0;
+  function render(){
+    slides.forEach((s,n)=>s.classList.toggle('active',n===i));
+    document.getElementById('count').textContent=(i+1)+' / '+slides.length;
+    document.getElementById('tag').textContent='Zer0 · slide '+(i+1);
+    document.getElementById('bar').style.width=((i+1)/slides.length*100)+'%';
+  }
+  function go(d){i=Math.max(0,Math.min(slides.length-1,i+d));render();}
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){go(1);e.preventDefault();}
+    if(e.key==='ArrowLeft'||e.key==='PageUp'){go(-1);e.preventDefault();}
+    if(e.key==='Home'){i=0;render();}
+    if(e.key==='End'){i=slides.length-1;render();}
+  });
+  render();
+</script>
+</body>
+</html>

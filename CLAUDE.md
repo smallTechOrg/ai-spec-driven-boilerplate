@@ -1,68 +1,43 @@
-# Claude Code — Entry Point
+# Zer0 — Claude Code entry point
 
-This is a spec-driven AI agent boilerplate. Read this file first, then follow the instructions below.
+This repo runs on **Zer0**, a four-layer coding-agent harness. Read this, then the
+harness. Keep this file lean — the source of truth is `harness/`.
 
-## What This Repo Is
+## First action, every session
 
-A starting template for building AI agents. The spec in `spec/` is either:
-- **Partially or fully filled in** — you are implementing an agent from a completed spec
-- **Empty / placeholder** — you are in the build phase; invoke the agent-builder to fill the spec first
+1. Read `harness/README.md` and `harness/rules/non-negotiables.md`.
+2. You are the **manager** (the main session). Your playbook: `harness/roles/manager.md`.
+3. Check `spec/product/01-vision.md`. If it has `<!-- FILL IN -->`, intake isn't done —
+   run the `build` skill (designer-led). Otherwise the spec is the goal; follow it.
+4. Open/append a session report in `logs/sessions/` (`harness/workflows/session-report.md`).
 
-## Your First Action Every Session
+## The four layers
 
-1. Read `spec/engineering/ai-agents.md` — mandatory rules for all AI sessions
-2. Check whether `spec/product/01-vision.md` has been filled in:
-   - If it still contains `<!-- FILL IN -->` placeholders → the spec is not ready; do not write application code yet
-   - If it is filled in → proceed to read the full spec manifest below before touching any code
-3. Open a session report at `reports/sessions/YYYY-MM-DD-HHMMSS-[branch].md`
+| Folder     | Holds                              | Role owner   |
+|------------|------------------------------------|--------------|
+| `spec/`    | the goal                           | designer     |
+| `src/`     | the action                         | engineer     |
+| `logs/`    | the outcome                        | analyst      |
+| `harness/` | mindfulness (keep the loop closed) | manager + qa |
 
-## Spec Manifest (read in this order when spec is complete)
+`harness/` is the source of truth. `.claude/` is the thin adapter (agents, skills,
+hooks, the rules shim). Don't duplicate harness content here — link to it.
 
-```
-spec/product/01-vision.md
-spec/product/02-architecture.md
-spec/product/capabilities/          ← all files
-spec/product/04-data-model.md
-spec/product/05-api.md
-spec/product/06-ui.md
-spec/product/07-agent-graph.md      ← REQUIRED for any agent framework project
-spec/engineering/ai-agents.md
-spec/engineering/spec-driven.md
-spec/engineering/phases.md
-spec/engineering/project-layout.md
-spec/engineering/tech-stack.md
-spec/engineering/code-style.md
-```
+## The team (delegate via sub-agents)
 
-**`07-agent-graph.md` is mandatory** for any project using LangGraph, CrewAI, AutoGen, or any agent orchestration framework. If it does not exist when you reach Phase 2, stop and raise it as a blocker.
+- `designer` — requirements, spec, UX (`harness/roles/designer.md`)
+- `engineer` — feasibility, code (`harness/roles/engineer.md`)
+- `qa` — standards, tests, sign-off (`harness/roles/qa.md`)
+- `analyst` — always-on logs/reality + reconcile (`harness/roles/analyst.md`)
 
-## If the Spec Is Not Ready
+## Skills
 
-Invoke the agent-builder:
+- `build` — idea → working, reconciled system (`harness/workflows/build.md`)
+- `fix` — diagnose + fix, loop kept closed (`harness/workflows/fix.md`)
+- `deploy` — later phase, Render default (`harness/workflows/deploy.md`)
 
-```
-Use the agent-builder sub-agent in .claude/agents/agent-builder.md
-```
+## Non-negotiables (full text: `harness/rules/non-negotiables.md`)
 
-Or the user can run the `/build` command with their idea.
-
-## Key Rules (summary — full rules in spec/engineering/ai-agents.md)
-
-- Never write application code before reading the full spec
-- Never skip a phase — complete phase N before starting phase N+1
-- Commit every logical unit of work; never let the working tree stay dirty
-- Update `reports/sessions/` at the start and end of every session
-- When in doubt, ask — do not guess requirements
-
-## Sub-agents Available
-
-| Agent | Purpose |
-|-------|---------|
-| `.claude/agents/agent-builder.md` | Master orchestrator — start here for a new build |
-| `.claude/agents/spec-writer.md` | Interview user, write product spec |
-| `.claude/agents/spec-reviewer.md` | Review spec for completeness and coherence |
-| `.claude/agents/tech-designer.md` | Propose tech stack and architecture |
-| `.claude/agents/planner.md` | Create phased implementation plan |
-| `.claude/agents/plan-reviewer.md` | Validate plan against spec |
-| `.claude/agents/drift-auditor.md` | Audit spec/code drift |
-| `.claude/agents/qa-auditor.md` | Test and audit completed phases |
+Spec before code · outcome is evidence (run the test) · docs must be true · commit then
+push (hook-enforced) · never `git add -A` · app code on a feature branch via PR, never on
+`main` · one phase at a time · close the loop before stopping · generate only what's needed.

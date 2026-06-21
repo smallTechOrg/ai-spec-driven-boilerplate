@@ -1,178 +1,80 @@
-# AI Agent Boilerplate — Spec-Driven, Zero-Shot to Working Agent
+# Zer0
 
-This is a boilerplate for building AI agents spec-first. Give it a one-line idea. Walk away with a working, tested, phased agent.
+**Zer0 is a coding-agent harness** — a disciplined, agent-agnostic method for building
+software with AI, where human intent and machine action stay continuously reconciled.
+This repository is Zer0's Claude Code reference implementation.
 
----
+Zero-shot from intent to a working system; the empty ground a build takes form from.
 
-## What This Is
+## The idea: four layers, one loop
 
-A starting point for anyone who wants to build an AI agent without writing boilerplate from scratch. The repo ships with:
+| Layer      | Holds       | Question                    |
+|------------|-------------|-----------------------------|
+| `spec/`    | the goal    | what should it be?          |
+| `src/`     | the action  | what is it?                 |
+| `logs/`    | the outcome | what does it do?            |
+| `harness/` | mindfulness | does outcome = goal? adjust |
 
-- A structured **spec template** covering product vision, architecture, capabilities, data model, API, and UI
-- An **agent-builder** sub-agent that orchestrates the full build lifecycle
-- Sub-agents for spec writing, reviewing, tech design, planning, and auditing
-- Engineering rules baked into the spec so every AI coding session is consistent
-- Phase-gated implementation — minimal working thing first, then iterative expansion
-
----
-
-## How to Use This
-
-### Step 1 — Clone and configure
-
-```bash
-git clone https://github.com/smallTechOrg/ai-spec-driven-boilerplate.git my-agent
-cd my-agent
-cp .env.example .env
+```
+spec → src → logs → (harness reconciles) → spec → …
 ```
 
-### Step 2 — Open in Claude Code (or any AI coding assistant)
+A build isn't "done" when the code runs — it's done when the **outcome** (`logs/`)
+matches the **goal** (`spec/`), and the harness can show they reconcile. See
+`harness/philosophy.md`.
+
+## The team
+
+Zer0 runs like a small engineering team of always-on roles:
+
+- **manager** (you, the main session) — coordinates, keeps the loop closing
+- **designer** — turns your prompts into a complete spec; UX
+- **engineer** — feasibility, then builds to the spec
+- **qa** — standards + the end-user's goals; nothing ships without sign-off
+- **analyst** — always watching logs, tests, and your prompts; feeds reality back
+
+## Use it (Claude Code)
 
 ```bash
+git clone <this repo> my-project && cd my-project
 claude
 ```
 
-### Step 3 — Kick off the agent builder with your idea
+Then:
 
 ```
-/build I want an agent that monitors my Shopify store for low-inventory products and automatically drafts restock emails to suppliers
+/build an agent that <your idea>
 ```
 
-Or just describe your idea naturally — the agent-builder will take it from there.
+The **designer** interviews you — for as long as it takes, to the line level — until
+the spec is complete and the engineer confirms it's feasible. You sign off once; then it
+builds, phase by phase, each gated by tests, with the analyst reconciling outcome against
+goal. `/fix` for defects; `/deploy` when it's ready (Render by default).
 
----
-
-## What Happens Next (Fully Automated)
-
-The **agent-builder** orchestrates this sequence:
-
-```
-Your idea
-    ↓
-[spec-writer]     → Asks clarifying questions → Drafts product spec
-    ↓
-[spec-reviewer]   → Checks coherence, flags gaps → Requests revisions
-    ↓
-[spec-writer]     → Iterates until spec is complete
-    ↓
-[tech-designer]   → Proposes tech stack, architecture, data model
-    ↓
-You approve the spec & tech design
-    ↓
-[planner]         → Breaks work into phases (minimal → complete)
-    ↓
-[plan-reviewer]   → Validates plan against spec
-    ↓
-Phase 1: Build the minimal working agent (core loop, no polish)
-    ↓
-[qa-auditor]      → Tests phase 1
-    ↓
-Phase 2, 3, ... : Iterate and expand
-    ↓
-[drift-auditor]   → Ensures code matches spec throughout
-    ↓
-Hand-off to you
-```
-
-**Nothing is skipped.** If a phase fails QA, it stays in that phase until it passes.
-
----
-
-## Development Phases (Default Model)
-
-| Phase | What Gets Built |
-|-------|-----------------|
-| 1 | Domain models + data layer |
-| 2 | Core agent loop (no integrations, stubbed tools) |
-| 3 | First real integration (the "happy path" end-to-end) |
-| 4 | Error handling, retries, resilience |
-| 5 | Remaining integrations |
-| 6 | API / CLI surface |
-| 7 | Basic UI (if needed) |
-| 8 | Integration tests |
-| 9 | Observability + logging |
-| 10 | Polish, documentation, hand-off |
-
-Each phase ends with a commit and passes QA before the next phase begins.
-
----
-
-## Repo Layout
+## Layout
 
 ```
-.claude/
-  agents/           ← Sub-agents (agent-builder, spec-writer, etc.)
-  commands/         ← Slash commands (/build, /spec-check, /plan)
-.github/
-  copilot-instructions.md  ← Global Copilot instructions (mandatory spec reads)
-  agents/           ← Copilot agent mode definitions (drift-auditor, planner, etc.)
-  prompts/          ← Slash-style Copilot prompts (/plan, /challenge, /spec-check)
-  instructions/     ← Scoped auto-applied rules (code-style, secret-hygiene, etc.)
-spec/
-  product/          ← What your agent does (fill this in or let spec-writer do it)
-  engineering/      ← How AI agents should write code for this project (immutable rules)
-    workflows/      ← Step-by-step procedures for each agent/workflow type
-reports/
-  sessions/         ← Auto-generated session logs from every AI coding session
-CLAUDE.md           ← Entry point for Claude Code
-AGENTS.md           ← Entry point for OpenAI Codex / GitHub Copilot
-.env.example        ← Environment variable template
+spec/      the goal     — human-authored intent (product/ + engineering/)
+src/       the action   — the code
+logs/      the outcome  — sessions/, runtime/, analysis/
+harness/   the method   — rules/, method/, roles/, workflows/  (source of truth)
+.claude/   the adapter  — agents, skills, hooks, rules shim
+CLAUDE.md  entry point
 ```
 
----
+## Default stack (editable)
 
-## Manually Editing the Spec
+Python + LangGraph + FastAPI · Next.js UI · SQLite/DuckDB · Anthropic Claude · Render
+(deploy, later). Change it in `spec/engineering/tech-stack.md` — it's part of the goal,
+not the harness.
 
-If you prefer to write the spec yourself before involving AI:
+## Status
 
-1. Open `spec/product/01-vision.md` and fill in the placeholders
-2. Work through each file in `spec/product/` in order
-3. Once the spec is complete, run `/plan` to jump straight to the planning phase
-
----
-
-## Rules That AI Agents Follow
-
-Every AI session in this repo follows the rules in `spec/engineering/ai-agents.md`:
-
-- Read the full spec before writing any code
-- Open a session report at `reports/sessions/`
-- Commit every logical unit of work (never accumulate uncommitted changes)
-- One phase at a time — no skipping
-- Write tests before marking a phase complete
-- Update this README whenever the project layout changes
-
----
-
-## FAQ
-
-**Can I use this without Claude Code?**
-Yes. `AGENTS.md` has the same entry point for OpenAI Codex and GitHub Copilot. The sub-agents are plain markdown files.
-
-**What if my agent needs a database?**
-The spec template includes a data model section. The tech-designer sub-agent will recommend the right database for your use case.
-
-**What if I already have a tech stack in mind?**
-Tell the agent-builder upfront: `/build [idea] — use Python + FastAPI + PostgreSQL`. It will skip the tech design Q&A for those decisions.
-
-**What if something breaks?**
-Each phase is resilient by design. The QA auditor will catch failures before the next phase starts. You can always re-run a phase.
-
----
-
-## Test-Branch Workflow
-
-The recommended way to iterate on this boilerplate:
-
-1. Keep `main` as the clean boilerplate — only spec, engineering rules, and agent config.
-2. For each build attempt, create a numbered test branch: `test-1`, `test-2`, etc.
-3. Give the agent-builder a single-line prompt on the test branch. Let it build.
-4. Review and test the result on that branch.
-5. **Never merge the generated application code back to main.** Test branches are disposable.
-6. If a run surfaces a boilerplate improvement (a clearer spec template, a missing rule), cherry-pick or manually apply that fix to `main`.
-
----
+This repository is the **Zer0 harness** itself. `main` stays harness-only; projects are
+built on feature branches and reach `main` via reviewed PRs
+(`harness/rules/non-negotiables.md`).
 
 ## Contributing
 
-This is a boilerplate, not a framework. Improvements to the spec templates, engineering rules, agent definitions, or workflow specs belong on `main`. Generated application code does not.
+The contribution surface is the harness (rules, method, roles, workflows) and the
+`.claude/` adapter. Generated application code is not.

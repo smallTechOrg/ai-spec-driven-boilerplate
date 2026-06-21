@@ -1,41 +1,39 @@
-# Spec — Single Source of Truth
+# spec — the goal
 
-This directory is the authoritative specification for this project. All code must match this spec. When spec and code disagree, spec wins — fix the code.
+This directory is the human-authored **goal**: what the system should be. It is the
+contract; `src/` conforms to it, and the analyst checks that `logs/` reconciles with it.
+When spec and code disagree, the spec wins — fix the code (unless the spec itself is
+wrong; then amend the spec first).
 
-## Status
-
-Check `spec/product/01-vision.md` to see if the spec has been filled in. If it still contains `<!-- FILL IN -->` markers, the spec-writer sub-agent needs to complete it before any application code is written.
+The **designer** authors this with the user, to the line level, during intake
+(`harness/roles/designer.md`). The method that governs it lives in `harness/`.
 
 ## Structure
 
 ```
 spec/
-  product/            ← What the agent does
-    01-vision.md      ← Purpose, goals, success criteria
-    02-architecture.md← System design, layers, data flow
-    03-capabilities/  ← One file per discrete capability
-    04-data-model.md  ← Data schema
-    05-api.md         ← API surface (REST/GraphQL/CLI/etc.)
-    06-ui.md          ← UI requirements (if any)
-  engineering/        ← How to build it
-    ai-agents.md      ← Rules for ALL AI coding sessions
-    spec-driven.md    ← Spec-first development rule
-    phases.md         ← Phased implementation model
-    tech-stack.md     ← Language, framework, libraries
-    code-style.md     ← Style and structural rules
-    workflows/        ← Repeatable procedures
+  product/            ← WHAT the system does (human-authored)
+    01-vision.md
+    02-architecture.md
+    capabilities/     ← one file per discrete capability
+    04-data-model.md
+    05-api.md
+    06-ui.md
+    07-agent-graph.md ← required for any agent-framework project
+  engineering/        ← HOW this build is done (editable defaults)
+    tech-stack.md     ← chosen stack (default: Python/LangGraph + Next.js + SQLite/DuckDB + Claude)
+    code-style.md
 ```
 
-## Governance Rules
+## Status
 
-1. **Spec first** — no code change without a spec backing it
-2. **One fact, one place** — never duplicate facts across spec files; cross-reference with links
-3. **Capabilities are atomic** — each file in `03-capabilities/` describes exactly one discrete thing the agent can do
-4. **No implementation details in product spec** — `spec/product/` describes WHAT, `spec/engineering/` describes HOW
-5. **Update spec before code** — if requirements change, update the spec first, then update the code
+If `spec/product/01-vision.md` still contains `<!-- FILL IN -->` markers, intake is not
+done — the designer must complete the spec (no placeholders) and designer + engineer +
+qa must sign off before any code is written (`harness/method/lifecycle.md`).
 
-## Who Updates the Spec
+## Governance
 
-- **New project:** spec-writer sub-agent drafts, spec-reviewer validates, you approve
-- **New capability:** use the `/spec-new-capability` command or ask the spec-writer directly
-- **Bug in spec:** any team member can open a PR; spec-reviewer must approve
+1. Spec before code — no `src/` change without a backing `spec/` change.
+2. One fact, one place — cross-reference, don't duplicate.
+3. Capabilities are atomic — one discrete thing per file.
+4. WHAT in `product/`, HOW in `engineering/` — no implementation detail in product.

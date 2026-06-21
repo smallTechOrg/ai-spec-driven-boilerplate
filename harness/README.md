@@ -58,7 +58,8 @@ sense of the truth and corrects course.
 **[layout.md](layout.md)** — repo skeleton, where things go
 
 **[patterns/](patterns/)** — hard-won knowledge
-- [gotchas.md](patterns/gotchas.md) — agentic AI gotchas
+- [working-with-llms.md](patterns/working-with-llms.md) — provider selection, stubs, model lifecycle, error handling
+- [observability.md](patterns/observability.md) — logs, session reports, drift signals, the analyser
 
 ---
 

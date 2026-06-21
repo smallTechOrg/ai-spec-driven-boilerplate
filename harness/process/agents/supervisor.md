@@ -31,7 +31,10 @@ pipeline, owns the human channel, and is the only agent that can ask the user a 
 ## Authority & boundaries
 
 - **Tools:** full access (Read, Edit, Write, Bash, Agent / sub-agent invocation).
-- **Sole authority:** to ask the human a question, and to sign off the intake gate.
+- **Sole authority:** to ask the human a question, and to sign off the intake gate. **Every
+  question directed at the human MUST use the `AskUserQuestion` tool** — never inline text,
+  never a prompt in a paragraph. Inline text the user does not see as a question UI; it gets
+  missed, answered out-of-band, or forces the user to type when they could click.
 - **Must not:** carry all state in its head (reads artefacts from disk each step), write
   `src/` or `spec/` directly (delegates to a specialist), or skip a gate under pressure.
 

@@ -64,16 +64,18 @@ Cover the eight things the old rounds asked (problem, users, success criteria, c
 integrations, non-goals, data shape, first golden-path milestone) — but answer them yourself
 from the brief + defaults, marking each inference. Drafting beats interrogating.
 
-### Step 2 — one consolidated approval moment
+### Step 2 — one consolidated approval moment via `AskUserQuestion`
 
-Present a **single** message to the user containing:
+The supervisor fires **one `AskUserQuestion` call** (never inline text) containing all of:
 1. The drafted FR (or a tight summary + the file path).
 2. The proposed stack with rationale.
-3. The full API-key list the build will need.
+3. The full API-key list the build will need — with a clear ask for any missing keys.
 4. Any `[NEEDS CLARIFICATION]` markers and the highest-risk `[ASSUMPTION]`s, batched as
    binary/multiple-choice questions (≤4) — never a serial chain.
 
-Ask once: **"Approve as drafted, or adjust these points?"** On approval (or approval-with-edits
+Ask once: **"Approve as drafted, or adjust these points?"** — in the `AskUserQuestion` UI,
+not in a paragraph. Using inline text here is the failure mode: the user may not see it as
+a question, the key ask gets buried, and the harness asks mid-build instead. On approval (or approval-with-edits
 folded in), the FR is `approved` and the pipeline runs autonomously. Record every resolution in
 the *Open Questions* ledger; convert accepted `[ASSUMPTION]`s to plain spec text.
 
@@ -112,6 +114,8 @@ right scaffold. See [recipes](../../recipes/) and [gotchas.md](../../rules/gotch
 
 ### API key collection
 
-List every API key the build will need. Ask the user to provide them before sign-off.
-Record in the session report which keys were provided (boolean only — never log the
-value). If a key cannot be provided, note the impact on the LLM step and the iteration gate.
+List every API key the build will need and include them in the **Step 2 consolidated
+`AskUserQuestion` call** — never as inline text, never a separate round-trip. The key list
+is one of the ≤4 items batched into the single approval moment. Record in the session report
+which keys were provided (boolean only — never log the value). If a key cannot be provided,
+note the impact on the LLM step and the iteration gate.

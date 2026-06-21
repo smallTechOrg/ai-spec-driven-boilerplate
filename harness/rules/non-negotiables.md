@@ -54,9 +54,12 @@ override is a deliberate, recorded act, never a silent one.
     three attempts, stop immediately, do not hack around it, and route to the fix
     workflow. The analyser diagnoses; the planner re-scopes.
 
-11. **Collect API keys at intake.** Ask for all required API keys before the build begins.
-    Never ask mid-build. If a key is missing and was not collected at intake, pause and
-    surface to the user — do not continue in a degraded state without telling them.
+11. **Collect API keys at intake, via `AskUserQuestion`.** Ask for all required API keys
+    before the build begins — batched into the one consolidated `AskUserQuestion` call at
+    intake (Step 2 of the researcher script), never as inline text, never mid-build. If a key
+    is missing and was not collected at intake, pause and surface it via `AskUserQuestion` —
+    do not continue in a degraded state without telling the user, and do not ask via inline
+    text they may not notice.
 
 12. **Timestamp every action, and account for the wall-clock.** Each stage **and each step**
     records a wall-clock **start and end time** in its session-report section (and gate commands

@@ -45,6 +45,74 @@ async def test_real_llm_query_returns_answer():
 
 
 @pytest.mark.asyncio
+async def test_agent_surfaces_cancellation_when_large_file_not_confirmed():
+    """IF user does not confirm large-file execution, agent SHALL surface cancellation message."""
+    import csv
+    import tempfile
+    from src.runner import run_agent
+    from src.graph import build_graph
+    from langchain_core.messages import AIMessage, ToolMessage
+
+    def _tc(name, args, tid):
+        return {"id": tid, "name": name, "args": args, "type": "tool_call"}
+
+    def _tool_msgs(messages):
+        return [m for m in messages if isinstance(m, ToolMessage)]
+
+    # FakeModel: get_schema → execute_sql (large file warning returned by tool) →
+    # finish with cancellation message (agent reads the LARGE_FILE_WARNING and aborts)
+    class _AbortModel:
+        def bind_tools(self, tools):
+            return self
+
+        async def ainvoke(self, messages):
+            n = len(_tool_msgs(messages))
+            if n == 0:
+                return AIMessage(content="", tool_calls=[
+                    _tc("get_dataset_schema", {"dataset_id": "ds_large"}, "t1")])
+            if n == 1:
+                # try to execute_sql without confirmation
+                return AIMessage(content="", tool_calls=[
+                    _tc("execute_sql", {"dataset_id": "ds_large", "sql": "SELECT * FROM t"}, "t2")])
+            # n >= 2: execute_sql returned LARGE_FILE_WARNING — agent must cancel
+            last_msg = _tool_msgs(messages)[-1]
+            assert "LARGE_FILE_WARNING" in last_msg.content or "warning" in last_msg.content.lower()
+            return AIMessage(content="", tool_calls=[
+                _tc("finish", {
+                    "answer": "Query cancelled — the dataset is larger than 100 MB. "
+                              "Please confirm to proceed."
+                }, "t3")])
+
+    from src import duck
+    from unittest.mock import patch, MagicMock
+
+    fake_schema = {"tables": [{"table": "t", "columns": [{"name": "x", "type": "BIGINT"}], "sample_rows": []}]}
+
+    with patch.object(duck, "dataset_path", return_value="/fake/large.duckdb"), \
+         patch.object(duck, "dataset_schema", return_value=fake_schema), \
+         patch("src.tools.os.path.getsize", return_value=110 * 1024 * 1024), \
+         patch("src.tools.os.path.exists", return_value=True):
+        result = await run_agent(
+            goal="Show all rows",
+            dataset_id="ds_large",
+            model=_AbortModel(),
+        )
+
+    assert result["status"] == "completed"
+    answer_lower = result["answer"].lower()
+    assert "cancel" in answer_lower or "large" in answer_lower or "100" in answer_lower
+
+
+@pytest.mark.asyncio
+async def test_domain_prompt_instructs_ambiguous_clarification():
+    """IF question is ambiguous, agent SHALL ask one clarifying question (DOMAIN_PROMPT verified)."""
+    from src.runner import DOMAIN_PROMPT
+    prompt_lower = DOMAIN_PROMPT.lower()
+    # Rule 12 must be present: clarifying question when column not found
+    assert "clarif" in prompt_lower or "which column" in prompt_lower or "ambiguous" in prompt_lower
+
+
+@pytest.mark.asyncio
 async def test_large_file_warning_returned_by_execute_sql_tool():
     """WHEN SQL would scan file > 100 MB, execute_sql SHALL return LARGE_FILE_WARNING."""
     from src.tools import execute_sql

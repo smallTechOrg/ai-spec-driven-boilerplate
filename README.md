@@ -24,6 +24,14 @@ uv run python -m src
 The server starts in **stub mode** (no LLM calls) when `ANALYST_LLM_API_KEY` is blank.
 `GET /health` returns `stub_mode: true` in that case — safe for offline tests and CI.
 
+**With frontend:**
+
+```bash
+# In a second terminal
+cd frontend && npm install && npm run dev
+# open http://localhost:3000
+```
+
 ## .env setup
 
 All variables use the `ANALYST_` prefix (read by `src/config.py` via pydantic-settings).
@@ -42,11 +50,19 @@ All variables use the `ANALYST_` prefix (read by `src/config.py` via pydantic-se
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/health` | Liveness probe — returns `stub_mode: true/false` |
-| `POST` | `/runs` | Submit a natural-language goal, get answer + chart |
-| `POST` | `/upload` | Upload a CSV/JSON file — creates a dataset |
-| `GET` | `/datasets` | List ingested datasets |
-| `GET` | `/datasets/{id}` | Dataset detail and schema |
-| `GET` | `/traces` | Run/span timeline (server-rendered, no JS) |
+| `POST` | `/datasets` | Create a named dataset (returns `{id, name}`) |
+| `POST` | `/datasets/{id}/files` | Upload one CSV/JSON file into a dataset |
+| `POST` | `/datasets/upload` | Convenience: create dataset + upload file in one step |
+| `GET` | `/datasets` | List datasets — returns name, file_format, row_count, upload_timestamp |
+| `GET` | `/datasets/{id}` | Dataset detail, schema, and column list |
+| `GET` | `/datasets/{id}/summary` | Column stats (numeric min/max/avg, categorical top values) |
+| `POST` | `/runs` | NL goal → SQL → answer + Plotly chart spec (+ dashboard_specs) |
+| `POST` | `/runs/stream` | Same as `/runs` but SSE token stream |
+| `GET` | `/sessions` | List conversation sessions |
+| `GET` | `/sessions/{id}` | Session detail + ordered run history + token totals |
+| `GET` | `/sessions/{id}/audit` | SQL audit log — one row per execute_sql call |
+| `GET` | `/runs/{id}/spans` | Observability spans for a run |
+| `GET` | `/traces` | Run/span timeline (server-rendered HTML) |
 
 ## Structure
 

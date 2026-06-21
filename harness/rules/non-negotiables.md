@@ -18,22 +18,14 @@ only a few rules, remember these.
    written, from the directory stated. Test them before marking work done. A README that
    lies is worse than no README.
 
-5. **Commit then push — always.** `git commit` and `git push` are one indivisible
-   action. A commit that is not pushed does not exist. (Enforced by a hook; see
-   `git-and-delivery.md`.)
+5. **Git discipline.** Stage specific files only — never `git add -A`. Commit and push
+   are one indivisible action; a commit that is not pushed does not exist. All code
+   lives on a feature branch and reaches `main` only via a reviewed PR; open the PR
+   before the first feature-branch commit. (See `git-and-delivery.md`.)
 
-6. **Never `git add -A` / `git add .`** — stage specific files. Bulk staging sweeps in
-   stray files from prior work and poisons the commit.
-
-7. **All code lives on a feature branch and reaches `main` only via a reviewed
-   PR.** Open the PR before the first feature-branch commit. (See `git-and-delivery.md`.)
-
-8. **One phase at a time.** Never start phase N+1 while phase N is failing. Each phase
+6. **One phase at a time.** Never start phase N+1 while phase N is failing. Each phase
    runs end-to-end and passes its gate first. (See `../process/lifecycle.md`.)
 
-9. **The loop must close before you stop.** Before ending any unit of work: spec ↔ src ↔
+7. **The loop must close before you stop.** Before ending any unit of work: spec ↔ src ↔
    logs reconcile, tests pass, the tree is clean, the branch is pushed, and the session
    report in `logs/sessions/` is up to date.
-
-10. **Generate only what is needed.** Build what the spec says, nothing more. Note future
-    ideas in the session report and move on.

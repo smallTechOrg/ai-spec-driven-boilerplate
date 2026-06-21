@@ -11,8 +11,8 @@ The harness views the ideal SDD process as made up of four fundamental layers:
 
 | Layer     | Question                                          | Artefacts |
 |-----------|---------------------------------------------------|-----------|
-| Intention | what should this system be?                       | Spec      |
-| Action    | what is the system designed to do right now?      | Code      |
+| Intention | what should this system do?                       | Spec      |
+| Action    | what is the system designed to do?      | Code      |
 | Outcome   | what does the system actually do?                 | Logs      |
 | Awareness | how do we get the system to do what it should do? | Harness   |
 
@@ -60,8 +60,9 @@ The supervisor co-ordinates this team of specialists based on the goal, task and
 | Path          | Purpose                                                                 |
 |---------------|-------------------------------------------------------------------------|
 | `rules/`      | Non-negotiable rules — what the harness enforces                        |
-| `process/`    | How work flows — lifecycle, reconcile, handoffs, layout, roles, workflows |
+| `process/`    | How work flows — iteration driven, roles, workflows |
 | `patterns/`   | Hard-won gotchas, recipes, and framework-specific knowledge             |
 
 The `.claude/` folder at the repo root is a thin adapter binding this harness to Claude Code.
 `harness/` is the source of truth; `.claude/` should never diverge from it.
+If there is similar file in `spec/` folder as in `harness/`, feel free to give that more important.

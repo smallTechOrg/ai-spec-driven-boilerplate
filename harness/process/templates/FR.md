@@ -52,12 +52,14 @@
 
 ## Non-Goals
 
-> What is explicitly out of scope for this FR? Anything **split out to keep this delivery
-> lovable-not-bloated** is named here with its follow-up FR number and `(proposed)` status — a
-> traceable pointer, never a vague "later."
+> What is explicitly out of scope for this FR? The 30-minute ceiling is hard — anything that
+> would push the build past it is split out here. **No idea gets dropped:** concrete excess goes
+> to a numbered `proposed` FR; directional excess goes to `spec/ROADMAP.md`. Name the
+> destination — a vague "later" is not acceptable.
 
-- <!-- Deferred scope → name the FR: "Multi-chart dashboards → FR-002 (proposed)" -->
-- <!-- e.g. "Authentication — not required for this milestone" -->
+- <!-- Concrete excess → "Multi-chart dashboards → FR-002 (proposed)" -->
+- <!-- Directional excess → "Real-time collaboration → spec/ROADMAP.md" -->
+- <!-- Out-of-scope by design → "Authentication — not required for this milestone" -->
 
 ## Key Constraints
 

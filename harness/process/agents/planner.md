@@ -133,18 +133,19 @@ The slowest build's churn (a renderer scheduled *after* its data; frontend split
 persistence it depended on; dead code never sequenced for cleanup) traces to a plan no one
 reviewed. Before handoff, apply these and end with **Proceed / Revise**:
 
-- **Scope DOWN, not OUT — with one sanctioned escape.** The default is unchanged: the iteration
-  ships *every* named capability minimally, end to end — shrink each capability, never silently
-  drop one to a "later iteration." **The one exception:** if even the minimal forms together would
-  over-build the first delivery — bloat it, blow the one-iteration budget, or delay the user's
-  first delightful test — flag a **scope-overflow** to the supervisor. The split must leave a
-  **core that independently delights** (a coherent, demoable, genuinely valuable end-to-end whole),
-  and move only the *excess* (secondary / advanced capabilities) to a follow-up **`proposed` FR**
-  the researcher authors and the user approves *after* testing the core. The planner only *flags*
-  the overflow with a proposed core/excess line; it does not author the FR (requirements are the
-  researcher's, human-gated by the supervisor). Aim for **Minimal Lovable, not Minimal** and not
-  bloated — enough to wow, no more. A vague deferral is still forbidden; only a numbered
-  `proposed` FR counts.
+- **Scope DOWN, not OUT — 30 minutes is the hard ceiling.** The iteration must be deliverable
+  in ≤ 30 minutes of wall-clock (the benchmark target). Shrink every capability to its minimal
+  lovable form, but ship them all. If the step DAG's critical path still exceeds 30 minutes after
+  scoping DOWN, that is a **scope-overflow**: flag it to the supervisor before dispatching any
+  executor. The planner proposes a core/excess split — one line each — and the supervisor gates
+  it with the user. **No good idea gets dropped** — excess scope goes to one of two places:
+  - **Concrete excess** (clear deliverable, testable): the researcher authors a numbered
+    `proposed` FR (e.g. FR-002) — fully specced, status `proposed`, enters the pipeline only
+    when the user promotes it to `approved` after testing the core.
+  - **Directional excess** (real idea, not yet concrete): a row in `spec/ROADMAP.md` — parked,
+    not lost, promoted to a `proposed` FR when it crystallises.
+  A vague "later" with no FR number and no roadmap entry is still forbidden. The planner only
+  *flags* the overflow; it does not author FRs or edit the roadmap (those are the researcher's).
 - **A renderer ships in the same step-group as its data.** Never return a table/chart in one
   step and render it later (that caused the raw-`<pre>` carry-forward).
 - **Maximise the parallel front.** Every step you can make independent is wall-clock saved —

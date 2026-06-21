@@ -31,6 +31,15 @@ One file per discrete request. Empty until work begins.
 
 The researcher authors these; the supervisor signs them off before any code is written.
 
+## ROADMAP.md
+
+Deferred scope and future ideas — two tiers:
+- **`proposed` FRs** in `features/` (fully specced, waiting for user approval after the core ships)
+- **Parked ideas** in `spec/ROADMAP.md` (directional, not yet concrete enough to spec)
+
+No idea gets dropped. The 30-minute build ceiling is hard; anything that would push past it is
+named here or in a `proposed` FR — never a vague "later."
+
 ## patterns/
 
 Two kinds of files live here, flat:

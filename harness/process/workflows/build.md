@@ -34,7 +34,7 @@ into a testable whole.
 The arrow order above is a *dependency order*. The supervisor **runs it as a swarm**: wherever
 steps are independent it spawns parallel executors and gathers at the iteration gate (see
 [supervisor.md](../agents/supervisor.md) → Swarm orchestration). In particular:
-- intake research probes + `spec/patterns/` usage-spec reads run concurrently;
+- intake research probes + `harness/patterns/` usage-spec reads run concurrently;
 - independent **steps run as parallel executors** (separate worktrees / disjoint paths);
 - the **frontend is a first-class step** — built alongside its backend data within the same
   iteration, never bolted on at the end;
@@ -48,7 +48,7 @@ file.
 
 | Stage      | Reads                            | Writes                                          |
 |------------|----------------------------------|-------------------------------------------------|
-| researcher | user's brief                     | `spec/features/FR-NNN.md`, `spec/rules/`        |
+| researcher | user's brief                     | `spec/features/FR-NNN.md`, `harness/rules/`        |
 | planner    | `spec/`                          | FR Step Plan (DAG) + seeded Progress Tracker rows |
 | executor   | `spec/`, FR step plan            | `src/`, `tests/`, recipe scaffold, FR tracker row |
 | reviewer   | `spec/`, `src/`, `tests/`        | acceptance tests, sign-off, FR tracker row      |

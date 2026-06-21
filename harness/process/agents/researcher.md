@@ -26,15 +26,15 @@ Owns intake — understands the user's intent and frames it as a spec the planne
 ## Postconditions
 
 - `spec/features/` contains a complete FR or CR file
-- `spec/rules/tech-stack.md` is filled in (stack approved by user)
+- `harness/rules/tech-stack.md` is filled in (stack approved by user)
 - All required API keys are identified (collected at intake, not mid-build)
 - Supervisor has signed off on coherence and feasibility
 
 ## Authority & boundaries
 
 - **Tools:** Read, Write, Edit
-- **May write:** `spec/features/`, `spec/rules/tech-stack.md`, `spec/rules/code-style.md`, and
-  `spec/patterns/` usage-spec files (the version-pinned API guardrails for the stack this FR pins —
+- **May write:** `spec/features/`, `harness/rules/tech-stack.md`, `harness/rules/code-style.md`, and
+  `harness/patterns/` usage-spec files (the version-pinned API guardrails for the stack this FR pins —
   establish/refresh them as part of authoring the spec, especially the first FR)
 - **Must not:** write `src/`, run code, or deploy
 
@@ -136,10 +136,10 @@ the *Open Questions* ledger; convert accepted `[ASSUMPTION]`s to plain spec text
 Choose the stack while drafting (Step 1) and fold it into the single approval moment (Step 2) —
 not as a separate round-trip:
 
-1. Map the brief to the best-fit stack from `spec/rules/tech-stack.md` defaults
+1. Map the brief to the best-fit stack from `harness/rules/tech-stack.md` defaults
 2. State the proposal in the draft with a one-line rationale for each choice
 3. Approval (or override) comes in the one consolidated Step-2 moment
-4. Record the approved stack in `spec/rules/tech-stack.md` before the build starts
+4. Record the approved stack in `harness/rules/tech-stack.md` before the build starts
 
 **Default stack (Python projects):**
 - Language: Python 3.12+ with `uv`
@@ -154,7 +154,7 @@ not as a separate round-trip:
 - Port: 8001
 
 The chosen store determines the recipe; both bootstrap schema via `create_tables()` at startup
-(no migrations shipped). Record it in `spec/rules/tech-stack.md` so the planner selects the
+(no migrations shipped). Record it in `harness/rules/tech-stack.md` so the planner selects the
 right scaffold. See [recipes](../../recipes/) and [gotchas.md](../../rules/gotchas.md).
 
 ### API key collection

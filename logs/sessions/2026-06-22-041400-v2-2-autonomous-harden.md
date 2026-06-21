@@ -12,8 +12,9 @@
 |---|-------|-------|-------|
 | 1 | Spec redesign (design+author+review+audit+coord) | **DONE** | wf_c45fb59f-fb8 — 7 spec docs authored (4-5/5), coord model decided |
 | 2 | Recipes: audit + generify (de-data-chat, copy-and-run) | **DONE** | wb4ywy872 — generic `echo` slice, stub-default LLM, all 3 verify green |
-| 3 | Apply: harmonize 7 spec docs to 5/5 + migrate harness FR→logs/PLAN.md + verify | **running** | wffd38et9 (background) |
-| 4 | Simulate building 3 diverse agents end-to-end; capture what breaks | pending | needs R2+R3 |
+| 3 | Apply: harmonize 7 spec docs to 5/5 + migrate harness FR→logs/PLAN.md + verify | **DONE** | wffd38et9 — verify clean (0 dangling). Committed 76a5db7, pushed. |
+| 3b | Restore missing /build skill shim + open v2 ref PR | **DONE** | .claude/skills/build/SKILL.md created; PR #44 (v2.2→v2) |
+| 4 | Simulate building 3 diverse agents end-to-end; capture what breaks | pending — user back, checking in | needs go-ahead |
 | 5 | Fix harness + recipes from sim findings | pending | needs R4 |
 | 6+ | Re-simulate → fix → raise bar until convergence | pending | loop |
 

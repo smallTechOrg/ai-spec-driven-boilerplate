@@ -7,6 +7,9 @@ Owns intake — understands the user's intent and frames it as a spec the planne
 - Runs the intake conversation (questions posed by the supervisor — only the supervisor
   owns the human channel)
 - Writes the FR or CR file using the template in `harness/process/templates/`
+- Writes **Success Criteria in EARS form** — each one testable, one acceptance test each
+- Writes **`[NEEDS CLARIFICATION: question]` inline instead of guessing**. Never silently
+  invents a requirement. All markers are resolved in one bounded clarify pass (below).
 - Proposes a tech stack and collects all required API keys before sign-off
 - Does not over-specify — elicit enough to act; the loop catches the rest
 
@@ -63,15 +66,18 @@ These prevent the most common mid-build surprises.
 8. **What is the first thing the user should be able to do after Phase 2?**
    *The golden-path scenario that proves the core loop works.*
 
-### Round N — adaptive (as needed)
+### Round N — the bounded clarify pass
 
-Continue asking until one of:
-- The FR template is fully filled in with no open questions blocking the build
-- The user explicitly says "go ahead" or "let's start"
+Draft the FR first, writing `[NEEDS CLARIFICATION: …]` wherever you would otherwise guess.
+Then resolve **all** markers in **one** batched pass — present them together as
+binary/multiple-choice questions through the supervisor, not as a long back-and-forth chain
+(the owner dislikes question chains; markers batch into a single decision moment). Record
+each resolution in the FR's *Open Questions* ledger. An FR is not `approved` while any
+marker is unresolved.
 
-If the user says "go ahead" before all gaps are resolved:
+If the user says "go ahead" before all markers are resolved:
 - Fill what you can from the conversation
-- Document unresolved questions in the FR's Open Questions section
+- Leave the unresolved markers in *Open Questions* with the risk each one carries
 - Inform the user of the specific risks they are accepting by proceeding early
 - Get explicit confirmation before handing off to the planner
 
@@ -88,10 +94,16 @@ After Round 1, propose a tech stack:
 - Language: Python 3.12+ with `uv`
 - Framework: FastAPI
 - Agent framework: LangGraph (if agent loop needed)
-- Database: PostgreSQL (SQLite/DuckDB for analytics/local-only)
+- Database — pick by workload, both are first-class (each has its own recipe):
+  - **DuckDB** (`python-fastapi-duckdb`) — analytics / local-first / CSV-Parquet-JSON-Excel
+  - **PostgreSQL** (`python-fastapi-postgres`) — transactional / multi-user / relational
 - Frontend: Next.js (if UI needed)
 - Deploy: local demo → Render (on request)
 - Port: 8001
+
+The chosen database determines the recipe and the stack-conditional Iteration 0 (DuckDB has
+no Alembic step) — record it in `spec/rules/tech-stack.md` so the planner selects the right
+scaffold. See [recipes](../../recipes/) and [gotchas.md](../../rules/gotchas.md).
 
 ### API key collection
 

@@ -1,4 +1,4 @@
-import json
+import json as _json
 from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
@@ -13,6 +13,8 @@ class AnalystState(TypedDict):
     plan: str
     sql: str
     intent: str          # "table" | "chart"
+    x_col: str
+    y_col: str
     raw_rows: list
     columns: list[str]
     response: dict
@@ -31,11 +33,13 @@ def plan_node(state: AnalystState) -> dict:
         "and for chart: x_col, y_col."
     )
     raw = llm.complete(prompt, system="You are a senior data analyst.")
-    parsed = json.loads(raw)
+    parsed = _json.loads(raw)
     return {
         "intent": parsed.get("intent", "table"),
         "sql": parsed.get("sql", ""),
         "plan": raw,
+        "x_col": parsed.get("x_col", ""),
+        "y_col": parsed.get("y_col", ""),
     }
 
 
@@ -44,9 +48,11 @@ def query_data_node(state: AnalystState) -> dict:
     conn = get_db()
     try:
         df = conn.execute(state["sql"]).fetchdf()
+        # Round-trip through JSON to convert numpy types → Python natives
+        records = _json.loads(df.to_json(orient="split"))
         return {
-            "raw_rows": df.values.tolist(),
-            "columns": list(df.columns),
+            "raw_rows": records["data"],
+            "columns": records["columns"],
         }
     finally:
         conn.close()
@@ -55,17 +61,29 @@ def query_data_node(state: AnalystState) -> dict:
 def respond_node(state: AnalystState) -> dict:
     """Format the response based on intent."""
     if state["intent"] == "chart":
+        cols = state["columns"]
+        x_col = state.get("x_col") or (cols[0] if cols else "x")
+        y_col = state.get("y_col") or (cols[1] if len(cols) > 1 else "y")
+
+        x_idx = cols.index(x_col) if x_col in cols else 0
+        y_idx = cols.index(y_col) if y_col in cols else (1 if len(cols) > 1 else 0)
+
         response = {
             "type": "chart",
             "plotly_spec": {
                 "data": [
                     {
                         "type": "bar",
-                        "x": [r[0] for r in state["raw_rows"]],
-                        "y": [r[1] for r in state["raw_rows"]],
+                        "x": [r[x_idx] for r in state["raw_rows"]],
+                        "y": [r[y_idx] for r in state["raw_rows"]],
+                        "name": y_col,
                     }
                 ],
-                "layout": {"title": state["question"]},
+                "layout": {
+                    "title": state["question"],
+                    "xaxis": {"title": x_col},
+                    "yaxis": {"title": y_col},
+                },
             },
         }
     else:

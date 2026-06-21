@@ -27,6 +27,8 @@ async def query(req: QueryRequest):
             "plan": "",
             "sql": "",
             "intent": "table",
+            "x_col": "",
+            "y_col": "",
             "raw_rows": [],
             "columns": [],
             "response": {},

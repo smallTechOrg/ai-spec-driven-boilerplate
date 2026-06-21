@@ -10,6 +10,7 @@ class AnalystState(TypedDict):
     question: str
     session_id: str
     datasets: list[str]
+    history: list[dict]   # [{"role": "user"|"assistant", "content": str}]
     plan: str
     sql: str
     intent: str          # "table" | "chart"
@@ -25,8 +26,14 @@ def plan_node(state: AnalystState) -> dict:
     from src.integrations.llm import get_llm_client
 
     llm = get_llm_client()
+
+    history_text = ""
+    for msg in state.get("history", [])[-6:]:  # last 3 turns
+        history_text += f"{msg['role'].upper()}: {msg['content']}\n"
+
     datasets_info = ", ".join(state["datasets"]) if state["datasets"] else "none"
     prompt = (
+        f"{history_text}"
         f"Datasets available: {datasets_info}\n"
         f"User question: {state['question']}\n"
         "Return JSON with keys: intent (table|chart), sql, "

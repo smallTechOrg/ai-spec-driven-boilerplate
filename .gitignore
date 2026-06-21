@@ -11,4 +11,14 @@ build/
 *.egg-info/
 .DS_Store
 *.log
-logs/
+logs/runtime/
+
+# recipe runtime artifacts (created by scaffold verification — never committed)
+*.duckdb
+*.db
+*.db-shm
+*.db-wal
+checkpoints.db
+data/
+.pytest_cache/
+.ruff_cache/

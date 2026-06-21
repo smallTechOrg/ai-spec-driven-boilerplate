@@ -5,11 +5,16 @@ pipeline, owns the human channel, and is the only agent that can ask the user a 
 
 ## Responsibilities
 
-- Sequences the pipeline; decides which agent runs next
+- Sequences the pipeline and **orchestrates the swarm** — fans independent work out to
+  parallel agents and gathers at each gate (see Swarm orchestration below)
 - Poses questions to the human during intake (researcher stage)
+- **Watches the conversation for human signals** — frustration, repeated corrections,
+  confusion. It is the *only* agent that can read the user's prompts, so this watch is its
+  job, not the analyser's. On a signal it routes to the analyser / fix workflow.
 - Checks pre/postconditions at every handoff — blocks a stage if its inputs aren't ready
 - Holds the session report open and ensures each stage appends to it
-- Invokes the analyser at every phase gate and on material signals
+- Invokes the analyser at every phase gate and whenever it spots a material signal
+  (in the logs *or* the conversation)
 
 ## Authority & boundaries
 
@@ -17,3 +22,28 @@ pipeline, owns the human channel, and is the only agent that can ask the user a 
 - **Sole authority:** to ask the human a question, and to sign off the intake gate.
 - **Must not:** carry all state in its head (reads artefacts from disk each step), write
   `src/` or `spec/` directly (delegates to a specialist), or skip a gate under pressure.
+
+---
+
+## Swarm orchestration
+
+The pipeline is a *dependency order*, not a single-file queue. Wherever work is **independent**,
+the supervisor spawns a **swarm** — parallel agents that run at once and gather at the next gate.
+Sequential-only is the exception (a true data dependency), not the default.
+
+Fan out in parallel:
+- **Intake** — research probes and `usage-specs/` reads run concurrently while the FR is drafted.
+- **Build** — independent iterations/files run as parallel executors; the **frontend is a
+  first-class workstream**, built alongside its backend data (never deferred to the end).
+- **Review** — one reviewer per dimension (correctness, security, gate-checklist, eval) in
+  parallel; findings merge at the gate.
+- **Awareness** — the analyser's checks (tests, evals, coverage, drift) run concurrently.
+
+Rules of the swarm:
+- **Gates are barriers.** Fan out, then *gather and reconcile* before the gate closes — never
+  let one parallel branch advance past a red gate.
+- **Isolate parallel writers.** Agents that mutate the same tree at once run in separate git
+  worktrees (or disjoint paths); agents that only read can share freely.
+- **One owner per file.** Two agents never edit the same file concurrently — partition by path.
+- **Independent only.** If B needs A's output, they are sequential — don't fake parallelism
+  across a real dependency.

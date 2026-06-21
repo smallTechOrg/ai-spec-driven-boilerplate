@@ -55,18 +55,22 @@ sense of the truth and corrects course.
 - [non-negotiables.md](rules/non-negotiables.md) — the rules that must survive context compression
 - [spec-driven.md](rules/spec-driven.md) — spec-before-code discipline
 - [git-and-delivery.md](rules/git-and-delivery.md) — branching, commits, PRs
-- [testing.md](rules/testing.md) — gate tests, smoke tests, evidence
+- [testing.md](rules/testing.md) — gate tests, smoke tests, evals, evidence
 - [secret-hygiene.md](rules/secret-hygiene.md) — env vars, keys, `.env`
+- [gotchas.md](rules/gotchas.md) — encoded institutional memory: the traps real builds hit, with stable IDs
 
 **[process/](process/)** — how work flows
 - [README.md](process/README.md) — agents, workflows, pipeline overview
 - [agents/](process/agents/) — supervisor, researcher, planner, executor, reviewer, deployer, analyser
 - [workflows/](process/workflows/) — build, fix, deploy
 **[layout.md](layout.md)** — repo skeleton, where things go
+**[recipes/](recipes/)** — proven, version-stamped runnable scaffolds (python-fastapi-sqlite, python-fastapi-duckdb, frontend-nextjs)
 
 **[patterns/](patterns/)** — hard-won knowledge
 - [working-with-llms.md](patterns/working-with-llms.md) — provider selection, stubs, model lifecycle, error handling
 - [observability.md](patterns/observability.md) — logs, session reports, drift signals, the analyser
+- [engineering.md](patterns/engineering.md) — fundamental software-engineering principles
+- [usage-specs/](patterns/usage-specs/) — version-pinned API-shape guardrails (fastapi, langgraph, google-genai, …)
 
 ---
 

@@ -19,9 +19,21 @@ the analyser can audit.
 
 ## When requirements change
 
-1. Update the spec first (researcher), with engineer feasibility and reviewer testability.
-2. Then update `src/`.
-3. The analyser confirms `logs/` reconciles with the amended spec.
+1. Write a **CR as a delta** (ADDED / MODIFIED / REMOVED) against the existing spec —
+   not a fresh spec. (`harness/process/templates/CR.md`.)
+2. Update `src/` to satisfy the delta.
+3. **Archive/merge:** when the CR lands, fold its delta back into the FR/spec baseline so
+   `spec/` reflects current reality, and mark the CR `done`.
+4. The analyser confirms `logs/` reconciles with the amended baseline.
+
+### The archive/merge step is load-bearing
+
+This is the step every competing SDD tool skips, and it is exactly where reconciliation
+breaks: if an applied CR is never merged into the baseline, `spec/` slowly stops describing
+the system, and "does the code match the spec?" becomes unanswerable. **A reconciliation
+rule with no enforced merge + check is just a wish.** The merge is mandatory, not optional;
+the analyser's drift check (see [observability.md](../patterns/observability.md)) verifies it
+held.
 
 
 ## Spec vs. implementation conflicts

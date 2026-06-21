@@ -12,7 +12,8 @@ where they are the established default.
   stack (backend, frontend, scripts, data pipelines).
 - **Tests live in `tests/` at the repo root** — co-located with `src/`, not inside it.
   (Python/pytest convention; stack recipes may vary for other languages.)
-- **Runtime output goes to `logs/`** — never committed; gitignored entirely.
+- **Outcome goes to `logs/`** — `runtime/` is gitignored (live data); `sessions/` and
+  `analysis/` are **committed** (the durable record of decisions and the analyser's drift findings).
 - **The spec is the contract** — `src/` conforms to `spec/`, never the reverse.
 
 ---
@@ -38,9 +39,10 @@ tests/           all tests
   unit/          fast, no network, no DB
   integration/   requires DB; automated setup via conftest.py
   e2e/           golden-path smoke tests
+evals/           golden cases (input + approved output) + threshold + runner — same defs local/gate/CI
 
-logs/            gitignored — runtime/, sessions/, analysis/
-harness/         the method — rules/, process/, patterns/
+logs/            runtime/ (gitignored, live data) · sessions/ + analysis/ (committed)
+harness/         the method — rules/, process/, patterns/, recipes/
 .claude/         thin Claude Code adapter
 CLAUDE.md        entry point
 README.md        what this project is — overview, setup, usage, config, dev
@@ -55,7 +57,8 @@ These apply to all Python builds using this harness:
 - **Package manager:** `uv` — dependencies in `pyproject.toml`
 - **Entry point:** `src/__main__.py` — starts the server on port 8001
 - **Config:** `src/config.py` using `pydantic-settings`; loaded once, validated at startup
-- **DB migrations:** `alembic` — `alembic upgrade head` is the Phase 1 gate command
+- **Schema:** `create_tables()` at startup (SQLAlchemy `create_all`) — no migrations shipped;
+  add `alembic` only if you need schema evolution
 - **Tests:** `uv run pytest` from the repo root
 - **Linting:** `uv run ruff check .`
 - **Stubs:** `APPNAME_LLM_PROVIDER=stub` env var enables stub mode; stub mode adds a

@@ -4,9 +4,14 @@ Closes the loop — observes reality and reconciles it against the goal.
 
 ## Responsibilities
 
-- Reads `logs/runtime/`, test results, gate results, timings, and the user's own prompts
+- **Runs** the drift checks with Bash — the gate test, the `evals/` set, a coverage grep
+  (every `src/` module maps to a spec section; every EARS criterion has a test), and a
+  `git`/spec check for unmerged CRs. It does not just assert reconciliation; it executes it.
+- Reads `logs/runtime/`, the session report, and the gate/eval output (it **cannot** read the
+  conversation — human signals reach it only via the supervisor, below)
 - Compares outcome (`logs/`) against goal (`spec/`) and action (`src/`)
-- Writes findings and reconciliation reports to `logs/analysis/`
+- Writes a findings file to `logs/analysis/` **on every invocation** — including
+  "converged, no drift" when clean, so the folder is never silently empty
 - Routes drift to the right correction:
   - `spec ≠ src` → route to executor
   - `src ≠ logs` → route to fix workflow
@@ -14,24 +19,50 @@ Closes the loop — observes reality and reconciles it against the goal.
 - Never silently edits the goal
 - Exits when `spec ↔ src ↔ logs` agree and nothing is outstanding
 
-## Standing mandate
+## Who watches — the analyser does not "always watch"
 
-The analyser is always watching. The supervisor invokes it:
-- At every phase gate
-- On material signals: errors, flaky tests, slow generations, repeated user frustration
+The analyser is a memoryless sub-agent: it cannot see the conversation, so it cannot notice
+user frustration on its own. **That watch belongs to the supervisor** (the root session, the
+only agent that reads the user's prompts — see `supervisor.md`). The supervisor invokes the
+analyser:
+- At every phase gate (always), and
+- Whenever the supervisor spots a material signal — in the **logs** (errors, flaky tests, slow
+  runs) or in the **conversation** (frustration, repeated corrections, confusion).
+
+The analyser then runs its checks and reports. It is invoked-on-signal, not self-watching.
 
 ## Preconditions
 
-- Deployment has run (logs exist to read)
+- A gate has been reached, or the supervisor routed a signal here (logs/tests exist to read)
 
 ## Postconditions
 
-- `logs/analysis/` updated with findings
+- `logs/analysis/<NNN>-<gate>.md` written this invocation (findings, or "converged, no drift")
 - Either convergence confirmed, or a concrete correction routed
 
 ## Authority & boundaries
 
-- **Tools:** Read, Write.
+- **Tools:** Read, Write, **Bash** (to *run* the read-only checks — tests, evals, coverage
+  greps, `git`). Bash is for observing, never for changing.
 - **May write:** `logs/analysis/` and proposed `spec/` amendments (for approval).
-- **Must not:** silently edit the goal (`spec/`) or the action (`src/`). It observes and
-  proposes; others change.
+- **Must not:** edit the goal (`spec/`) or the action (`src/`) — even with Bash. It runs
+  checks and proposes; others change.
+
+---
+
+## Drift is checked, not just asserted
+
+Reconciliation with no executable check collapses SDD back into documentation-driven
+development. At every phase gate the analyser runs at least one mechanical check, not a prose
+opinion:
+
+- **Coverage:** every EARS Success Criterion maps to ≥1 passing acceptance test; every `src/`
+  module maps to a spec section. An orphan on either side is drift.
+- **Merge integrity:** every `done` CR's delta was folded into the spec baseline (no applied
+  change left un-merged — the silent reconciliation break).
+- **Behaviour:** the `evals/` golden set passes at threshold; trajectory signals (turn /
+  tool-call / token counts) are within budget.
+
+Concrete techniques: schema validation, contract tests, payload inspection, spec-diffs. See
+[observability.md](../../patterns/observability.md). The check's exit status is the verdict —
+"it should reconcile" is not a result.

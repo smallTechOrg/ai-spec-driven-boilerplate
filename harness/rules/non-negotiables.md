@@ -3,6 +3,10 @@
 These rules are never optional and must survive context compression. If you can remember
 only a few rules, remember these.
 
+**Cite on override.** These rules are numbered so they can be cited. Overriding any one
+requires naming its number and logging a one-line justification in the session report — an
+override is a deliberate, recorded act, never a silent one.
+
 1. **Humans own the goal.** No code is written until the spec is complete enough to act
    and the supervisor has reviewed it (with researcher, executor feasibility, reviewer
    testability). Elicit as much as needed — the loop catches the rest.
@@ -12,7 +16,9 @@ only a few rules, remember these.
    then build. (See `spec-driven.md`.)
 
 3. **Outcome is evidence.** Never claim a test passed without running it. "It should
-   work" is not a result. Show the output, or say you couldn't run it.
+   work" is not a result. Show the output, or say you couldn't run it. Tests run against the
+   **production data driver** (never a SQLite stand-in), and a green stub run is paired with
+   golden-case **evals** — coverage is not correctness.
 
 4. **Docs must be true.** Every command in the README and docs must work exactly as
    written, from the directory stated. Test them before marking work done. A README that
@@ -31,8 +37,8 @@ only a few rules, remember these.
    - Session report is updated with what was done and what is next
 
 7. **The loop must close before you stop.** Before ending any unit of work: spec ↔ src ↔
-   logs reconcile, tests pass, the tree is clean, the branch is pushed, and the session
-   report in `logs/sessions/` is up to date.
+   logs reconcile (the drift check is clean), tests and evals pass, the tree is clean, the
+   branch is pushed, and the session report in `logs/sessions/` is up to date.
 
 8. **Done means the user says done.** Tests passing and reviewer sign-off are necessary
    but not sufficient. A phase is complete only when the user has explicitly accepted it.

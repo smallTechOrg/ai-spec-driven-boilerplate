@@ -102,10 +102,11 @@ focused on the golden path.
 Tests should assert what the system does from the outside, not how it does it. A test
 that breaks when you rename a private function is a test that costs more than it earns.
 
-### Same DB as Production
-If production uses PostgreSQL, tests use PostgreSQL. A test suite that passes on SQLite
-and fails on Postgres is not a passing test suite — it is a false signal. See
-[spec/rules/](../../spec/rules/) for the gate rule.
+### Same store as production
+Tests run on the store you actually ship — SQLite or DuckDB locally. A suite that passes on
+a *different* engine than production is a false signal (if you ever add a server DB, test on
+it, not on a substitute). See [../rules/testing.md](../rules/testing.md) and
+[../rules/gotchas.md](../rules/gotchas.md) (C-DB-SAME-AS-PROD).
 
 ### Every External Call Must Be Stubbable
 Design the boundary between your code and external providers (LLMs, APIs, DBs) so that

@@ -10,7 +10,9 @@ sub-agents. You do not write `src/` or `spec/` directly. See
 
 ## First actions every session
 
-1. Read [harness/rules/non-negotiables.md](harness/rules/non-negotiables.md).
+1. Read [harness/rules/non-negotiables.md](harness/rules/non-negotiables.md). Before writing
+   code, skim [harness/rules/gotchas.md](harness/rules/gotchas.md) for your stack's section
+   (encoded traps from real builds — don't re-derive what a prior build already paid for).
 2. Continue or open a session report in `logs/sessions/` (the SessionStart hook surfaces
    the latest one).
 3. Check spec readiness:

@@ -57,15 +57,27 @@ Every build starts with these two iterations, then adds project-specific ones:
 
 ### Iteration 0 — Scaffold (~8 min)
 
-**Deliverable:** server starts, `/health` returns 200  
+**Deliverable:** server starts, `/health` returns 200, README quickstart works  
 **Gate:** `uv run python -m src` → `curl http://localhost:8001/health` returns `{"status":"ok"}`  
 **What executor does:**
-1. Copy `harness/recipes/python/` to project root
+1. Copy the **selected recipe** (see Recipe Selection below) to project root
 2. Replace all `appname` / `APPNAME` with the project name
-3. `uv sync`
-4. `uv run alembic revision --autogenerate -m "init"` (even if Base has no models yet)
-5. `uv run alembic upgrade head`
-6. Start server, confirm `/health`
+3. `uv sync --extra dev`
+4. Tables are created automatically at startup (`create_tables()` in the lifespan — both
+   recipes; no migration step, no Alembic)
+5. Update `README.md` (quickstart + `.env` setup) — an Iteration-0 deliverable
+6. Start server, confirm `/health` shows `stub_mode: true`
+
+## Recipe Selection
+
+Name the recipe in the plan so the executor copies the *right* one — a mismatched scaffold
+is exactly how the slowest build lost ~30% of Iteration 0:
+
+| Approved stack | Recipe | Schema init |
+|----------------|--------|-------------|
+| Analytics, CSV/Parquet/JSON, local-first | `python-fastapi-duckdb` | `create_tables()` at lifespan |
+| Relational / transactional, local-first | `python-fastapi-sqlite` | `create_tables()` at lifespan |
+| UI required | + `frontend-nextjs` | `npm install` |
 
 ### Iteration 1 — First model (~12 min)
 
@@ -93,12 +105,28 @@ Suggested ordering for an agent project:
 7  observability     → structured logs, session report accurate  (~10 min)
 ```
 
-UI comes at Iteration 3 — not last. Use the Jinja2 templates from
-`harness/recipes/python/src/api/templates/`. One form, one result area, stub
-banner already wired. No frontend build step. Gate: browser opens, form submits,
-stub result renders.
+UI comes at Iteration 3 — not last. For a no-build-step UI use the Jinja2 templates in the
+backend recipe (`…/src/api/templates/` — one form, one result area, stub banner wired); for a
+richer chat/markdown UI copy `harness/recipes/frontend-nextjs/`. Gate: browser opens, form
+submits, stub result renders.
 
 ---
+
+## Planning rules — self-review before handoff
+
+The slowest build's churn (a renderer scheduled *after* its data; frontend split from the
+session persistence it depended on; dead code never sequenced for cleanup) traces to a plan
+no one reviewed. Before handing the plan to the executor, apply these and run a one-paragraph
+self-review ending in **Proceed / Revise**:
+
+- **Scope DOWN, not OUT.** Iteration 0–2 ships *every* named capability minimally, end to
+  end — not the easiest subset. Shrink each capability; don't drop one to a later iteration.
+- **A renderer ships in the same iteration as its data.** Never return a table/chart in one
+  iteration and render it three iterations later (that caused the raw-`<pre>` carry-forward).
+- **Draw the dependency edges.** Name cross-iteration dependencies explicitly (e.g. frontend
+  `session_id` ↔ the persistence iteration) so nothing is built before what it needs.
+- **No deferred cleanup.** If an iteration leaves dead code or a known defect, the iteration
+  that removes it is in the plan — not "later."
 
 ## Session Report Entry
 

@@ -96,9 +96,19 @@ def build_graph(model, checkpointer=None):
                     + last_tool.content
                 )
 
+        final_answer = content_to_text(answer) or "(analysis incomplete — no data retrieved)"
+
+        # Generate follow-up suggestions (heuristic when stubbed, LLM when available)
+        from .runner import _DEFAULT_FOLLOW_UPS, generate_follow_ups
+        try:
+            follow_ups = await generate_follow_ups(final_answer, model)
+        except Exception:
+            follow_ups = list(_DEFAULT_FOLLOW_UPS)
+
         return {
-            "answer": content_to_text(answer) or "(analysis incomplete — no data retrieved)",
+            "answer": final_answer,
             "chart_spec": chart_spec,
+            "follow_ups": follow_ups,
         }
 
     def route(state):

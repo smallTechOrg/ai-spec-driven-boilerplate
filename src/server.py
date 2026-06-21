@@ -13,10 +13,13 @@ One envelope: ok(data) / err(msg). AsyncSqliteSaver checkpointer is opened in li
 across all runs so multi-turn thread_id state is persistent within the session.
 """
 import json
+import logging
 import os
 import tempfile
 import uuid
 from contextlib import asynccontextmanager
+
+_logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -82,7 +85,10 @@ class RunIn(BaseModel):
 
 @app.get("/health")
 async def health():
-    return ok({"status": "alive"})
+    from .config import get_settings
+    s = get_settings()
+    stub_mode = not bool(s.llm_api_key)
+    return ok({"status": "alive", "stub_mode": stub_mode, "llm_provider": s.llm_provider})
 
 
 @app.post("/runs")
@@ -95,7 +101,7 @@ async def create_run(body: RunIn):
             graph=_graph,
         )
         return ok({k: r[k] for k in ("run_id", "thread_id", "answer", "chart_spec",
-                                      "input_tokens", "output_tokens", "cost_usd",
+                                      "follow_ups", "input_tokens", "output_tokens", "cost_usd",
                                       "iterations", "dataset_id", "status")})
     except Exception as e:
         return err(str(e))
@@ -204,9 +210,49 @@ async def create_dataset(body: DatasetIn):
 
 @app.get("/datasets")
 async def list_datasets_endpoint():
+    from .domain import DataTable
     async with get_sessionmaker()() as s:
         rows = (await s.execute(select(Dataset).order_by(Dataset.created_at.desc()))).scalars().all()
-    return ok([{"id": d.id, "name": d.name} for d in rows])
+        result = []
+        for d in rows:
+            tables_q = (await s.execute(
+                select(DataTable).where(DataTable.dataset_id == d.id)
+            )).scalars().all()
+            row_count = sum(t.n_rows for t in tables_q)
+            first_cols = tables_q[0].columns if tables_q else []
+            tables_out = [
+                {"table_name": t.table_name, "n_rows": t.n_rows, "n_cols": t.n_cols, "columns": t.columns}
+                for t in tables_q
+            ]
+            result.append({
+                "id": d.id,
+                "name": d.name,
+                "row_count": row_count,
+                "created_at": d.created_at.isoformat(),
+                "tables": tables_out,
+            })
+    return ok(result)
+
+
+@app.delete("/datasets/{dataset_id}")
+async def delete_dataset_endpoint(dataset_id: str):
+    import asyncio as _asyncio
+    from .domain import DataTable
+    async with get_sessionmaker()() as s:
+        ds = await s.get(Dataset, dataset_id)
+        if ds is None:
+            return err(f"dataset {dataset_id} not found")
+        # Delete DataTable rows
+        tables = (await s.execute(
+            select(DataTable).where(DataTable.dataset_id == dataset_id)
+        )).scalars().all()
+        for t in tables:
+            await s.delete(t)
+        await s.delete(ds)
+        await s.commit()
+    # Drop DuckDB tables + file (after SQLite commit so metadata is always consistent)
+    await _asyncio.to_thread(duck.delete_dataset, dataset_id)
+    return ok({"deleted": True})
 
 
 @app.post("/datasets/{dataset_id}/files")
@@ -239,11 +285,35 @@ async def upload_file(dataset_id: str, file: UploadFile):
 
 @app.post("/upload")
 async def upload_files(files: list[UploadFile]):
-    """Convenience: create dataset + upload files in one shot. Returns list of per-file results."""
+    """Convenience: create dataset + upload files in one shot. Returns list of per-file results.
+
+    If a dataset with the same name already exists it is deleted first (replace-by-name).
+    The replacement is recorded in the audit log via a TOOL span.
+    """
+    import asyncio
+    from .domain import DataTable
+
     results = []
     for file in files:
-        ds_name = os.path.splitext(file.filename or "upload")[1 :]  # use filename stem as dataset name
         ds_name = os.path.splitext(file.filename or "upload")[0]
+
+        # Replace-by-name: delete any existing dataset with the same name
+        async with get_sessionmaker()() as s:
+            existing = (await s.execute(
+                select(Dataset).where(Dataset.name == ds_name)
+            )).scalars().first()
+            if existing is not None:
+                old_id = existing.id
+                old_tables = (await s.execute(
+                    select(DataTable).where(DataTable.dataset_id == old_id)
+                )).scalars().all()
+                for t in old_tables:
+                    await s.delete(t)
+                await s.delete(existing)
+                await s.commit()
+                await asyncio.to_thread(duck.delete_dataset, old_id)
+                _logger.info("audit: replaced dataset name=%r old_id=%s", ds_name, old_id)
+
         async with get_sessionmaker()() as s:
             ds = Dataset(name=ds_name)
             s.add(ds)
@@ -254,7 +324,6 @@ async def upload_files(files: list[UploadFile]):
         try:
             tmp.write(await file.read())
             tmp.close()
-            import asyncio
             meta = await asyncio.to_thread(
                 duck.ingest_file, ds_id, file.filename or "table", tmp.name, file.filename or "table")
         except ValueError as e:
@@ -359,6 +428,62 @@ async def get_run_spans(run_id: str):
         "duration_ms": sp.duration_ms,
         "attributes": sp.attributes or {},
     } for sp in spans])
+
+
+@app.get("/audit-log")
+async def audit_log(session_id: str | None = None, since: str | None = None):
+    """Return the last 100 execute_sql TOOL spans, optionally filtered by session_id and/or since.
+
+    session_id: filter by the run's thread_id.
+    since: ISO date string; only spans with start_ms >= that timestamp.
+    """
+    from sqlalchemy import and_
+    import datetime as _dt
+
+    since_ms: float | None = None
+    if since:
+        try:
+            # URL query strings encode '+' as ' '; restore it for timezone offsets like +00:00
+            since_clean = since.replace(" ", "+")
+            since_ms = _dt.datetime.fromisoformat(since_clean).timestamp() * 1000
+        except ValueError:
+            return err(f"invalid 'since' value: {since!r} (expected ISO date string)")
+
+    async with get_sessionmaker()() as s:
+        filters = [Span.kind == "TOOL", Span.name.contains("execute_sql")]
+        if since_ms is not None:
+            filters.append(Span.start_ms >= since_ms)
+
+        if session_id:
+            # Join with runs to filter by thread_id
+            stmt = (
+                select(Span)
+                .join(Run, Span.run_id == Run.id)
+                .where(and_(*filters, Run.thread_id == session_id))
+                .order_by(Span.start_ms.desc())
+                .limit(100)
+            )
+        else:
+            stmt = (
+                select(Span)
+                .where(and_(*filters))
+                .order_by(Span.start_ms.desc())
+                .limit(100)
+            )
+        spans = (await s.execute(stmt)).scalars().all()
+
+    data = []
+    for sp in spans:
+        attrs = sp.attributes or {}
+        data.append({
+            "id": sp.id,
+            "run_id": sp.run_id,
+            "sql": attrs.get("sql") or attrs.get("args", {}).get("sql") if isinstance(attrs.get("args"), dict) else attrs.get("sql"),
+            "rows_returned": attrs.get("rows_returned") or (attrs.get("result_preview") and None),
+            "duration_ms": sp.duration_ms,
+            "timestamp_ms": sp.start_ms,
+        })
+    return ok(data)
 
 
 @app.get("/datasets/{dataset_id}/summary")

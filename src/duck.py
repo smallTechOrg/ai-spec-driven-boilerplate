@@ -144,6 +144,33 @@ def dataset_schema(dataset_id: str) -> dict:
         con.close()
 
 
+def delete_dataset(dataset_id: str) -> None:
+    """Drop all DuckDB tables for this dataset and remove the DuckDB file.
+
+    Synchronous — call via asyncio.to_thread from async routes.
+    """
+    path = dataset_path(dataset_id)
+    if not os.path.exists(path):
+        return
+    # Drop all tables inside the file first (graceful), then remove the file
+    try:
+        con = duckdb.connect(path)
+        try:
+            tnames = [r[0] for r in con.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema='main' ORDER BY table_name").fetchall()]
+            for t in tnames:
+                con.execute(f'DROP TABLE IF EXISTS "{t}"')
+        finally:
+            con.close()
+    except duckdb.Error:
+        pass
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
 def run_query(dataset_id: str, sql: str, max_rows: int) -> dict:
     """Execute one read-only SQL statement against the dataset (read_only connection). Caps rows.
 

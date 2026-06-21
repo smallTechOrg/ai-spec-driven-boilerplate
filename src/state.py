@@ -15,3 +15,4 @@ class AgentState(TypedDict):
     answer: str | None
     chart_spec: str | None
     run_id: str
+    follow_ups: list[str]

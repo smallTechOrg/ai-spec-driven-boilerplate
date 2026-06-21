@@ -15,6 +15,45 @@ from .graph import build_graph, content_to_text
 from .llm import get_model
 from .observability import span
 
+_DEFAULT_FOLLOW_UPS = [
+    "What's the trend over time?",
+    "Show this as a chart.",
+    "Filter by the top category.",
+]
+
+
+async def generate_follow_ups(answer: str, model) -> list[str]:
+    """Ask the LLM for 2-3 follow-up questions based on the answer.
+
+    Returns defaults on any failure so the caller is never blocked.
+    The model here is the raw (unbound) model — no tools needed.
+    """
+    if not answer or not answer.strip():
+        return _DEFAULT_FOLLOW_UPS
+    prompt = (
+        "Given this data analysis answer, suggest exactly 3 concise follow-up questions "
+        "a user might ask next. Return ONLY a JSON array of strings, no markdown fences, "
+        "no explanation.\n\nAnswer:\n" + answer[:1000]
+    )
+    try:
+        from langchain_core.messages import HumanMessage
+        resp = await model.ainvoke([HumanMessage(content=prompt)])
+        text = resp.content if isinstance(resp.content, str) else ""
+        # Strip optional markdown fences (C-LLM-FENCE)
+        text = text.strip()
+        if text.startswith("```"):
+            text = text.split("```", 2)[1]
+            if text.startswith("json"):
+                text = text[4:]
+        text = text.strip().rstrip("```").strip()
+        parsed = __import__("json").loads(text)
+        if isinstance(parsed, list) and parsed:
+            return [str(q) for q in parsed[:3]]
+    except Exception:
+        pass
+    return _DEFAULT_FOLLOW_UPS
+
+
 DOMAIN_PROMPT = (
     "You are DataChat, a precise and helpful data-analysis assistant. You help users understand their "
     "uploaded datasets by translating natural-language questions into SQL queries and presenting results clearly.\n\n"
@@ -167,6 +206,7 @@ async def run_agent(
     state = {
         "messages": new_messages,
         "iterations": 0, "answer": None, "chart_spec": None, "run_id": run_id,
+        "follow_ups": [],
     }
     invoke_cfg = {"configurable": {"thread_id": thread_id}, "recursion_limit": 50}
 
@@ -202,6 +242,7 @@ async def run_agent(
         "thread_id": thread_id,
         "answer": result["answer"],
         "chart_spec": result.get("chart_spec"),
+        "follow_ups": result.get("follow_ups", []),
         "iterations": result["iterations"],
         "dataset_id": dataset_id,
         "status": "completed",

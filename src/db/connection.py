@@ -7,7 +7,9 @@ from src.db.schema import create_tables
 
 
 def get_db() -> duckdb.DuckDBPyConnection:
-    os.makedirs(os.path.dirname(settings.analyst_db_path), exist_ok=True)
+    dirname = os.path.dirname(settings.analyst_db_path)
+    if dirname:
+        os.makedirs(dirname, exist_ok=True)
     return duckdb.connect(settings.analyst_db_path)
 
 

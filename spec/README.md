@@ -24,16 +24,12 @@ Any overrides to [harness/rules/](../harness/rules/) also live here.
 
 ## features/
 
-What the system should be. The researcher fills these in; they are the source of truth
-for product intent. Code conforms to features, never the reverse.
+One file per discrete request. Empty until work begins.
 
-- [features/vision.md](features/vision.md) — purpose, goals, success criteria
-- [features/architecture.md](features/architecture.md) — system design, layers, data flow
-- [features/data-model.md](features/data-model.md) — data schema
-- [features/api.md](features/api.md) — API surface
-- [features/ui.md](features/ui.md) — UI requirements
+- **FR-NNN-title.md** — feature request, created during `/build`
+- **CR-NNN-title.md** — change request, created during `/fix`
 
-To add a capability: add a file to `features/`. One file = one discrete feature.
+The researcher authors these; the supervisor signs them off before any code is written.
 
 ## patterns/
 

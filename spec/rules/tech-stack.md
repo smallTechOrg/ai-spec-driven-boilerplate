@@ -20,9 +20,9 @@ Override: <!-- e.g. CrewAI, custom -->
 
 ## LLM Provider
 
-**Provider:** <!-- FILL IN: openai | anthropic | gemini -->  
-**Model:** <!-- FILL IN: see safe defaults table below -->  
-**Env var:** `APPNAME_LLM_MODEL` — always configurable, never hardcoded.
+**Provider:** gemini (google_genai via langchain-google-genai)  
+**Model:** gemini-2.5-flash (in config: APP_LLM_MODEL, never hardcoded — C-LLM-MODEL)  
+**Env var:** `APP_LLM_MODEL` — always configurable, never hardcoded.
 
 Safe defaults (2026):
 
@@ -49,7 +49,7 @@ Override: <!-- e.g. MongoDB + Motor, if different -->
 
 ## Frontend
 
-<!-- FILL IN: Next.js 15 / Jinja2 templates / none -->
+**Next.js** (frontend-nextjs recipe) + Plotly (dynamic SSR-safe, C-PLOTLY-SSR) + react-markdown (C-MD-RENDER)
 
 Override if needed.
 

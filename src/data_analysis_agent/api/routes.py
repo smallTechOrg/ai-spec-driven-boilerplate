@@ -215,6 +215,38 @@ def upload_csv(
     return RedirectResponse(url="/", status_code=303)
 
 
+# ─── Data Source: Sync descriptions ─────────────────────────────────────────
+
+@router.post("/datasources/{datasource_id}/sync")
+def sync_datasource(
+    request: Request,
+    datasource_id: str,
+    session: Session = Depends(get_session),
+):
+    ds = session.get(DataSourceRow, datasource_id)
+    if not ds:
+        raise api_error("NOT_FOUND", "Data source not found.", status_code=404)
+
+    if not ds.parquet_path or not Path(ds.parquet_path).exists():
+        raise api_error("NO_PARQUET", "Parquet file is missing — re-upload the data source.")
+
+    tool = session.query(ToolRow).filter(ToolRow.data_source_id == datasource_id).first()
+    if not tool:
+        raise api_error("NO_TOOL", "No tool registered for this data source.")
+
+    table_name = tool.config.get("table_name", "data")
+    tool_desc, cap_desc = _generate_tool_descriptions(
+        ds.name, table_name, ds.schema, ds.row_count or 0, ds.parquet_path
+    )
+
+    tool.description = tool_desc
+    for cap in session.query(ToolCapabilityRow).filter(ToolCapabilityRow.tool_id == tool.id).all():
+        cap.description = cap_desc
+
+    log.info("datasource.synced", datasource_id=datasource_id, filename=ds.name)
+    return RedirectResponse(url="/", status_code=303)
+
+
 # ─── Data Source: Delete ──────────────────────────────────────────────────────
 
 @router.post("/datasources/{datasource_id}/delete")

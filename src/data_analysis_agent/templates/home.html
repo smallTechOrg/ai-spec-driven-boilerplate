@@ -93,7 +93,12 @@
           </div>
           {% endif %}
         </div>
-        <div style="flex-shrink:0;">
+        <div style="flex-shrink:0;display:flex;flex-direction:column;gap:.4rem;align-items:flex-end;">
+          <form method="post" action="/datasources/{{ src.id }}/sync"
+                onsubmit="var b=this.querySelector('button');b.textContent='Syncing…';b.disabled=true;">
+            <button class="btn btn-ghost" type="submit"
+                    style="font-size:.82rem;padding:.35rem .75rem;">Sync</button>
+          </form>
           <div id="dz-{{ src.id }}">
             <button class="btn btn-ghost" style="color:var(--err);border-color:#fca5a5;font-size:.82rem;padding:.35rem .75rem;"
                     onclick="showDel('{{ src.id }}')">Delete</button>

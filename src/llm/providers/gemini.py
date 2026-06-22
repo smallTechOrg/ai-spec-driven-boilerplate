@@ -2,7 +2,7 @@ import google.generativeai as genai
 
 
 class GeminiProvider:
-    DEFAULT_MODEL = "gemini-2.0-flash"
+    DEFAULT_MODEL = "gemini-2.5-flash"
 
     def __init__(self, api_key: str, model: str) -> None:
         genai.configure(api_key=api_key)

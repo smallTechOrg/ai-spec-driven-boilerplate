@@ -15,6 +15,7 @@ dependencies = [
     "pandas>=2.2",
     "structlog>=24",
     "openai>=2.41.1",
+    "psycopg2-binary>=2.9.12",
 ]
 
 [project.optional-dependencies]

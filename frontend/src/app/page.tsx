@@ -23,6 +23,8 @@ export default function Home() {
       const data = await res.json()
       if (!res.ok) {
         setError(data.detail?.message ?? `Request failed (${res.status})`)
+      } else if (data.data?.error) {
+        setError(data.data.error)
       } else {
         setResult(data.data.output_text)
       }

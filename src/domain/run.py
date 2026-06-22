@@ -9,3 +9,4 @@ class RunResponse(BaseModel):
     run_id: str
     status: str
     output_text: str | None = None
+    error: str | None = None

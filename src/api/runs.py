@@ -16,7 +16,7 @@ def create_run(req: RunRequest, session: Session = Depends(get_session)) -> dict
     run = session.get(RunRow, run_id)
     if run is None:
         raise api_error("NOT_FOUND", "Run not found after creation", 500)
-    return ok(RunResponse(run_id=run.id, status=run.status, output_text=run.output_text).model_dump())
+    return ok(RunResponse(run_id=run.id, status=run.status, output_text=run.output_text, error=run.error_message).model_dump())
 
 
 @router.get("/runs/{run_id}")
@@ -24,4 +24,4 @@ def get_run(run_id: str, session: Session = Depends(get_session)) -> dict:
     run = session.get(RunRow, run_id)
     if run is None:
         raise api_error("NOT_FOUND", f"Run {run_id} not found", 404)
-    return ok(RunResponse(run_id=run.id, status=run.status, output_text=run.output_text).model_dump())
+    return ok(RunResponse(run_id=run.id, status=run.status, output_text=run.output_text, error=run.error_message).model_dump())

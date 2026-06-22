@@ -94,15 +94,14 @@ def check_env() -> None:
     ok(".env exists")
 
     providers = {
-        "ANTHROPIC_API_KEY":  "Anthropic",
-        "GEMINI_API_KEY":     "Gemini",
-        "OPENROUTER_API_KEY": "OpenRouter",
+        "AGENT_ANTHROPIC_API_KEY": "Anthropic",
+        "AGENT_GEMINI_API_KEY":    "Gemini",
     }
     found = [name for key, name in providers.items() if env_key_set(env, key)]
     if found:
         ok(f"API key set: {', '.join(found)}")
     else:
-        fail(f"No provider key found in .env — set one of: {', '.join(providers)}")
+        fail("No provider key found in .env — set AGENT_ANTHROPIC_API_KEY or AGENT_GEMINI_API_KEY")
 
 
 def check_python_env() -> None:

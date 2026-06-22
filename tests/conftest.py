@@ -3,7 +3,6 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _reset_settings_singleton():
-    """Reset cached settings so env patches take effect in every test."""
     import config.settings as m
     m._settings = None
     yield
@@ -12,7 +11,6 @@ def _reset_settings_singleton():
 
 @pytest.fixture(autouse=True)
 def _isolated_db(tmp_path, monkeypatch):
-    """Isolated SQLite DB for each test — monkeypatches the session module."""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from db.models import Base
@@ -29,8 +27,18 @@ def _isolated_db(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def _require_api_key():
-    """Skip the test if the Anthropic API key is not set in .env."""
+def _require_llm_key():
+    """Skip if no LLM provider key is set — works for Anthropic or Gemini."""
     from config.settings import get_settings
-    if not get_settings().anthropic_api_key:
-        pytest.skip("AGENT_ANTHROPIC_API_KEY not set — required for integration tests")
+    s = get_settings()
+    if not s.anthropic_api_key and not s.gemini_api_key:
+        pytest.skip("No LLM key set in .env (AGENT_ANTHROPIC_API_KEY or AGENT_GEMINI_API_KEY)")
+
+
+@pytest.fixture
+def api_client(_isolated_db):
+    """FastAPI test client with isolated DB."""
+    from fastapi.testclient import TestClient
+    from api import app
+    with TestClient(app) as client:
+        yield client

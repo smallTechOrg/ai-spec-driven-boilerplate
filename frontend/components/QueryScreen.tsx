@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { API_URL } from "@/lib/api";
+import { useAppContext } from "@/components/AppContext";
 
 // [C-PLOTLY-SSR]: load client-only, never during SSR
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
 
 interface QueryResult {
   table_markdown: string;
@@ -33,22 +32,20 @@ const STUB_SUGGESTIONS = [
 ];
 
 export default function QueryScreen() {
+  const { activeSessionId, datasetIds } = useAppContext();
   const [question, setQuestion] = useState("");
   const [state, setState] = useState<QueryState>("empty");
   const [result, setResult] = useState<QueryResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  // [C-SSR-BROWSER-API]: session id generated in useEffect, not initialiser
-  const sessionIdRef = useRef<string | null>(null);
-  // We set it lazily on first submit; in Phase 5 it moves to useEffect with localStorage
 
   async function submit(q: string) {
     if (!q.trim()) return;
     setQuestion(q);
     setState("loading");
 
-    // Phase 1: use hardcoded session placeholder; Step 5 replaces with real session
-    const sessionId = sessionIdRef.current ?? "phase1-stub-session";
+    // [C-SESSION-SCOPE]: activeSessionId from context (set in useEffect in SessionSidebar)
+    // Fall back to stub value only if context hasn't loaded yet
+    const sessionId = activeSessionId ?? "phase1-stub-session";
 
     try {
       const resp = await fetch(`${API_URL}/query`, {
@@ -56,7 +53,7 @@ export default function QueryScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           session_id: sessionId,
-          dataset_ids: [],
+          dataset_ids: datasetIds,
           question: q,
         }),
       });
@@ -226,7 +223,7 @@ export default function QueryScreen() {
             </details>
           )}
 
-          {/* Suggestion chips */}
+          {/* Suggestion chips from API response */}
           {result.suggestions && result.suggestions.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {result.suggestions.map((s) => (
@@ -241,7 +238,7 @@ export default function QueryScreen() {
             </div>
           )}
 
-          {/* Phase 1 stub suggestions if none from API */}
+          {/* Fallback stub suggestions if none from API */}
           {(!result.suggestions || result.suggestions.length === 0) && (
             <div className="flex flex-wrap gap-2">
               {STUB_SUGGESTIONS.map((s) => (

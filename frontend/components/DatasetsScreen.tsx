@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
+import { useState, useRef, useEffect } from "react";
+import { API_URL } from "@/lib/api";
+import { useAppContext } from "@/components/AppContext";
 
 interface DatasetCard {
   id: string;
@@ -14,6 +13,7 @@ interface DatasetCard {
 }
 
 export default function DatasetsScreen() {
+  const { activeSessionId, setDatasetIds } = useAppContext();
   const [datasets, setDatasets] = useState<DatasetCard[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -21,20 +21,42 @@ export default function DatasetsScreen() {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Phase 1: session is hardcoded; Step 5 wires to real session
-  const SESSION_ID = "phase1-stub-session";
+  // [C-SSR-BROWSER-API]: fetch in useEffect only
+  useEffect(() => {
+    if (!activeSessionId) return;
+    fetchDatasets(activeSessionId);
+  }, [activeSessionId]);
+
+  async function fetchDatasets(sessionId: string) {
+    try {
+      const resp = await fetch(`${API_URL}/datasets?session_id=${sessionId}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        const list: DatasetCard[] = Array.isArray(data) ? data : data.datasets ?? [];
+        setDatasets(list);
+        setDatasetIds(list.map((d) => d.id));
+      }
+    } catch {
+      // silently ignore — backend may not be ready
+    }
+  }
 
   async function uploadFile(file: File) {
+    const sessionId = activeSessionId;
+    if (!sessionId) {
+      setUploadError("No active session — please wait for session to load");
+      return;
+    }
+
     setUploading(true);
     setUploadProgress(0);
     setUploadError(null);
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("session_id", SESSION_ID);
+    formData.append("session_id", sessionId);
 
     try {
-      // Use XMLHttpRequest to get upload progress
       const xhr = new XMLHttpRequest();
       await new Promise<void>((resolve, reject) => {
         xhr.upload.onprogress = (e) => {
@@ -49,7 +71,7 @@ export default function DatasetsScreen() {
             let msg = `HTTP ${xhr.status}`;
             try {
               const body = JSON.parse(xhr.responseText);
-              msg = body?.detail ?? msg;
+              msg = body?.detail ?? body?.error?.message ?? msg;
             } catch {}
             reject(new Error(msg));
           }
@@ -59,25 +81,12 @@ export default function DatasetsScreen() {
         xhr.send(formData);
       });
 
-      // Re-fetch dataset list
-      await fetchDatasets();
+      await fetchDatasets(sessionId);
     } catch (err: unknown) {
       setUploadError(err instanceof Error ? err.message : String(err));
     } finally {
       setUploading(false);
       setUploadProgress(0);
-    }
-  }
-
-  async function fetchDatasets() {
-    try {
-      const resp = await fetch(`${API_URL}/datasets?session_id=${SESSION_ID}`);
-      if (resp.ok) {
-        const data = await resp.json();
-        setDatasets(Array.isArray(data) ? data : data.datasets ?? []);
-      }
-    } catch {
-      // silently ignore — Phase 1 shell may have no backend
     }
   }
 

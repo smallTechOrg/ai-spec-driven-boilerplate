@@ -29,6 +29,7 @@ async def chat(req: ChatRequest, db: Session = Depends(get_session)) -> dict:
 
     duckdb_svc = get_duckdb_service()
 
+    from fastapi import HTTPException
     from data_analyst.agent.runner import run_turn
     try:
         result = run_turn(
@@ -38,6 +39,8 @@ async def chat(req: ChatRequest, db: Session = Depends(get_session)) -> dict:
             duckdb_svc=duckdb_svc,
             settings=settings,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Agent run_turn failed: %s", e)
         raise api_error("AGENT_ERROR", f"Agent failed: {str(e)}", 502)

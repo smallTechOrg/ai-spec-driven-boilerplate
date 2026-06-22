@@ -20,7 +20,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 _ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls"}
-_MAX_FILE_BYTES = 50 * 1024 * 1024  # 50 MB (spec says 200 MB; plan enforces 50 MB)
+_MAX_FILE_BYTES = 200 * 1024 * 1024  # 200 MB
 
 
 def _sanitise_table_name(name: str) -> str:
@@ -94,7 +94,7 @@ async def upload_dataset(
     if len(content) > _MAX_FILE_BYTES:
         raise api_error(
             "FILE_TOO_LARGE",
-            f"File exceeds the 50 MB limit ({len(content) // 1024 // 1024} MB received)",
+            f"File exceeds the 200 MB limit ({len(content) // 1024 // 1024} MB received)",
             413,
         )
 

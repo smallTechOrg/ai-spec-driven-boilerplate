@@ -1,172 +1,104 @@
-# AI Agent Boilerplate — Spec-Driven, Zero-Shot to Working Agent
+# Data Analyst Agent
 
-This is a boilerplate for building AI agents spec-first. Give it a one-line idea. Walk away with a working, tested, phased agent.
+A browser-based conversational data analyst agent. Upload CSV/Excel files and ask questions in plain English — the agent generates SQL via DuckDB, executes it, and returns formatted markdown tables with analyst narrative, powered by Gemini 2.5 Flash.
 
----
+> **All commands in this README run from the repo root** (`/Users/sai/Workspace/Code/exp1` or wherever you cloned this repo).
 
-## What This Is
+## Stack
 
-A starting point for anyone who wants to build an AI agent without writing boilerplate from scratch. The repo ships with:
+- Python 3.11+ · FastAPI · DuckDB · SQLite · Gemini 2.5 Flash (`google-genai` SDK)
+- Single-page HTML/JS frontend (no build step)
 
-- A structured **spec template** covering product vision, architecture, capabilities, data model, API, and UI
-- Three **zero-shot skills** (`/zero-shot-build`, `/zero-shot-fix`, `/zero-shot-sync`), each also available as a slash command
-- A five-agent **team** — agent-builder orchestrates (and owns git/PR) spec-writer, tech-architect, code-generator, and qa-auditor; the code maker is paired with an independent checker (qa-auditor reviews *and* runs), spec and tech design self-review
-- Engineering rules in `harness/` so every Claude Code session is consistent
-- Phase-gated implementation — minimal working thing first, then iterative expansion
-- Autonomous after a single intake round: one prompt → a thoroughly-tested agent with no further interaction
-- Real-key testing — every phase gate runs against the live LLM/API using keys from `.env`
+## Setup
 
----
-
-## How to Use This
-
-### Step 1 — Clone and configure
+### 1. Install dependencies
 
 ```bash
-git clone https://github.com/smallTechOrg/ai-spec-driven-boilerplate.git my-agent
-cd my-agent
+uv sync
+```
+
+### 2. Configure environment
+
+```bash
 cp .env.example .env
 ```
 
-### Step 2 — Open in Claude Code (or any AI coding assistant)
+Edit `.env` and set:
+```
+DA_GEMINI_API_KEY=your-gemini-api-key-here
+```
+
+Or if your `.env` already has the bare `GEMINI_API_KEY=...` (from a previous setup), that works too — the app falls back to reading it.
+
+### 3. Apply database migrations
 
 ```bash
-claude
+uv run alembic upgrade head
 ```
 
-### Step 3 — Kick off the build with your idea
-
-```
-/zero-shot-build An agent that monitors my Shopify store for low-inventory products and automatically drafts restock emails to suppliers
-```
-
-`/zero-shot-build` asks a short round of intake questions up front — including which API keys to put in `.env` — then runs fully autonomously to a tested, working agent with no further interaction.
-
----
-
-## What Happens Next (Intake, Then Fully Automated)
-
-`/zero-shot-build` runs one intake round, then hands off to the **agent-builder**, which coordinates the team:
-
-```
-Your idea
-    ↓
-INTAKE — scope, stack, trigger, constraints; fill .env with the required API keys
-         (may ask extra clarifying questions up front)
-    ↓
-[spec-writer]    → Drafts AND self-reviews the product spec (ruthless MVP scope)
-    ↓
-[tech-architect] → Designs AND reviews stack / architecture / agent / plan
-    ↓
-[agent-builder]  → Feature branch + PR before the first commit
-    ↓
-per phase:  [code-generator] → [qa-auditor] → [agent-builder]
-            write code+tests    review + run    commit+push
-            ↑______ loop until reviewed clean AND VERIFIED ______↑
-    ↓
-[qa-auditor]     → Final spec↔code drift audit (CLEAN before hand-off)
-    ↓
-Hand-off to you
+Verify the migration was applied (should show a revision hash, not blank output):
+```bash
+uv run alembic current
 ```
 
-**Nothing is skipped.** A phase stays open until qa-auditor's code review is clean and it returns VERIFIED — meaning edge-case, end-to-end, and UI tests pass against the real LLM/API using keys from `.env`, "perfect, zero errors" (~20-30 min to a thoroughly-tested agent). After the build, fix bugs with `/zero-shot-fix` and keep spec and code aligned with `/zero-shot-sync`.
+### 4. Run the server
 
----
-
-## Development Phases (Default Model)
-
-| Phase | What Gets Built |
-|-------|-----------------|
-| 1 | Domain models + data layer |
-| 2 | Core agent loop wired to the real LLM (keys from `.env`); integrations stubbed only where the external system itself isn't built yet |
-| 3 | First real integration (the "happy path" end-to-end, real keys) |
-| 4 | Error handling, retries, resilience |
-| 5 | Remaining integrations |
-| 6 | API / CLI surface |
-| 7 | Basic UI (if needed) — UI tests required when a UI exists |
-| 8 | Integration + edge-case + end-to-end tests (real keys) |
-| 9 | Observability + logging |
-| 10 | Polish, documentation, hand-off |
-
-Each phase ends with a commit and passes QA before the next phase begins.
-
----
-
-## Repo Layout
-
-```
-.claude/
-  skills/           ← Entry points (/zero-shot-build, /zero-shot-fix, /zero-shot-sync) — source of truth
-  commands/         ← Thin slash-command aliases that defer to the skills
-  agents/           ← The team, one full self-contained definition each (agent-builder, spec-writer, tech-architect, code-generator, qa-auditor)
-spec/               ← The product — what your agent does (you read & edit this)
-  roadmap.md        ← Purpose, goals, success criteria
-  architecture.md   ← System design + the chosen ## Stack
-  agent.md          ← This agent's graph (if a framework is used)
-  data.md  api.md  ui.md
-  capabilities/     ← One file per discrete capability
-harness/            ← How Claude Code should build, generically (doctrine the skills/agents cite)
-  rules/            ← Mandatory rules (ai-agents, git, secret-hygiene)
-  patterns/         ← phases, test-driven, project-layout, tech-stack, code, agentic-ai, …
-reports/
-  sessions/         ← Auto-generated session logs from every AI coding session
-CLAUDE.md           ← Entry point for Claude Code
-.env.example        ← Environment variable template
+```bash
+uv run python -m data_analyst
 ```
 
----
+Open `http://localhost:8001` in your browser.
 
-## Manually Editing the Spec
+## Tests
 
-If you prefer to write the spec yourself before involving AI:
+All tests run against the real Gemini API using the key from `.env`. No mocking.
 
-1. Open `spec/roadmap.md` and fill in the placeholders
-2. Work through each file in `spec/` in order
-3. Once the spec is complete, run `/zero-shot-build` — it sees the filled-in spec and goes straight to planning and building
+```bash
+# Unit tests only (no Gemini API calls)
+uv run pytest tests/unit/ -v
 
----
+# Full suite (unit + integration + e2e, real Gemini API)
+uv run pytest -v
+```
 
-## Rules That AI Agents Follow
+## Usage
 
-Every Claude Code session in this repo follows the rules in `harness/rules/ai-agents.md`:
+1. Open `http://localhost:8001`
+2. Upload a CSV or Excel file using the sidebar
+3. Ask questions in the chat panel
+4. The agent generates SQL, executes it via DuckDB, and returns a formatted response
 
-- Read the full spec before writing any code
-- Open a session report at `reports/sessions/`
-- Commit every logical unit of work (never accumulate uncommitted changes)
-- One phase at a time — no skipping
-- Write tests before marking a phase complete
-- Tests and evals run against the real LLM/API using keys from `.env` — offline/stubbed runs are not a passing gate
-- The build is non-interactive after intake — questions are asked once, up front
-- Update this README whenever the project layout changes
+## Key features
 
----
+- Natural language to SQL via Gemini tool-use (SELECT-only; destructive SQL refused)
+- DuckDB in-process query engine (fast, zero config)
+- Persistent sessions and dataset catalogue (SQLite)
+- Append-only audit log (timestamp, question, SQL, datasets touched, latency, sql_error)
+- Token economy: schema-aware table selection, history windowing, conversation summarisation
+- Uploads survive server restarts (re-registered from SQLite catalogue on startup)
 
-## FAQ
+## Project layout
 
-**What if my agent needs a database?**
-The spec template includes a data model section. The tech-architect sub-agent will recommend the right database for your use case.
+```
+src/data_analyst/        Python package
+  api/                   FastAPI routers
+  agent/                 Gemini tool-use loop
+  db/                    SQLAlchemy models and session
+  config/                Settings (pydantic-settings)
+  duckdb_service.py      DuckDB singleton
+  domain/schemas.py      Pydantic response schemas
+src/static/index.html    Single-page frontend (served at /)
+tests/
+  unit/                  No LLM calls
+  integration/           Real Gemini API
+  e2e/                   Golden-path + restart simulation
+data/                    Uploaded files, SQLite DB, DuckDB file (gitignored)
+```
 
-**What if I already have a tech stack in mind?**
-Say it in the idea: `/zero-shot-build [idea] — use Python + FastAPI + PostgreSQL`. The tech-architect honors stated stack choices as binding and skips those questions.
+## What's deferred (v2)
 
-**What if something breaks?**
-Run `/zero-shot-fix [what's broken]` — it classifies the problem (bug, error, failing test, or drift), fixes it with spec context, and verifies. The qa-auditor catches phase failures before the next phase starts.
-
----
-
-## Test-Branch Workflow
-
-The recommended way to iterate on this boilerplate:
-
-1. Keep `main` as the clean boilerplate — only spec, engineering rules, and agent config.
-2. For each build attempt, create a numbered test branch: `test-1`, `test-2`, etc.
-3. Run `/zero-shot-build` with a single-line idea on the test branch. Let it build.
-4. Review and test the result on that branch.
-5. **Never merge the generated application code back to main.** Test branches are disposable.
-6. If a run surfaces a boilerplate improvement (a clearer spec template, a missing rule), cherry-pick or manually apply that fix to `main`.
-
----
-
-## Contributing
-
-This is a boilerplate, not a framework. Improvements to the spec templates, engineering rules, agent definitions, or skills belong on `main`; generated application code does not (see Test-Branch Workflow above).
+- Charts and dashboards
+- Multi-user / authentication
+- Multi-sheet Excel support
+- Docker deployment
+- Streaming responses

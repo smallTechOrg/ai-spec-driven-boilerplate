@@ -90,14 +90,17 @@ def test_upload_unsupported_extension_returns_415(app_client):
     assert r.status_code == 415
 
 
-def test_upload_file_over_50mb_returns_413(app_client):
-    """File exceeding 50 MB must return 413."""
-    big_content = b"a,b,c\n" + b"1,2,3\n" * (10 * 1024 * 1024)  # ~50+ MB
-    r = app_client.post(
-        "/datasets",
-        files={"file": ("big.csv", io.BytesIO(big_content), "text/csv")},
-        data={"name": "huge"},
-    )
+def test_upload_file_over_200mb_returns_413(app_client, tmp_path, monkeypatch):
+    """File exceeding 200 MB must return 413."""
+    monkeypatch.setattr("data_analyst.api.datasets._MAX_FILE_BYTES", 1)
+    tiny = tmp_path / "tiny.csv"
+    tiny.write_text("a,b\n1,2\n")
+    with open(tiny, "rb") as f:
+        r = app_client.post(
+            "/datasets",
+            files={"file": ("tiny.csv", f, "text/csv")},
+            data={"name": "Tiny"},
+        )
     assert r.status_code == 413
 
 

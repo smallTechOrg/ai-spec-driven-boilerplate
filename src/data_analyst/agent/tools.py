@@ -4,20 +4,9 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from data_analyst.duckdb_service import DuckDBService
+from data_analyst.duckdb_service import DuckDBService, is_destructive
 
 logger = logging.getLogger(__name__)
-
-# Destructive SQL guard — regex covers all blocked statement types
-_DESTRUCTIVE = re.compile(
-    r"^\s*(DROP|DELETE|TRUNCATE|ALTER|INSERT|UPDATE|CREATE|REPLACE|MERGE|UPSERT|GRANT|REVOKE)\b",
-    re.IGNORECASE,
-)
-
-
-def is_destructive(sql: str) -> bool:
-    """Return True if the SQL starts with a destructive statement keyword."""
-    return bool(_DESTRUCTIVE.match(sql.strip()))
 
 
 @dataclass
@@ -29,6 +18,7 @@ class TurnState:
     sql_calls: list[str] = field(default_factory=list)  # all SQL executed this turn
     tables_touched: set[str] = field(default_factory=set)  # table names touched this turn
     row_count_returned: int = 0
+    sql_error: str | None = None  # last SQL error encountered this turn
 
 
 def get_tool_definitions() -> list[dict]:
@@ -137,8 +127,11 @@ def dispatch_tool_call(name: str, args: dict, state: TurnState) -> dict:
                 state.result_tables.append(capped)
             return {"rows": capped, "row_count": len(capped), "truncated": was_truncated, "error": None}
         except Exception as e:
+            error_msg = f"SQL execution failed: {e}"
             logger.warning("execute_sql failed: %s", e)
-            return {"rows": [], "row_count": 0, "error": f"SQL execution failed: {e}"}
+            state.sql_error = error_msg
+            state.sql_calls.append(sql)  # still track that SQL was attempted
+            return {"rows": [], "row_count": 0, "error": error_msg}
 
     elif name == "get_sample_rows":
         table_name = args.get("table_name", "")

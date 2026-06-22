@@ -112,6 +112,7 @@ def run_turn(
             datasets_touched,
             state.row_count_returned,
             latency_ms,
+            state.sql_error,
         )
 
     # Step 10: Maybe summarise if too many turns
@@ -133,8 +134,14 @@ def _get_or_create_session(session_id: str | None, db: Session) -> SessionModel:
     """Load an existing session or create a new one."""
     if session_id:
         s = db.query(SessionModel).filter(SessionModel.id == session_id).first()
-        if s:
-            return s
+        if not s:
+            from fastapi import HTTPException
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "SESSION_NOT_FOUND", "message": f"Session {session_id} not found."},
+            )
+        return s
+    # No session_id provided — create a new one
     s = SessionModel()
     db.add(s)
     db.flush()
@@ -228,6 +235,7 @@ def _write_audit_log(
     datasets_touched: list[str],
     row_count: int | None,
     latency_ms: int,
+    sql_error: str | None = None,
 ) -> None:
     """Write an audit log entry; failures are logged but non-fatal."""
     try:
@@ -238,6 +246,7 @@ def _write_audit_log(
             datasets_touched=json.dumps(datasets_touched),
             row_count_returned=row_count,
             latency_ms=latency_ms,
+            sql_error=sql_error,
         )
         db.add(entry)
     except Exception as e:

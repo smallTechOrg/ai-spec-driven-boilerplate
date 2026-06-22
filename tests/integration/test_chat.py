@@ -87,15 +87,13 @@ def test_chat_empty_message_returns_422(app_client):
     assert r2.status_code == 422
 
 
-def test_chat_nonexistent_session_creates_new(app_client):
-    """Sending a non-existent session_id creates a new session (or the server handles gracefully)."""
-    # With no data uploaded, Gemini should respond saying no tables available
+def test_chat_nonexistent_session_returns_404(app_client):
+    """Sending a non-existent session_id must return 404 (not silently create a new session)."""
     r = app_client.post(
         "/chat",
         json={"session_id": "00000000-0000-0000-0000-000000000000", "message": "What tables do I have?"},
     )
-    # Should not 500 — either 200 (new session) or 404
-    assert r.status_code in (200, 404)
+    assert r.status_code == 404
 
 
 def test_chat_with_no_datasets_graceful_response(app_client):

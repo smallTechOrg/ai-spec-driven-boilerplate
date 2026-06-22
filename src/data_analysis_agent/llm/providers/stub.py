@@ -1,3 +1,4 @@
+import json
 import re
 
 from data_analysis_agent.llm.providers.base import LLMProvider
@@ -8,7 +9,18 @@ class StubLLMProvider(LLMProvider):
     """Offline stub — returns plausible shaped output without any API call."""
 
     def complete(self, prompt: str) -> LLMResult:
-        if "<node:plan_action>" not in prompt:
+        if "<node:describe_tool>" in prompt:
+            name_m = re.search(r"File name: (.+)", prompt)
+            table_m = re.search(r"SQL table name: (\w+)", prompt)
+            name  = name_m.group(1).strip() if name_m else "dataset"
+            table = table_m.group(1) if table_m else "data"
+            text = json.dumps({
+                "tool_description": f"(stub) Dataset '{name}' available for SQL analysis.",
+                "capability_description": (
+                    f"(stub) Execute SQL SELECT queries against the '{table}' table."
+                ),
+            })
+        elif "<node:plan_action>" not in prompt:
             text = "(stub) No response — unrecognized node tag in prompt."
         elif "[1] capability:" in prompt:
             text = (

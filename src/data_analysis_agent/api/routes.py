@@ -27,6 +27,76 @@ log = structlog.get_logger()
 router = APIRouter()
 
 
+def _generate_tool_descriptions(
+    filename: str,
+    table_name: str,
+    schema: list[dict],
+    row_count: int,
+    parquet_path: str,
+) -> tuple[str, str]:
+    """
+    Ask the LLM to write a tool description and capability description for this
+    dataset. Falls back silently to hardcoded templates on any error (stub mode,
+    network failure, bad JSON).
+    """
+    fallback_tool = (
+        f"Execute SQL SELECT queries against '{filename}' (table: {table_name})."
+    )
+    fallback_cap = (
+        f"Execute a SQL SELECT statement against '{filename}'. "
+        f"Table name is '{table_name}'."
+    )
+    try:
+        import pandas as pd
+        from data_analysis_agent.llm.client import get_llm_client
+
+        schema_lines = "\n".join(
+            f"  {c['name']} ({c['dtype']}{'?' if c['nullable'] else ''})"
+            for c in schema
+        )
+        sample_csv = pd.read_parquet(parquet_path).head(5).to_csv(index=False)
+
+        prompt = "\n".join([
+            "<node:describe_tool>",
+            "You are a data catalog assistant. Analyze the dataset below and write",
+            "concise, accurate metadata descriptions for the tool registry.",
+            "",
+            f"File name:      {filename}",
+            f"SQL table name: {table_name}",
+            f"Row count:      {row_count}",
+            "",
+            "Column schema  (name, dtype, ? = nullable):",
+            schema_lines,
+            "",
+            "Sample data (first 5 rows):",
+            sample_csv,
+            "",
+            "Write exactly two short descriptions (1-2 sentences each):",
+            "  tool_description      — what the dataset contains and what questions it can answer.",
+            "  capability_description — what the run_query SQL capability does on this table.",
+            "",
+            "Respond with ONLY a JSON object, no prose, no markdown fences:",
+            '{"tool_description": "...", "capability_description": "..."}',
+        ])
+
+        result = get_llm_client().complete(prompt)
+        raw = (result.text or "").strip()
+        # Strip markdown fences that models add despite the instruction
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            end = len(lines) - 1 if lines[-1].strip() == "```" else len(lines)
+            raw = "\n".join(lines[1:end]).strip()
+        parsed = json.loads(raw)
+        tool_desc = parsed.get("tool_description") or fallback_tool
+        cap_desc  = parsed.get("capability_description") or fallback_cap
+        log.info("upload.descriptions_generated", filename=filename)
+        return tool_desc, cap_desc
+
+    except Exception as exc:
+        log.warning("upload.descriptions_fallback", filename=filename, error=str(exc))
+        return fallback_tool, fallback_cap
+
+
 # ─── Home ────────────────────────────────────────────────────────────────────
 
 @router.get("/")
@@ -103,11 +173,16 @@ def upload_csv(
     if table_name[0].isdigit():
         table_name = 'ds_' + table_name
 
+    schema = json.loads(result.schema_json) if result.schema_json else []
+    tool_desc, cap_desc = _generate_tool_descriptions(
+        filename, table_name, schema, result.row_count, result.parquet_path
+    )
+
     tool = ToolRow(
         data_source_id=ds.id,
         name="csv_query",
         type="csv_query",
-        description=f"Execute SQL SELECT queries against '{ds.name}' (table: {table_name}).",
+        description=tool_desc,
         config_json=json.dumps({
             "table_name": table_name,
             "parquet_path": result.parquet_path,
@@ -119,7 +194,7 @@ def upload_csv(
     cap = ToolCapabilityRow(
         tool_id=tool.id,
         name="run_query",
-        description=f"Execute a SQL SELECT statement against '{ds.name}'. Table name is '{table_name}'.",
+        description=cap_desc,
         parameter_schema_json=json.dumps({
             "query": {
                 "type": "string",

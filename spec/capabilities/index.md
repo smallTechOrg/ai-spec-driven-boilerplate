@@ -1,38 +1,13 @@
 # Capabilities Index
 
-> **Boilerplate status:** The spec-writer sub-agent creates one file per capability in this directory. Each file describes exactly one discrete thing the agent can do.
+One file per capability. v1 is ruthlessly scoped to 4 capabilities; Phase-1 ones are real, later ones are stubbed in the UI and deferred.
 
----
+| Capability | File | Phase |
+|------------|------|-------|
+| Upload dataset | [upload-dataset.md](upload-dataset.md) | 1 (real) |
+| Natural-language query | [nl-query.md](nl-query.md) | 1 (real) |
+| Audit logging | [audit-logging.md](audit-logging.md) | 1 (real, write-only; UI in Phase 5) |
+| Persistent sessions | [persistent-sessions.md](persistent-sessions.md) | 1 (real) |
 
-## What Is a Capability?
-
-A capability is a single, discrete action or behavior the agent performs. Examples:
-- "Search the web for companies matching criteria X"
-- "Draft a personalized email given a lead profile"
-- "Send a Slack notification when a threshold is crossed"
-
-## Capabilities in This Project
-
-<!-- FILL IN: List capabilities here as they are defined. Each entry links to its spec file (no number prefix). -->
-
-| Capability | File |
-|-----------|------|
-| <!-- name --> | [name.md](name.md) |
-
-## How to Add a New Capability
-
-Run `/zero-shot-build [description]` on the existing spec. The spec-writer sub-agent will:
-1. Create a new file in this directory (`<name>.md`, no number prefix)
-2. Update this index
-3. Flag any dependencies on existing capabilities
-4. Self-review that it fits the architecture and data model before returning
-
-## Capability File Template
-
-Each capability file should answer:
-- **What it does** (one sentence)
-- **Inputs** (what data it receives)
-- **Outputs** (what it produces)
-- **External calls** (APIs, LLMs, databases it touches)
-- **Error cases** (what can go wrong and how it's handled)
-- **Success criteria** (how we test it)
+### Deferred (later phases, not v1 capabilities)
+- Charts/dashboards (Phase 2), cross-dataset query (Phase 3), senior-analyst multi-step reasoning (Phase 4), audit UI + Excel (Phase 5). See [roadmap.md](../roadmap.md#phases-of-development).

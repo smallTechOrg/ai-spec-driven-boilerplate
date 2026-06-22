@@ -8,7 +8,7 @@ allowed-tools: Bash(git*) Bash(uv run*)
 
 You orchestrate a spec↔code sync by calling worker agents directly. **Spec is the source of truth — when spec and code disagree, fix the code** (harness/patterns/spec-driven.md). Optional scope in `$ARGUMENTS`; otherwise the whole project. Run autonomously to a CLEAN audit; pause only on a hard blocker or if a divergence reveals the *spec* is wrong (surface it — don't silently rewrite the spec to match code).
 
-Read-only **qa-auditor** finds and confirms drift; **code-generator** fixes code toward spec; **deployer** pushes.
+Read-only **qa-auditor** finds and confirms drift; **code-generator** fixes code toward spec; you (the skill) own the commit + push.
 
 ## Step 1 — Audit
 
@@ -29,7 +29,7 @@ For each "code wrong" divergence, invoke **code-generator** with the spec sectio
 
 ## Step 4 — Verify
 
-Invoke **qa-auditor** (gate mode) to confirm the reconciliation didn't break anything (tests green, offline, smoke if there's a UI). BLOCKED → re-invoke code-generator with the detail; loop.
+Invoke **qa-auditor** (gate mode) to confirm the reconciliation didn't break anything (tests green against real keys from `.env`, plus smoke + UI tests if there's a UI). BLOCKED → re-invoke code-generator with the detail; loop.
 
 ## Step 5 — Re-audit
 
@@ -37,4 +37,4 @@ Invoke **qa-auditor** (drift mode) again. Repeat 2–4 until CLEAN (modulo spec-
 
 ## Step 6 — Ship + report
 
-Invoke **deployer** to commit + push. Summarize: divergences by severity, which were fixed in code (files + regression tests), which were surfaced as possible spec bugs awaiting decision, and the final audit status.
+Commit + push yourself (atomic `git commit … && git push`, staging only the changed files, per `harness/rules/git.md`). Summarize: divergences by severity, which were fixed in code (files + regression tests), which were surfaced as possible spec bugs awaiting decision, and the final audit status.

@@ -8,7 +8,7 @@ allowed-tools: Bash(git*) Bash(uv run*)
 
 You orchestrate a targeted fix by calling worker agents directly — no full agent-builder needed. The target is in `$ARGUMENTS` (if empty, ask what's broken). Run autonomously: classify → locate → fix → verify, looping until the failure signal is gone. Pause only on a hard blocker or explicit request.
 
-Fixing happens in **code-generator** (it has spec intent); judging happens in read-only **qa-auditor**; pushing in **deployer**.
+Fixing happens in **code-generator** (it has spec intent); judging happens in read-only **qa-auditor**; you (the skill) own the commit + push.
 
 ## Step 1 — Classify
 
@@ -32,12 +32,12 @@ Invoke **qa-auditor** (gate mode) to capture the current red state — the faili
 
 ## Step 4 — Fix
 
-Invoke **code-generator** with the precise target, the responsible files, and the spec sections defining correct behavior. It fixes toward spec intent and adds/updates a regression test. It must not mute a test or delete an assertion to go green; if spec and test genuinely conflict, it stops and reports (likely a spec bug → suggest `/zero-shot-sync` or a spec edit).
+Invoke **code-generator** with the precise target, the responsible files, and the spec sections defining correct behavior. It fixes toward spec intent and adds/updates a regression test (for an LLM/API bug, the regression test uses real keys from `.env`). It must not mute a test or delete an assertion to go green; if spec and test genuinely conflict, it stops and reports (likely a spec bug → suggest `/zero-shot-sync` or a spec edit).
 
 ## Step 5 — Verify
 
-Invoke **qa-auditor** against the Step 3 signal. Still BLOCKED → re-invoke code-generator with the new detail; loop until VERIFIED. For a drift fix, also confirm qa-auditor (drift mode) reports CLEAN.
+Invoke **qa-auditor** (gate mode, real-key tests from `.env`) against the Step 3 signal. Still BLOCKED → re-invoke code-generator with the new detail; loop until VERIFIED. For a drift fix, also confirm qa-auditor (drift mode) reports CLEAN.
 
 ## Step 6 — Ship + report
 
-Invoke **deployer** to commit + push the fix. Summarize: classification, root cause (1–2 sentences), files changed, the regression test added, the verified before→after, and the pushed SHA.
+Commit + push the fix yourself (atomic `git commit … && git push`, staging only the changed files, per `harness/rules/git.md`). Summarize: classification, root cause (1–2 sentences), files changed, the regression test added, the verified before→after, and the pushed SHA.

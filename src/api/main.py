@@ -52,6 +52,9 @@ def create_app() -> FastAPI:
     from src.api.datasets import router as datasets_router
     app.include_router(datasets_router)
 
+    from src.api.query import router as query_router
+    app.include_router(query_router)
+
     return app
 
 

@@ -72,7 +72,7 @@ Step 1  SQLite spine ─────┬─────────────�
 | 1 — SQLite spine | executor | green | `pytest tests/test_startup.py -q` exits 0 — 3 passed | five tables + indexes; readiness 503/200 probe; P1-AC7; committed |
 | 2A — /datasets | executor | green | `pytest tests/test_datasets.py -q` — 5 passed | sample.csv (100 rows, 3 cols), broken.png fixtures; DuckDB persistent TABLE [C-DUCKDB-VIEW]; P1-AC4, P1-AC5 |
 | 2B — /sessions | executor | green | `pytest tests/test_sessions.py tests/test_health.py -q` exits 0 — 4 passed | uuid4 id, 201 + Location; P1-AC2, P1-AC10; committed |
-| 3 — POST /query stub | executor | todo | `pytest tests/test_query.py tests/test_audit.py -q` exits 0 | canned 5-row response; 1 audit_log row; P1-AC3, P1-AC8, P1-AC9 |
+| 3 — POST /query stub | executor | green | `pytest tests/test_query.py tests/test_audit.py -q` — 4 passed | canned 5-row response; 1 audit_log row; P1-AC3, P1-AC8, P1-AC9 |
 | 4 — Next.js shell | executor | green | `npm run build` exits 0 — GATE PASS | stub banner literal; session sidebar; Datasets + Query tabs; Plotly SSR-disabled; P1-AC1, P1-AC11 |
 | 5 — Wire + e2e | executor | todo | playwright tests pass; refuse-to-start test passes | GET /health → banner; POST /sessions per tab; chip auto-submit; P1-AC1, P1-AC6, P1-AC11 |
 

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-agent.py — local setup checker and run helper
+agent.py — run the agent or check local setup
 
 Usage:
-  python agent.py           # check everything
-  python agent.py --run     # check + alembic + build frontend + start server
-  python agent.py --reset   # restore spec templates and wipe runtime data
+  python agent.py               # build frontend + apply migrations + start server
+  python agent.py --check-setup # verify all tools, .env, deps, and tests
 """
 import argparse
 import os
@@ -24,10 +23,10 @@ CYAN   = "\033[36m"
 RESET  = "\033[0m"
 BOLD   = "\033[1m"
 
-def ok(msg: str)   -> None: print(f"  {GREEN}✓{RESET}  {msg}")
-def fail(msg: str) -> None: print(f"  {RED}✗{RESET}  {msg}"); _failures.append(msg)
-def warn(msg: str) -> None: print(f"  {YELLOW}!{RESET}  {msg}")
-def info(msg: str) -> None: print(f"  {CYAN}→{RESET}  {msg}")
+def ok(msg: str)     -> None: print(f"  {GREEN}✓{RESET}  {msg}")
+def fail(msg: str)   -> None: print(f"  {RED}✗{RESET}  {msg}"); _failures.append(msg)
+def warn(msg: str)   -> None: print(f"  {YELLOW}!{RESET}  {msg}")
+def info(msg: str)   -> None: print(f"  {CYAN}→{RESET}  {msg}")
 def header(msg: str) -> None: print(f"\n{BOLD}{msg}{RESET}")
 
 _failures: list[str] = []
@@ -58,32 +57,26 @@ def env_key_set(path: Path, key: str) -> bool:
 def check_tools() -> None:
     header("Tools")
 
-    # git
     v = cmd_version(["git", "--version"])
     if v: ok(v)
     else: fail("git not found — install git")
 
-    # python 3.11+
     vi = sys.version_info
     if vi >= (3, 11):
         ok(f"Python {vi.major}.{vi.minor}.{vi.micro}")
     else:
         fail(f"Python {vi.major}.{vi.minor} found — need 3.11+")
 
-    # uv
     v = cmd_version(["uv", "--version"])
     if v: ok(v)
     else: fail("uv not found — install: curl -LsSf https://astral.sh/uv/install.sh | sh")
 
-    # claude
     v = cmd_version(["claude", "--version"])
     if v: ok(v)
     else: fail("claude CLI not found — install Claude Code")
 
-    # node + pnpm (optional — needed only for frontend build)
     if which("node"):
-        v = cmd_version(["node", "--version"])
-        ok(f"node {v}")
+        ok(f"node {cmd_version(['node', '--version'])}")
         v = cmd_version(["pnpm", "--version"])
         if v: ok(f"pnpm {v}")
         else: warn("pnpm not found — needed for frontend build: npm install -g pnpm")
@@ -101,9 +94,9 @@ def check_env() -> None:
     ok(".env exists")
 
     providers = {
-        "ANTHROPIC_API_KEY": "Anthropic",
-        "GEMINI_API_KEY":    "Gemini",
-        "OPENROUTER_API_KEY":"OpenRouter",
+        "ANTHROPIC_API_KEY":  "Anthropic",
+        "GEMINI_API_KEY":     "Gemini",
+        "OPENROUTER_API_KEY": "OpenRouter",
     }
     found = [name for key, name in providers.items() if env_key_set(env, key)]
     if found:
@@ -115,8 +108,7 @@ def check_env() -> None:
 def check_python_env() -> None:
     header("Python environment")
 
-    venv = ROOT / ".venv"
-    if not venv.exists():
+    if not (ROOT / ".venv").exists():
         fail(".venv not found — run: uv sync")
         return
     ok(".venv present")
@@ -131,17 +123,16 @@ def check_python_env() -> None:
 def check_db() -> None:
     header("Database")
 
-    data = ROOT / "data"
-    data.mkdir(exist_ok=True)
+    (ROOT / "data").mkdir(exist_ok=True)
     ok("data/ directory ready")
 
     r = run(["uv", "run", "alembic", "current"])
     if r.returncode == 0 and r.stdout.strip():
         ok(f"alembic migration applied: {r.stdout.strip().splitlines()[0]}")
     elif r.returncode == 0:
-        warn("no migration applied yet — run: uv run alembic upgrade head")
+        warn("no migration applied yet — will apply on next run")
     else:
-        warn("alembic check failed — run: uv run alembic upgrade head")
+        warn("alembic check failed — will attempt on next run")
 
 
 def check_tests() -> None:
@@ -163,119 +154,69 @@ def check_frontend() -> None:
         warn("frontend/ not found — skipping")
         return
 
-    nm = fe / "node_modules"
-    if not nm.exists():
+    if not (fe / "node_modules").exists():
         warn("node_modules missing — run: cd frontend && pnpm install")
         return
     ok("node_modules present")
 
-    lock = fe / "pnpm-lock.yaml"
-    out = fe / "out"
-    if out.exists():
-        ok("frontend/out/ built — server will serve UI at /app/")
+    if (fe / "out").exists():
+        ok("frontend/out/ built — will serve UI at /app/")
     else:
-        warn("frontend not built — run: cd frontend && pnpm build  (or use --run)")
+        warn("frontend not built — will build on next run")
 
 
-# ── actions ───────────────────────────────────────────────────────────────────
+# ── run ───────────────────────────────────────────────────────────────────────
 def do_run() -> None:
-    header("Build & run")
-
-    # alembic
+    # migrations
     info("applying migrations...")
     r = run(["uv", "run", "alembic", "upgrade", "head"], capture=False)
     if r.returncode != 0:
-        fail("alembic upgrade head failed")
-        return
+        print(f"\n{RED}alembic upgrade failed — fix before running.{RESET}")
+        sys.exit(1)
 
-    r = run(["uv", "run", "alembic", "current"])
-    rev = r.stdout.strip().splitlines()[0] if r.stdout.strip() else "(unknown)"
-    ok(f"migrations applied: {rev}")
-
-    # frontend
+    # frontend build
     fe = ROOT / "frontend"
-    if not which("pnpm"):
-        warn("pnpm not found — skipping frontend build")
-    elif fe.exists():
+    if which("pnpm") and fe.exists():
         info("building frontend...")
         r = run(["pnpm", "build"], cwd=fe, capture=False)
-        if r.returncode == 0:
-            ok("frontend built → frontend/out/")
-        else:
-            fail("frontend build failed")
+        if r.returncode != 0:
+            print(f"\n{RED}frontend build failed.{RESET}")
+            sys.exit(1)
 
-    if not _failures:
-        print(f"\n{GREEN}{BOLD}Starting server…{RESET}")
-        print(f"  {CYAN}http://localhost:8001{RESET}       (API)")
-        fe_out = ROOT / "frontend" / "out"
-        if fe_out.exists():
-            print(f"  {CYAN}http://localhost:8001/app/{RESET}  (UI)\n")
-        else:
-            print()
-        os.execvp("uv", ["uv", "run", "python", "-m", "agent"])
-
-
-def do_reset() -> None:
-    header("Reset to baseline")
-
-    # restore spec templates from git
-    info("restoring spec/ templates...")
-    r = run(["git", "checkout", "HEAD", "--", "spec/"])
-    if r.returncode == 0:
-        ok("spec/ restored to boilerplate templates")
-    else:
-        warn("git checkout spec/ failed — spec/ unchanged")
-
-    # wipe runtime data only
-    data = ROOT / "data"
-    if data.exists():
-        shutil.rmtree(data)
-    data.mkdir()
-    (data / "uploads").mkdir(exist_ok=True)
-    ok("data/ cleared")
-
-    print(f"\n{GREEN}Baseline restored.{RESET}")
-    print("  src/, frontend/, tests/ are untouched — they are the framework baseline.")
-    print("  Next: branch and build.")
-    print(f"\n    {CYAN}git checkout -b feat/my-agent && claude{RESET}")
-    print(f"    {CYAN}/zero-shot-build [your idea]{RESET}\n")
+    # start
+    print(f"\n{GREEN}{BOLD}Starting…{RESET}")
+    print(f"  {CYAN}http://localhost:8001{RESET}       (API)")
+    if (ROOT / "frontend" / "out").exists():
+        print(f"  {CYAN}http://localhost:8001/app/{RESET}  (UI)")
+    print()
+    os.execvp("uv", ["uv", "run", "python", "-m", "agent"])
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
 def main() -> None:
-    parser = argparse.ArgumentParser(description="agent.py — setup checker and build helper")
-    parser.add_argument("--run", action="store_true", help="run alembic + build frontend after checks")
-    parser.add_argument("--reset", action="store_true", help="restore spec templates and clear runtime data")
+    parser = argparse.ArgumentParser(description="Run the agent or check local setup")
+    parser.add_argument("--check-setup", action="store_true", help="verify tools, .env, deps, and tests")
     args = parser.parse_args()
 
-    if args.reset:
-        do_reset()
+    if args.check_setup:
+        print(f"\n{BOLD}=== Setup Check ==={RESET}")
+        check_tools()
+        check_env()
+        check_python_env()
+        check_db()
+        check_tests()
+        check_frontend()
+        print()
+        if _failures:
+            print(f"{RED}{BOLD}{len(_failures)} issue(s) found — fix before running.{RESET}")
+            for f in _failures:
+                print(f"  {RED}✗{RESET}  {f}")
+            sys.exit(1)
+        else:
+            print(f"{GREEN}{BOLD}All checks passed. Run: python agent.py{RESET}\n")
         return
 
-    print(f"\n{BOLD}=== Local Setup Check ==={RESET}")
-
-    check_tools()
-    check_env()
-    check_python_env()
-    check_db()
-    check_tests()
-    check_frontend()
-
-    print()
-    if _failures:
-        print(f"{RED}{BOLD}{len(_failures)} issue(s) found — fix before starting.{RESET}")
-        for f in _failures:
-            print(f"  {RED}✗{RESET}  {f}")
-        if not args.build:
-            sys.exit(1)
-    else:
-        print(f"{GREEN}{BOLD}All checks passed.{RESET}")
-
-    if args.build:
-        do_run()
-    else:
-        print(f"\n  Run {CYAN}python agent.py --run{RESET} to apply migrations and build the frontend.")
-        print(f"  Run {CYAN}python agent.py --reset{RESET} to restore spec templates for a fresh build.\n")
+    do_run()
 
 
 if __name__ == "__main__":

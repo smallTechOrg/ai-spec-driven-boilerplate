@@ -19,6 +19,8 @@ For code purposes, treat any field whose name matches `*_token`, `*_secret`,
 | Git history | ❌ Never |
 | Commit messages, PR descriptions, logs | ❌ Never |
 
+Tests and evals read keys from `.env` / the process environment at runtime — never hardcode a key in a test or fixture.
+
 ## Rules for code
 
 ### Never log a secret
@@ -62,9 +64,10 @@ Before every commit involving new or changed files:
 
 ## Rules for AI agents
 
-- **Never read a `.env` file** unless the user explicitly asks.
-- **Never echo, print, or paste a secret value** into your response. Confirm by presence only.
+- **Load keys programmatically, never echo them.** The build and tests load keys from `.env` programmatically (e.g. via the config loader / process env) — that is expected. Do not echo or paste raw `.env` values into responses or logs. When you must confirm a key, confirm by presence only (a bool), never by value.
+- **Never echo, print, or paste a secret value** into your response.
 - **Never commit a file that contains a secret** even if the user asks. Push back, rotate, continue.
+- **When intake requests API keys, instruct the user to put them in `.env`** (gitignored) — never accept secrets pasted into chat or committed to source.
 
 ## If a secret leaks
 

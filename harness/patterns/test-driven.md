@@ -27,9 +27,8 @@ If you wrote code before its test, you skipped Red. Delete the test you wrote af
 ## What a Good Test Asserts
 
 - **Behaviour, not implementation.** Assert what the function returns or what side-effect occurred — never which internal helpers were called. Tests that mirror the code break on every refactor.
-- **One concept per test.** When it fails you should know exactly what broke from the test name alone. `test_validate_rejects_negative_threshold`, not `test_validation`.
-- **Arrange / Act / Assert**, visibly separated. Setup at top, one action, then assertions. No assertions interleaved with more actions.
-- **The test name is a sentence.** It states the precondition and the expected outcome. Read top-to-bottom, the test file is a behaviour spec.
+- **One concept per test, named as a sentence** stating precondition and outcome — so a failure tells you exactly what broke: `test_validate_rejects_negative_threshold`, not `test_validation`.
+- **Arrange / Act / Assert**, visibly separated. Setup at top, one action, then assertions — never interleaved.
 
 ---
 
@@ -39,17 +38,17 @@ A flaky test is worse than no test — it trains everyone to ignore red.
 
 - **No wall clock.** Inject time (a `clock` parameter, a frozen-time fixture). Never assert against `now()`.
 - **No randomness.** Seed it, or pass the value in. A test that fails 1-in-50 runs is a defect.
-- **No live network.** External calls are stubbed at the boundary (see below). The Phase 2 gate runs with **no LLM API key set** — if a test needs a real key, it isn't a unit/integration test.
+- **Determinism at the unit level.** Pure unit tests inject time/seeds and may stub the provider boundary. Integration and E2E tests DO call the real LLM/API (keys from `.env`); for those, assert on response shape/invariants (status, key fields, structure) and tolerate non-deterministic prose rather than exact strings.
 - **No shared mutable state between tests.** Each test sets up and tears down its own world. Order-dependence is a bug.
 
 ---
 
-## Stub, Don't Mock
+## If a Stub Is Used, Don't Mock
 
-Prefer a thin real implementation (in-memory queue, fake repository, stub LLM provider) over a framework mock.
+For pure-unit isolation, prefer a thin real implementation (in-memory queue, fake repository, stub LLM provider) over a framework mock. Integration and E2E tests use the **real provider**, not a stub.
 
 - Stubs **compose** and survive refactors; mocks encode call sequences and break on them.
-- The stub LLM provider must produce **distinct, node-tagged output** (see `rules/ai-agents.md` rule 8) so offline tests are credible and node cross-contamination is caught.
+- IF a stub LLM provider is used (unit tests or optional offline dev), it should produce **distinct, node-tagged output** (see `rules/ai-agents.md` rule 8) so it is credible and node cross-contamination is caught.
 - Use the production DB driver in integration tests (PostgreSQL via `conftest.py` setup/teardown) — **never** SQLite-as-a-substitute (`rules/ai-agents.md` rule 5).
 
 ---
@@ -59,10 +58,10 @@ Prefer a thin real implementation (in-memory queue, fake repository, stub LLM pr
 | Level | Count | Speed | Scope |
 |-------|-------|-------|-------|
 | Unit | many | ms | one function/class, all deps stubbed |
-| Integration | fewer | 100s of ms | real DB / real I/O boundary, stubbed network |
+| Integration | fewer | 100s of ms | real DB and real LLM/API boundary (keys from `.env`) |
 | E2E / smoke | fewest | seconds | a real process, golden-path user journey |
 
-Push assertions **down** the pyramid: if a unit test can catch it, don't wait for the smoke test. The golden-path UI smoke test (Phase 2 gate) asserts **response content**, not just status codes — a 200 that renders a broken page is a failing test.
+Push assertions **down** the pyramid: if a unit test can catch it, don't wait for the smoke test. The golden-path UI smoke test (Phase 2 gate) runs against the **live provider** and asserts **real response content**, not just status codes — a 200 that renders a broken or stub-looking page is a failing test.
 
 ---
 
@@ -78,4 +77,4 @@ Push assertions **down** the pyramid: if a unit test can catch it, don't wait fo
 
 - Run the **full** suite, not just the test you touched. Show the output.
 - "It should pass" is not a passing test (`rules/ai-agents.md` rule 2). Run it or say you couldn't.
-- A phase is not complete until its gate suite is green against the production DB driver, offline.
+- A phase is not complete until its gate suite is green against the production DB driver WITH real LLM/API keys from `.env`, including edge-case and E2E/UI tests.

@@ -20,22 +20,27 @@ These rules are never optional, never skipped, and must survive context compress
 
 5. **No SQLite substitute for PostgreSQL tests.** If the production database is PostgreSQL, tests run against PostgreSQL. Tests that only pass on SQLite do not count as passing.
 
-6. **Golden-path UI smoke test is mandatory before Phase 2 passes.** If the project has any UI or HTTP surface, Phase 2 must include an automated test that walks the full primary user journey via `TestClient` (or equivalent) and asserts **response content**, not just status codes. A build that returns 200 but renders a broken-looking page is a failing build.
+6. **Golden-path UI smoke test is mandatory before Phase 2 passes.** If the project has any UI or HTTP surface, Phase 2 must include an automated test that walks the full primary user journey end-to-end against the **real LLM/API** (keys from `.env`) via `TestClient` (or equivalent) and asserts **response content**, not just status codes. A build that returns 200 but renders a broken-looking page is a failing build. Edge-case and end-to-end coverage of the journey are required, not optional.
 
-7. **Stub / offline providers must be clearly signalled in the UI.** If an LLM provider is stubbed (no key, demo mode), the UI must display a visible banner on every page. Silent stubs that look like real output are a bug — users will report "it didn't work." The provider should auto-select real when an API key is present (`provider=auto` → real when key set, stub otherwise). Never require the user to flip a flag *in addition* to setting the key.
+7. **Tests and evals run against the real LLM/API using keys loaded from `.env`.** There is no offline-passing requirement; real-key execution is the default and required path for every gate, against the production DB driver (never SQLite if production is PostgreSQL). A stub provider MAY exist as an optional local fallback when a key is genuinely absent, but it is never the gate. The quality bar is perfect, zero errors — edge-case, end-to-end, and UI tests are required, not optional.
 
-8. **Stub LLM outputs must be distinct per pipeline node and article-shaped.** Pipeline nodes that share a stub provider must inject unambiguous tags (e.g. `<node:plan>`, `<node:draft>`, `<node:title>`) into their prompts, and the stub must branch on those tags — never on prose keywords from the prompt body (keyword matching cross-contaminates: the word "outline" in a draft prompt must not cause the stub to emit outline bullets instead of a draft). Stub "draft" output must contain paragraphs/headings, not just bullets, so offline demos are credible.
+8. **Every commit must be pushed immediately.** `git commit -m "..." && git push origin <branch>` is one indivisible action — a commit that isn't pushed doesn't exist. See `harness/rules/git.md`.
 
-9. **Every commit must be pushed immediately.** `git commit` and `git push` are a single atomic action — never one without the other. Use `git commit -m "..." && git push origin <branch>` as a single command. A commit that is not pushed does not exist as far as the project is concerned. This is not optional and is not context-compression-safe — if you remember only this sentence: **commit then push, every time, no exceptions.**
+9. **`main` is boilerplate-only. Never commit application code to `main`.** App code lives on a feature branch and reaches `main` only via a reviewed PR. See `harness/rules/git.md`.
 
-10. **`main` is boilerplate-only. Never commit application code to `main`.** All application code lives on a named feature branch and reaches `main` only via a reviewed pull request. This rule has no exceptions:
-    - Before writing any application code, create a feature branch: `git checkout -b feature/<slug>-v0.1`
-    - All phase commits go to the feature branch, never to `main`
-    - Spec, harness, and boilerplate improvements (no app code) are the only commits that may go directly to `main`
-    - When the build is complete, open a PR from the feature branch into `main` — do not merge locally
-    - If you find yourself on `main` while writing application code, stop immediately, create the feature branch, and continue there
+10. **A PR must exist before the first feature-branch commit.** Open it right after the first push (`gh pr create --base main --head feature/<slug>-v0.1`); every later push updates it. See `harness/rules/git.md`.
 
-11. **A PR must exist before the first feature-branch commit, and every push must go to that PR.** After creating the feature branch and pushing the first commit, immediately open a PR: `gh pr create --base main --head feature/<slug>-v0.1`. Every subsequent `git push` automatically updates the same PR — no extra step needed — but the PR must be open. Pushing commits without an open PR is equivalent to committing without pushing: the work is invisible and unreviable. This is not optional and survives context compression.
+---
+
+### Optional stub fallback (non-normative)
+
+The real provider is the default and what every gate tests. A stub provider MAY exist purely as a local fallback for when a key is genuinely absent:
+
+- It should auto-select real when a key is present (`provider=auto` → real when key set), never requiring the user to flip a flag *in addition* to setting the key.
+- If an active stub is ever used, signal it visibly in the UI so demo output is never mistaken for real output.
+- If implemented, its per-node outputs should be distinct (branch on injected node tags, never on prose keywords) and shaped like real output, so the fallback is not misleading.
+
+None of this is gated — the Phase 2 gate runs against real keys.
 
 ---
 
@@ -50,8 +55,9 @@ Complete all steps in order before writing any code:
 - [ ] Run `git status` — working tree must be clean before starting
 - [ ] **Create and switch to a feature branch**: `git checkout -b feature/<slug>-v0.1` — **never build on `main`**
 - [ ] **Create the project directory** `<agent-slug>/` if it doesn't exist — never write agent code into the boilerplate root
+- [ ] Confirm `.env` exists and contains the required API keys/secrets (requested at intake) — tests and the build run against the real LLM/API using these keys
 - [ ] Open a session report at `reports/sessions/YYYY-MM-DD-HHMMSS-[branch].md` — **must exist before Phase 1 starts**
-- [ ] Confirm which phase you are implementing (see `harness/phases.md`)
+- [ ] Confirm which phase you are implementing (see `harness/patterns/phases.md`)
 
 ## 2. Session Report (Mandatory)
 
@@ -59,106 +65,44 @@ Every session must have a report at `reports/sessions/YYYY-MM-DD-HHMMSS-[branch]
 
 ### Required structure
 
-```markdown
-# Session — YYYY-MM-DD HH:MM
+Top-matter (`Branch`, `Phase`, `Goal`, `Started`), then these sections:
 
-**Branch:** feature/<slug>-v0.1
-**Phase:** <current phase number and name>
-**Goal:** <one sentence — what this session is trying to accomplish>
-**Started:** HH:MM
-
----
-
-## Steps
-
-<!-- Log entries in real time. Format: HH:MM — [agent or action] — [what happened / outcome] -->
-
-HH:MM — [session start] — read spec, confirmed phase N in scope, working tree clean
-HH:MM — [code-generator] — implemented X, Y, Z; gate ran, PASS
-HH:MM — [code-reviewer] — APPROVED / returned 2 blockers: ...
-HH:MM — [qa-auditor] — VERIFIED / BLOCKED: <specific failures>
-HH:MM — [deployer] — committed + pushed phase-N (abc1234)
-
----
-
-## Decisions & Assumptions
-
-<!-- Record any non-obvious choice made during this session and why. -->
-
-- <decision>: <rationale>
-
----
-
-## Blockers & Open Questions
-
-<!-- Anything that stopped progress or needs user input. -->
-
-- [ ] <blocker or question>
-
----
-
-## Latency Log
-
-| Stage | Agent | Start | End | Duration |
-|-------|-------|-------|-----|----------|
-| Spec draft | spec-writer | HH:MM | HH:MM | Xm |
-| Spec review | spec-reviewer | HH:MM | HH:MM | Xm |
-| Tech design | tech-architect | HH:MM | HH:MM | Xm |
-| Phase 1 code | code-generator | HH:MM | HH:MM | Xm |
-| Phase 1 review | code-reviewer | HH:MM | HH:MM | Xm |
-| Phase 1 gate | qa-auditor | HH:MM | HH:MM | Xm |
-| Phase 1 deploy | deployer | HH:MM | HH:MM | Xm |
-
----
-
-## End State
-
-**Finished:** HH:MM
-**Phase completed:** <N>
-**Tests:** PASS / FAIL
-**Working tree:** clean / dirty (explain)
-**Next session starts at:** Phase <N+1> — <brief description>
-
----
-
-## Harness Notes
-
-<!-- Anything this session revealed about the harness itself — confusing rules, missing guidance, slow stages, false-positive gates. These feed harness improvements. -->
-
-- <observation>
-```
+- **Steps** — real-time log, one line per action: `HH:MM — [agent or action] — [what happened / outcome]`.
+- **Decisions & Assumptions** — `<decision>: <rationale>` for any non-obvious choice.
+- **Blockers & Open Questions** — the exact failure or question.
+- **Latency Log** — a table with `Stage | Agent | Start | End | Duration`, one row per agent stage.
+- **End State** — `Finished`, `Phase completed`, `Tests` (PASS/FAIL), `Working tree`, `Next session starts at`.
+- **Harness Notes** — anything this session revealed about the harness itself (confusing rules, slow stages, false-positive gates).
 
 ### Rules for filling in the report
 
 - **Log in real time** — do not reconstruct at the end. Each step entry as it happens.
 - **Timestamp every action** — start + end time per agent stage. Latency data is how we improve the harness.
-- **Decisions are permanent** — if you chose something non-obvious (a library, a schema shape, a stub strategy), record it. Future sessions need to know why.
-- **Blockers are actionable** — if you're blocked, write the exact question or failure. Not "blocked on DB" but "blocked: `psycopg2` not in PATH, suspect missing C library — need user to run `brew install libpq`."
-- **Harness Notes are gold** — any observation about where the harness slowed you down or gave wrong guidance is a first-class output, not a throwaway comment.
+- **Decisions are permanent** — record any non-obvious choice (a library, a schema shape, a provider choice) and why.
+- **Blockers are actionable** — write the exact question or failure, not "blocked on DB" but "blocked: `psycopg2` not in PATH, suspect missing C library — need user to run `brew install libpq`."
+- **Harness Notes are gold** — observations about where the harness slowed you down are a first-class output.
 
-## 3. Gate Law
+## 3. Build Flow
 
-The goal is: **one prompt → working skeleton in ~10 minutes.** All decisions are captured upfront and approved once. There is exactly one user approval gate before code is written.
+The goal is: **one prompt → a perfectly-working, thoroughly-tested agent in ~20-30 minutes, with zero user interaction after intake.** There is no build/approval gate. Intake is the only interactive step: it captures scope, stack, trigger, and constraints, may ask additional clarifying questions up front, and asks the user to fill `.env` with the required API keys/secrets. Once intake completes, agent-builder runs design → scaffold → build → ship autonomously, with zero further user interaction.
 
 ```
-INTAKE (4 questions: scope, stack, trigger, constraints)
+INTAKE (capture scope, stack, trigger, constraints; ask additional clarifying
+        questions up front if anything is ambiguous; request the user fill .env
+        with the required API keys/secrets)
         ↓
-DRAFT (spec + tech design + plan produced together)
-        ↓
-ONE APPROVAL (user sees everything at once — one response to proceed)
-        ↓
-BUILD (Phase 1 → Phase 2, each gated by passing tests)
+BUILD (spec + tech design + plan, then Phase 1 → Phase 2, each gated by passing
+       real-key tests) — runs autonomously, no approval gate
 ```
 
 **Rules that never change:**
-- Stack decisions (database, language, hosting) belong to the user — captured at intake, never chosen autonomously
-- No code is written before the single approval gate is cleared
-- Each build phase must pass its gate test before the next phase starts
-- spec-reviewer reviews the spec and code-reviewer reviews the code; tech-architect self-reviews its design; qa-auditor gates each phase. None of these add a user approval round for v0.1 — there is exactly one approval gate (after intake)
+- Stack decisions (database, language, hosting) belong to the user — captured at intake, never chosen autonomously.
+- Filling `.env` is the only manual user step, requested at intake; after intake there is no further user interaction.
+- Each build phase must pass its gate against the real LLM/API before the next phase starts.
+- spec-writer and tech-architect each self-review their output, and qa-auditor independently reviews the code and gates each phase — none of these add a user approval round.
 
-**After v0.1 is running**, subsequent phases follow the standard gate:
 ```
-[Phase implemented] → [gate test passes] → [committed] → [next phase]
+[Phase implemented] → [real-key gate passes] → [committed] → [next phase]
 ```
 
 ---
@@ -173,7 +117,7 @@ If you are asked to implement something not in the spec:
 3. Propose adding it to the spec first
 4. Wait for approval before writing code
 
-See `harness/spec-driven.md` for full details.
+See `harness/patterns/spec-driven.md` for full details.
 
 ## 5. Phase Discipline
 
@@ -184,11 +128,11 @@ Each phase ends when:
 - All tests for that phase pass
 - The qa-auditor sub-agent has returned VERIFIED (or you have run the gate checklist manually)
 
-See `harness/phases.md` for the phase definitions and gates.
+See `harness/patterns/phases.md` for the phase definitions and gates.
 
 ## 6. Git Discipline
 
-See `harness/git.md` for the full rules. Summary:
+See `harness/rules/git.md` for the full rules. Summary:
 
 - Commit every logical unit of work — never let the working tree stay dirty for more than one logical change
 - **Push immediately after every commit** — `git commit -m "..." && git push origin <branch>` is one indivisible action
@@ -203,10 +147,11 @@ See `harness/git.md` for the full rules. Summary:
 
 ## 7. Test Before Claiming Done
 
-A phase is not done until tests pass. "It looks right" is not a test.
+A phase is not done until all tests pass against the real LLM/API. "It looks right" is not a test. The quality bar is perfect, zero errors — not fast and minimal.
 
-- Write tests for each capability as you implement it
-- Run the full test suite before marking a phase complete
+- Write tests for each capability as you implement it, including edge cases
+- Cover end-to-end and UI journeys (real keys) for any UI/HTTP surface
+- Run the full suite against keys from `.env` before marking a phase complete
 - If tests fail, fix them before moving on
 
 ## 8. Error Resilience
@@ -215,6 +160,8 @@ Every external call (API, database, LLM) must have:
 - Error handling that doesn't crash the agent
 - Logged failures (to file or stdout at minimum)
 - Graceful degradation (the agent continues if a non-critical step fails)
+
+Surface a clear, actionable error when an API key is missing or invalid (point the user at `.env`) — never silently fall back in a way that hides a real failure during tests.
 
 ## 9. No Gold-Plating
 

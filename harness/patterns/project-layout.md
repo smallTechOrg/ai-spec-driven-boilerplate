@@ -79,8 +79,10 @@ The repo root **is** the agent project. There is no `<agent-slug>/` subdirectory
 │   │   ├── db/test_models.py
 │   │   ├── domain/test_models.py
 │   │   └── graph/test_agent.py       ← graph compiles without env vars
-│   └── integration/
-│       └── test_pipeline.py          ← stub run, one DB record, status=completed
+│   ├── integration/
+│   │   └── test_pipeline.py          ← real-provider run end-to-end, one DB record, status=completed (+ edge cases / error paths)
+│   ├── e2e/                          ← full primary journey against the real LLM/API + live server
+│   └── ui/                           ← UI-only projects: rendered content + empty/loading/error states
 ├── alembic/
 │   ├── env.py                        ← reads DB URL from settings; sets target_metadata = Base.metadata
 │   ├── script.py.mako                ← REQUIRED — standard mako template; alembic revision fails without it
@@ -97,11 +99,6 @@ The repo root **is** the agent project. There is no `<agent-slug>/` subdirectory
 ```
 
 **Critical:** `tests/` is at the repo root — **not** inside `src/`. The `pyproject.toml` must have `testpaths = ["tests"]` (not `["src/tests"]`).
-
----
-├── .env.example
-└── README.md
-```
 
 ---
 
@@ -172,6 +169,8 @@ class Settings(BaseSettings):
     )
 
     database_url: str = Field(...)
+    # Filled from .env (the single manual user step, requested at intake) and
+    # required for the real-provider gate; fail fast at startup if it is absent.
     anthropic_api_key: str = Field(default="")
     llm_model: str = Field(default="claude-sonnet-4-6")
     log_level: str = Field(default="INFO")
@@ -272,12 +271,12 @@ class AgentState(TypedDict, total=False):
     # add domain fields here
 ```
 
-### graph/nodes.py (stub shape)
+### graph/nodes.py (Phase 1 placeholder shape)
 
 ```python
 from <package>.graph.state import AgentState
 
-STUB_RESULT = {"stub": True}  # replace with real call in Phase 3+
+STUB_RESULT = {"stub": True}  # placeholder — replaced by real provider calls before the Phase 2 gate
 
 def fetch_data(state: AgentState) -> AgentState:
     return {**state, "data": STUB_RESULT}
@@ -393,7 +392,7 @@ def api_error(code: str, message: str, status_code: int = 400) -> HTTPException:
     return HTTPException(status_code=status_code, detail={"code": code, "message": message})
 ```
 
-### src/tests/conftest.py
+### tests/conftest.py
 
 ```python
 import pytest
@@ -407,18 +406,28 @@ def _reset_settings_singleton():
     m._settings = None
 ```
 
-### src/tests/integration/test_pipeline.py
+### tests/integration/test_pipeline.py
+
+Integration tests run end-to-end against the **real LLM/API** using keys loaded
+from `.env` (via `get_settings()`), against an isolated copy of the production DB
+driver. Assert on the run's structural result (status, shape, key fields), not on
+exact model prose. If a required key is genuinely absent, `pytest.skip` — never
+fall back to a stub key as the default path. Integration tests also cover edge
+cases and error paths, not just the happy run.
 
 ```python
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from <package>.config.settings import get_settings
 from <package>.db.models import Base, RunRow
 from <package>.db import session as session_module
 from <package>.graph.runner import run_agent
 
 @pytest.fixture(autouse=True)
-def _use_sqlite(tmp_path, monkeypatch):
+def _isolated_db(tmp_path, monkeypatch):
+    # Isolated copy of the production DB driver (use a temp PostgreSQL DB if prod
+    # is PostgreSQL — never substitute SQLite for a production DB).
     engine = create_engine(f"sqlite:///{tmp_path}/test.db")
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, autocommit=False)
@@ -429,13 +438,16 @@ def _use_sqlite(tmp_path, monkeypatch):
     engine.dispose()
 
 @pytest.fixture(autouse=True)
-def _stub_env(monkeypatch):
-    monkeypatch.setenv("APP_DATABASE_URL", "sqlite:///stub.db")
-    monkeypatch.setenv("APP_ANTHROPIC_API_KEY", "stub-key")
+def _real_env(monkeypatch, tmp_path):
+    # The provider key is loaded from .env via get_settings(); confirm presence
+    # only (bool) — never echo or hardcode the value. Skip (do NOT stub) if absent.
+    monkeypatch.setenv("APP_DATABASE_URL", f"sqlite:///{tmp_path}/test.db")
+    if not get_settings().anthropic_api_key:
+        pytest.skip("real LLM/API key not set in .env — required for the real-provider run")
 
-def test_pipeline_runs_end_to_end(_use_sqlite, _stub_env):
+def test_pipeline_runs_end_to_end(_isolated_db, _real_env):
     from sqlalchemy.orm import Session
-    run_id = run_agent()
+    run_id = run_agent()  # exercises the real provider end-to-end
     assert run_id is not None
     with Session(session_module._engine) as s:
         run = s.get(RunRow, run_id)
@@ -447,7 +459,7 @@ def test_pipeline_runs_end_to_end(_use_sqlite, _stub_env):
 
 ## Rules
 
-1. **Agent code goes in `<agent-slug>/src/<package>/`** — never in the boilerplate root
+1. **Agent code goes in `src/<package>/`** — never in the boilerplate root
 2. **No repository pattern** — direct SQLAlchemy queries in graph nodes and API handlers
 3. **`graph/` not `agent/`** — directory name matches sales-agent convention
 4. **TypedDict state** — not dataclass or Pydantic model
@@ -456,4 +468,4 @@ def test_pipeline_runs_end_to_end(_use_sqlite, _stub_env):
 7. **LLM abstraction** — `LLMClient` wrapper, never call provider SDK directly in nodes
 8. **FastAPI response envelope** — every route returns `ok(data)` or raises `api_error()`
 9. **Settings singleton** must be resettable via `monkeypatch.setattr(m, "_settings", None)`
-10. **Phase 2 gate must pass with zero env vars** — SQLite in-memory, stubs only, no network I/O
+10. **Phase 2 gate runs against real services** — tests and the golden-path smoke hit the real LLM/API using keys loaded from `.env` (requested at intake), against the production DB driver (never SQLite if production is PostgreSQL). A stub provider remains only as an optional fallback when a key is genuinely absent; offline-passing is no longer required, and real-key execution is the default and required path for the gate.

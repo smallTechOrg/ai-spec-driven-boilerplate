@@ -74,7 +74,7 @@ The diff shows the *what*. The message answers: *why was this change needed, and
 
 - **Commits are logical units.** Each commit should be a self-contained, reviewable change. "Fix bug and refactor and add feature" is three commits.
 - **No commented-out code in commits.** If code is not needed, delete it. Git history preserves it.
-- **Never commit secrets** — no API keys, passwords, or tokens in source files. See `harness/secret-hygiene.md`.
+- **Never commit secrets** — no API keys, passwords, or tokens in source files. See `harness/rules/secret-hygiene.md`. The `.env` containing API keys is the only manual user step and must stay gitignored — `.env.example` is committed, `.env` is never staged.
 - **Never force-push without explicit user confirmation.**
 
 ---

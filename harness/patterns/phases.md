@@ -6,7 +6,7 @@ Agents are built incrementally. This file defines the default phase model. The t
 
 **Build the minimal working thing first. Then expand.**
 
-A "working" agent in Phase 2 should demonstrate the core loop end-to-end — even if connections are stubbed, data is hardcoded, and UI is non-existent. Each subsequent phase makes it more real.
+A "working" agent in Phase 2 should demonstrate the core loop end-to-end against the real LLM/API (keys from `.env`), even if data is thin and UI is minimal. Each subsequent phase makes it more complete.
 
 ## Default Phase Model
 
@@ -22,32 +22,30 @@ The tech-architect sub-agent will customize this for your project, but the gener
   3. Basic CRUD unit tests pass
   4. Working tree is clean and committed
 
-### Phase 2 — Core Agent Loop (Stubbed)
-- Implement the agent's main loop from start to finish
-- **All external calls are hardcoded stubs — zero real API calls, zero network I/O**
-- LLM calls return a hardcoded string. Search calls return a hardcoded list. File writes use a temp path.
-- The agent must run fully offline. If `pytest` requires an API key to pass, Phase 2 is not done.
+### Phase 2 — Core Agent Loop (Real Integration)
+- Implement the agent's main loop from start to finish.
+- All external calls hit the real provider (LLM/API/search) using keys loaded from `.env`.
+- The agent runs end-to-end against the real LLM; tests assert on real responses (shape/content), not hardcoded strings.
+- A stub provider MAY remain as an optional fallback for offline development, but it is not required and tests are NOT expected to pass with keys unset.
 - **Gate (all must pass):**
   1. Agent runs end-to-end; at least one record written to DB; run status "completed"
-  2. `pytest` passes against the **production DB driver** (e.g. PostgreSQL via psycopg2) — not SQLite
+  2. `pytest` passes against the **production DB driver** (e.g. PostgreSQL via psycopg2, not SQLite) **with** real LLM/API keys loaded from `.env`
   3. Tests are fully automated: `conftest.py` creates and tears down the test schema; no manual DB setup steps
-  4. No LLM API key required to pass tests
-  5. **Golden-path UI smoke test passes** (if the project has any UI or HTTP surface). Walks the full primary user flow through `TestClient` AND asserts response content (not only status codes).
-  6. **Live-server smoke:** the agent starts the app (`uv run python -m <pkg>`) and hits `/health` plus one real page with `curl`. Both return 200. Exit codes logged in the session report.
-  7. **Stub mode is visibly labelled:** every rendered page shows a banner when the LLM provider is stubbed, so a human viewer cannot mistake stub output for real AI output.
+  4. Real LLM/API keys are present in `.env` and the suite exercises the real provider — no all-stubbed run is accepted as the Phase 2 gate
+  5. **Golden-path UI smoke test passes** (if the project has any UI or HTTP surface). Drives the full primary user flow through `TestClient` against the real LLM/API and asserts real response content (not only status codes). Edge-case and end-to-end UI assertions are required, not optional.
+  6. **Live-server smoke:** the agent starts the app (`uv run python -m <pkg>`) and hits `/health` plus one real page with `curl`, exercising the live LLM/API path. Both return 200 and the page shows real AI output. Exit codes logged in the session report.
 
-### Phase 3 — First Real Integration
-- Replace the most critical stub with a real external call
-- Typically this is the LLM or the primary data source
-- **Gate:** Agent runs with one real integration; happy path works with real data
+### Phase 3 — Remaining Integrations
+- Wire up any secondary providers or data sources not covered by the Phase 2 core loop.
+- **Gate:** Each integration runs for real; happy path works end-to-end with real data.
 
 ### Phase 4 — Error Handling + Resilience
 - Add try/catch, retries, timeouts to all external calls
 - Agent should continue (degraded, not crashed) on non-critical failures
 - **Gate:** Agent handles all documented failure modes without crashing
 
-### Phase 5 — Remaining Integrations
-- Replace remaining stubs with real implementations
+### Phase 5 — Full Integration Pass
+- Complete any remaining secondary integrations and verify the whole system runs against real services.
 - **Gate:** All integrations are real; agent runs fully end-to-end
 
 ### Phase 6 — API / CLI Surface
@@ -60,8 +58,8 @@ The tech-architect sub-agent will customize this for your project, but the gener
 - **Gate:** All specified screens/views are present and functional
 
 ### Phase 8 — Integration Tests
-- Write integration tests that exercise the full system
-- **Gate:** Integration tests pass reliably
+- Write integration tests that exercise the full system against real services, including edge cases, error paths, and any UI journey.
+- **Gate:** Integration, edge-case, end-to-end, and UI tests pass reliably against the real LLM/API
 
 ### Phase 9 — Observability + Logging
 - Add structured logging, metrics, and monitoring
@@ -86,6 +84,8 @@ A phase is complete when ALL of the following are true:
 **Never mark a phase complete if any gate is red.**
 
 **Never claim a phase passes based on tests alone if those tests use a different DB driver than production.** SQLite tests passing does not mean PostgreSQL migrations work.
+
+**Never claim Phase 2+ passes on stubbed providers** — the gate runs against the real LLM/API with keys from `.env`.
 
 ## Phase Tracking
 
@@ -113,7 +113,7 @@ The gate test command depends on the project language. The tech-architect sets t
 | TypeScript (Node) | migration tool + `npx vitest run tests/unit/` | `npx vitest run tests/integration/` |
 | Go | `migrate up` + `go test ./internal/...` | `go test ./...` |
 
-The Phase 2 gate must pass with **no LLM API key set** regardless of language. The DB URL must be set — tests need a real database, they just don't need a real LLM.
+The Phase 2 gate runs with **real LLM/API keys loaded from `.env`** regardless of language; both the DB URL and the provider key(s) must be set.
 
 ## TypeScript/Bun Phase 2 Test Pattern
 
@@ -121,13 +121,12 @@ The Phase 2 gate must pass with **no LLM API key set** regardless of language. T
 // tests/integration/pipeline.test.ts
 import { describe, it, expect, beforeEach } from "bun:test";
 
-// Use an in-memory or tmp SQLite DB for tests — never real PostgreSQL
-// Stub all external HTTP calls with a simple mock
+// Use the production DB driver via conftest-style setup/teardown — never SQLite-as-a-substitute
+// Call the real LLM/API using keys from .env
 
 describe("pipeline", () => {
-  it("runs end-to-end with stubs", async () => {
-    // stub external calls
-    // call runner
+  it("runs end-to-end against the real provider", async () => {
+    // call runner against the real provider
     // assert DB record created with correct status
   });
 });

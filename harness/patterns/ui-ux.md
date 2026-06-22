@@ -25,7 +25,7 @@ A view that only handles state 4 is half-built.
 
 ## Honesty (raises the bar — and it's a project rule)
 
-- **Stub/offline mode is always visibly labelled.** If the LLM provider is stubbed, every page shows a banner (`rules/ai-agents.md` rule 7). Stub output that looks real is a bug — users will report "it didn't work." Provider auto-selects real when a key is present; the user never flips an extra flag.
+- **Real-provider output is the default and what gets tested.** The provider auto-selects real when a key is present in `.env`; the user never flips an extra flag. *If* the optional stub fallback is ever used (no key present), it should be visibly labelled so demo output is never mistaken for real output — but the gate runs against the real provider, so the label is a should-if-used, not a mandate.
 - **Never fake progress.** A progress bar reflects real work or it doesn't exist. No spinners over instant operations to feel "busy."
 - **Destructive actions confirm.** Delete, overwrite, and irreversible actions ask first and name what will be lost.
 
@@ -67,10 +67,10 @@ A view that only handles state 4 is half-built.
 
 ## Verification
 
-The Phase 2 golden-path smoke test walks the **full primary user journey** and asserts **response content**, not status codes (`rules/ai-agents.md` rule 6, `patterns/phases.md`). Extend it to assert that:
+The Phase 2 golden-path smoke test is a **live-server** test that runs against the **real provider** using keys from `.env`. It walks the **full primary user journey** and asserts on **real response content**, not status codes (`rules/ai-agents.md` rule 6, `patterns/phases.md`). Extend it to assert that:
 
+- the live golden-path smoke runs against the real provider and asserts real response content,
 - the empty state renders its guidance copy,
-- the stub banner is present when offline,
 - an error path renders a human message (not a stack trace).
 
 If you can't write that assertion, the state isn't really designed yet.

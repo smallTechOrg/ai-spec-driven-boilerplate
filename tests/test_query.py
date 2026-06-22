@@ -81,7 +81,7 @@ async def test_empty_question(client, tmp_path):
         "question": "",
     })
     assert r.status_code == 422
-    assert r.json()["detail"]["error"]["code"] == "BAD_INPUT"
+    assert r.json()["error"]["code"] == "BAD_INPUT"
 
 
 @pytest.mark.asyncio
@@ -93,4 +93,4 @@ async def test_invalid_session(client):
         "question": "test",
     })
     assert r.status_code == 404
-    assert r.json()["detail"]["error"]["code"] == "NO_SESSION"
+    assert r.json()["error"]["code"] == "NO_SESSION"

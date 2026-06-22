@@ -3,7 +3,8 @@ import uuid
 from datetime import datetime, UTC
 
 import aiosqlite
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.config import get_settings
@@ -24,15 +25,9 @@ async def run_query(body: QueryRequest):
 
     # Validate question
     if not body.question.strip():
-        raise HTTPException(
-            status_code=422,
-            detail={"error": {"code": "BAD_INPUT", "message": "Question must not be empty"}},
-        )
+        return JSONResponse(status_code=422, content={"error": {"code": "BAD_INPUT", "message": "Question must not be empty"}})
     if len(body.question) > 2000:
-        raise HTTPException(
-            status_code=422,
-            detail={"error": {"code": "BAD_INPUT", "message": "Question exceeds 2000 characters"}},
-        )
+        return JSONResponse(status_code=422, content={"error": {"code": "BAD_INPUT", "message": "Question exceeds 2000 characters"}})
 
     async with aiosqlite.connect(settings.sqlite_path) as db:
         db.row_factory = aiosqlite.Row
@@ -40,10 +35,7 @@ async def run_query(body: QueryRequest):
         # Validate session
         cursor = await db.execute("SELECT id FROM session WHERE id = ?", (body.session_id,))
         if not await cursor.fetchone():
-            raise HTTPException(
-                status_code=404,
-                detail={"error": {"code": "NO_SESSION", "message": "Session not found"}},
-            )
+            return JSONResponse(status_code=404, content={"error": {"code": "NO_SESSION", "message": "Session not found"}})
 
         # Validate datasets
         for did in body.dataset_ids:
@@ -52,10 +44,7 @@ async def run_query(body: QueryRequest):
                 (did, body.session_id),
             )
             if not await cursor.fetchone():
-                raise HTTPException(
-                    status_code=404,
-                    detail={"error": {"code": "NO_DATASET", "message": f"Dataset {did} not found"}},
-                )
+                return JSONResponse(status_code=404, content={"error": {"code": "NO_DATASET", "message": f"Dataset {did} not found"}})
 
     # Call LLM (stub in Phase 1)
     t0 = time.monotonic()
@@ -95,7 +84,4 @@ async def run_query(body: QueryRequest):
 # Phase 2 deferred stub
 @router.get("/{run_id}/audit")
 async def get_audit(run_id: str):
-    raise HTTPException(
-        status_code=404,
-        detail={"error": {"code": "NOT_YET", "message": "Audit retrieval available in Phase 2"}},
-    )
+    return JSONResponse(status_code=404, content={"error": {"code": "NOT_YET", "message": "Audit retrieval available in Phase 2"}})

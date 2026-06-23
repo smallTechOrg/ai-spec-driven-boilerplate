@@ -20,8 +20,15 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# Override sqlalchemy.url from settings
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+# Override sqlalchemy.url from settings so migrations + app target the SAME db file
+_db_url = get_settings().database_url
+config.set_main_option("sqlalchemy.url", _db_url)
+
+# Ensure the parent directory of a sqlite file DB exists (e.g. ./data/)
+if _db_url.startswith("sqlite:///"):
+    _db_path = Path(_db_url.replace("sqlite:///", "", 1))
+    if _db_path.parent and not _db_path.parent.exists():
+        _db_path.parent.mkdir(parents=True, exist_ok=True)
 
 
 def run_migrations_offline() -> None:

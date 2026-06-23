@@ -1,53 +1,67 @@
 """DB layer tests — no LLM key required."""
 from sqlalchemy.orm import Session
-from db.models import RunRow
-import db.session as session_module
+
+from db.models import AuditLogEntry, Dataset, Query
 
 
-def test_run_row_roundtrip(_isolated_db):
+def test_dataset_roundtrip(_isolated_db):
     with Session(_isolated_db) as s:
-        run = RunRow(input_text="hello world")
-        s.add(run)
+        ds = Dataset(
+            name="sales.csv",
+            table_name="ds_abc",
+            row_count=3,
+            columns_json='[{"name": "region", "type": "TEXT"}]',
+            schema_text="TABLE ds_abc (region TEXT)",
+            sample_text="region\nWest",
+        )
+        s.add(ds)
         s.commit()
-        run_id = run.id
+        ds_id = ds.id
 
     with Session(_isolated_db) as s:
-        fetched = s.get(RunRow, run_id)
+        fetched = s.get(Dataset, ds_id)
         assert fetched is not None
-        assert fetched.input_text == "hello world"
-        assert fetched.status == "pending"
-        assert fetched.output_text is None
+        assert fetched.name == "sales.csv"
+        assert fetched.row_count == 3
+        assert fetched.created_at is not None
 
 
-def test_run_row_status_update(_isolated_db):
+def test_query_roundtrip(_isolated_db):
     with Session(_isolated_db) as s:
-        run = RunRow(input_text="test")
-        s.add(run)
+        q = Query(dataset_id="ds-1", question="how many?", status="pending")
+        s.add(q)
         s.commit()
-        run_id = run.id
+        q_id = q.id
 
     with Session(_isolated_db) as s:
-        run = s.get(RunRow, run_id)
-        run.status = "completed"
-        run.output_text = "some output"
+        q = s.get(Query, q_id)
+        q.status = "completed"
+        q.answer_text = "There are 3."
+        q.generated_sql = "SELECT COUNT(*) FROM ds_abc"
         s.commit()
 
     with Session(_isolated_db) as s:
-        run = s.get(RunRow, run_id)
-        assert run.status == "completed"
-        assert run.output_text == "some output"
+        q = s.get(Query, q_id)
+        assert q.status == "completed"
+        assert q.answer_text == "There are 3."
 
 
-def test_multiple_runs_independent(_isolated_db):
-    ids = []
+def test_audit_entry_roundtrip(_isolated_db):
     with Session(_isolated_db) as s:
-        for i in range(3):
-            run = RunRow(input_text=f"input {i}")
-            s.add(run)
+        a = AuditLogEntry(
+            operation="ingest",
+            dataset_id="ds-1",
+            sql_text="CREATE TABLE ds_abc",
+            row_count=3,
+            duration_ms=12,
+            success=True,
+        )
+        s.add(a)
         s.commit()
-        # fetch all
-        runs = s.query(RunRow).all()
-        ids = [r.id for r in runs]
+        a_id = a.id
 
-    assert len(ids) == 3
-    assert len(set(ids)) == 3  # all unique
+    with Session(_isolated_db) as s:
+        a = s.get(AuditLogEntry, a_id)
+        assert a.operation == "ingest"
+        assert a.success is True
+        assert a.duration_ms == 12

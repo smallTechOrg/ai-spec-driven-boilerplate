@@ -1,5 +1,17 @@
 # Spec — Single Source of Truth
 
+## Product Vision
+
+A **token-economical data analyst agent** that runs locally and behaves like a senior analyst: a user uploads their own CSV/Excel data, asks questions in plain English, and gets back a concise narrative interpretation plus a formatted result table — produced by SQL the agent writes and runs locally, never by dumping data to a third party. Three hard constraints are first-class, testable design goals:
+
+1. **Token economy is critical** — the LLM is sent only schema + a hard-capped number of sample rows (default 5) and small aggregates, never raw dataset rows.
+2. **Full audit trail** — every data operation is persisted (timestamp, NL question, generated SQL, row count, duration) and is viewable + exportable in the UI.
+3. **Local-only** — ingestion, storage, and query execution all happen on the user's machine (DuckDB); the sole network egress is the metadata-only LLM call.
+
+See `roadmap.md` for the phased plan and `architecture.md`'s `## Stack` for the concrete technology choices.
+
+---
+
 This directory is the authoritative specification for this project. All code must match this spec. When spec and code disagree, spec wins — fix the code.
 
 ## Status

@@ -1,218 +1,254 @@
 # Agent
 
-> Required when the project uses an agent framework. Delete this file if your project has no agent framework.
->
-> If your project has no agent framework (e.g., a simple script or single-LLM API call), delete this file.
->
-
 ---
 
 ## Agent Architecture Pattern
 
-<!-- FILL IN: Which pattern does this agent follow? Choose one and describe why. -->
-
 | Pattern | Use when |
 |---------|----------|
-| **Single-agent loop** | One LLM drives a deterministic tool-call loop. No branches, no handoffs. |
 | **Graph (LangGraph)** | Multi-step pipeline with conditional edges, checkpointing, or parallel nodes. |
-| **Multi-agent** | Specialised sub-agents with distinct roles; orchestrator routes between them. |
-| **Supervisor** | One supervisor LLM dispatches to worker agents based on task type. |
-| **Human-in-the-loop** | Execution pauses at defined checkpoints for user review or approval. |
 
-**Chosen:** <!-- state pattern + one-sentence rationale -->
+**Chosen:** Graph (LangGraph) as a deterministic **Prompt Chaining + Tool Use** pipeline — `profile_schema → generate_sql → execute_sql → narrate` — with **Exception Handling** (any node sets `error` and routes to `handle_error`) and **Resource-Aware Optimization** as a first-class constraint (the `profile_schema` node is the token-economy guard). Catalogue refs in `harness/patterns/agentic-ai.md`: #1 Prompt Chaining, #5 Tool Use, #12 Exception Handling, #16 Resource-Aware Optimization. A fixed chain (not a single tool-loop) is chosen because the steps are ordered and dependent, and isolating SQL generation from execution lets us validate/guard each boundary. The senior-analyst clarify/plan/recommend loop (Routing/HITL/Planning, catalogue #2/#13/#6) is a deliberate Phase-3 expansion, noted under Graph Topology.
 
 ---
 
 ## LLM Provider & Model
 
-<!-- FILL IN: Which model drives each agent/node? State provider, model ID, and why. -->
-
 | Agent / Node | Provider | Model ID | Rationale |
 |-------------|----------|----------|-----------|
-| <!-- node --> | Anthropic | <!-- e.g. claude-sonnet-4-6 --> | <!-- latency vs. quality trade-off --> |
+| `generate_sql` | Gemini | `gemini-2.5-flash` | Fast, cheap, strong at structured SQL from a compact schema prompt. |
+| `narrate` | Gemini | `gemini-2.5-flash` | Short narrative over a tiny result preview; flash is ample and cheap. |
 
-**Fallback behaviour:** <!-- Production resilience only: retry/backoff, degraded mode, or a surfaced error if the LLM API is unavailable or rate-limited. NOT a test/offline stub path — tests call the real API with keys from `.env`. -->
+Provider is auto-detected from `AGENT_GEMINI_API_KEY` via the existing `LLMClient`. Model overridable with `AGENT_LLM_MODEL`.
 
-**Prompt strategy:** <!-- System/user split, few-shot examples, structured output (tool_use / JSON mode)? -->
+**Fallback behaviour:** On Gemini error/timeout/rate-limit, the node retries up to 2× with exponential back-off (handled in/around the LLM call); if still failing it sets `state["error"]`, the graph routes to `handle_error`, the audit row is marked `failed`, and the API returns 502 with a clear message. This is production resilience, not a test stub — tests call the real Gemini API with the `.env` key.
+
+**Prompt strategy:** System/user split. `generate_sql` system prompt (`src/prompts/generate_sql.md`) instructs: emit exactly one read-only DuckDB SELECT over the given table, using only the listed columns, returning raw SQL with no prose/markdown fences. User content = compact schema block (table name, columns+types, ≤`AGENT_MAX_SAMPLE_ROWS` sample rows, basic aggregates) + the NL question. `narrate` (`src/prompts/narrate.md`) gets the question, the SQL, and a capped result preview and returns a 2–4 sentence senior-analyst narrative. Output parsing is defensive: strip code fences; reject non-SELECT.
 
 ---
 
 ## Tools & Tool Calling
 
-<!-- FILL IN: Every tool the agent can call. -->
-
 | Tool name | Description | Inputs | Output | Side-effects |
 |-----------|-------------|--------|--------|--------------|
-| <!-- name --> | <!-- what it does --> | <!-- params --> | <!-- return type --> | <!-- DB write, API call, file write, etc. --> |
+| `duckdb_execute` | Run a read-only SQL statement on the dataset's DuckDB table | `sql: str`, `duckdb_path: str` | `columns: list[str]`, `rows: list[list]` (capped), `row_count: int`, `duration_ms: int` | Reads DuckDB; no writes |
+| `schema_profile` | Build the token-economical schema context for a dataset | `dataset_id`, `duckdb_path`, `max_sample_rows` | `SchemaContext` (columns, types, samples, aggregates) | Reads DuckDB |
 
-**Tool selection strategy:** <!-- How does the agent decide which tool to call? (LLM choice, rule-based routing, forced single tool) -->
+**Tool selection strategy:** Rule-based — the chain calls each tool at a fixed step; the LLM does not choose tools. `generate_sql` produces SQL (no tool); `execute_sql` always calls `duckdb_execute`.
 
-**Tool failure handling:** <!-- retry, fallback, abort — per tool or global policy? -->
+**Tool failure handling:** `duckdb_execute` failure (bad SQL, missing column) is caught by `execute_sql`, which sets `state["error"]` → `handle_error`. No retry on SQL errors (a malformed query won't fix itself); LLM-call retries are handled at the LLM layer.
 
 ---
 
 ## Agent State
 
-<!-- FILL IN: The full state type. Every field must be named, typed, and annotated with what populates it. -->
-
 ```python
-class AgentState(TypedDict):
+class AgentState(TypedDict, total=False):
     # Identity
-    run_id: int                          # set at initialisation
+    run_id: str                       # set by runner (AuditLog row id)
+    session_id: str                   # active session, set by runner
+    dataset_id: str                   # target dataset, set by runner
 
     # Input
-    # ...                                # fields populated from the trigger
+    nl_question: str                  # the user's natural-language question
+    duckdb_path: str                  # set by runner from settings
+    max_sample_rows: int              # token-economy cap, set by runner from settings
 
-    # Pipeline data (populated progressively by nodes)
-    # ...
+    # Pipeline data (populated progressively)
+    table_name: str                   # DuckDB table for the dataset (profile_schema)
+    schema_context: dict              # columns/types/samples/aggregates (profile_schema)
+    generated_sql: str                # SQL from the LLM (generate_sql)
+    result_columns: list[str]         # execute_sql
+    result_rows: list[list]           # capped result rows (execute_sql)
+    row_count: int                    # full result row count (execute_sql)
+    duration_ms: int                  # query execution time (execute_sql)
 
     # Output
-    # ...                                # final result fields
+    narrative: str                    # senior-analyst narrative (narrate)
+    status: str                       # "completed" | "failed" (finalize/handle_error)
 
     # Control
-    error: str | None                    # set by any node on fatal failure
-    checkpoint: str | None              # last completed node (for resume)
+    error: str | None                 # set by any node on fatal failure
 ```
 
 ---
 
 ## Nodes / Steps
 
-<!-- FILL IN: One section per node. For single-agent loops, describe each "step" or "tool call phase." -->
-
-### `node_[name]`
-
-**Reads from state:** <!-- field names -->
-
-**Writes to state:** <!-- field names -->
-
-**LLM call:** <!-- yes/no; if yes: prompt template summary, model used, output format -->
-
+### `profile_schema`
+**Reads from state:** `dataset_id`, `duckdb_path`, `max_sample_rows`
+**Writes to state:** `table_name`, `schema_context` (or `error`)
+**LLM call:** No.
 **External calls:**
 
 | System | Operation | On Failure |
 |--------|-----------|------------|
-| <!-- system --> | <!-- what it calls --> | <!-- fatal (set error) / partial (log + continue) / retry --> |
+| DuckDB | Read column metadata + up to `max_sample_rows` sample rows + basic aggregates | fatal (set `error`) |
 
-**Behaviour:** <!-- One paragraph. What decision or transformation does this node perform? -->
+**Behaviour:** Builds the compact, token-economical context. This node is the enforcement point for the token-economy constraint: it caps sample rows at `max_sample_rows` and never materializes the full table into state or the prompt.
+
+### `generate_sql`
+**Reads from state:** `schema_context`, `nl_question`, `table_name`
+**Writes to state:** `generated_sql` (or `error`)
+**LLM call:** Yes — Gemini `gemini-2.5-flash`, system prompt `generate_sql.md`, output = raw SQL.
+**External calls:**
+
+| System | Operation | On Failure |
+|--------|-----------|------------|
+| Gemini | Generate one read-only SELECT | retry 2× then fatal (set `error`) |
+
+**Behaviour:** Produces a single read-only SELECT. Strips code fences; validates it is a SELECT and references only known columns/table; rejects anything else (set `error`).
+
+### `execute_sql`
+**Reads from state:** `generated_sql`, `duckdb_path`
+**Writes to state:** `result_columns`, `result_rows` (capped), `row_count`, `duration_ms` (or `error`)
+**LLM call:** No.
+**External calls:**
+
+| System | Operation | On Failure |
+|--------|-----------|------------|
+| DuckDB | Execute SELECT, capture rows/count/timing | fatal (set `error`) |
+
+**Behaviour:** Runs the SQL on DuckDB, times it, truncates returned rows to the display cap for the UI while recording the true `row_count`.
+
+### `narrate`
+**Reads from state:** `nl_question`, `generated_sql`, `result_columns`, `result_rows` (capped preview)
+**Writes to state:** `narrative` (or `error`)
+**LLM call:** Yes — Gemini `gemini-2.5-flash`, system prompt `narrate.md`.
+**External calls:**
+
+| System | Operation | On Failure |
+|--------|-----------|------------|
+| Gemini | Produce 2–4 sentence narrative | retry 2× then fatal (set `error`) |
+
+**Behaviour:** Interprets the result like a senior analyst. Receives only the capped preview, never the full result set.
+
+### `finalize`
+**Reads:** all output fields. **Writes:** `status="completed"`. No external calls.
+
+### `handle_error`
+**Reads:** `error`, `run_id`. **Writes:** `status="failed"`. The runner persists the failure to the audit row.
 
 ---
 
 ## Graph / Flow Topology
 
-<!-- FILL IN: ASCII diagram of node flow. Show ALL conditional edges explicitly. -->
-
 ```
 START
   │
   ▼
-node_a ──(error)──► node_handle_error ──► END
+profile_schema ──(error)──► handle_error ──► END
   │
   ▼
-node_b ──(condition)──► node_c
-  │                         │
-  │                         ▼
-  └──────────────────► node_finalize
-                             │
-                             ▼
-                            END
+generate_sql ──(error)──► handle_error
+  │
+  ▼
+execute_sql ──(error)──► handle_error
+  │
+  ▼
+narrate ──(error)──► handle_error
+  │
+  ▼
+finalize ──► END
 ```
 
 **Conditional edges:**
 
 | Source node | Condition | Target |
 |-------------|-----------|--------|
-| <!-- node --> | <!-- e.g. state["error"] is not None --> | <!-- target node --> |
+| `profile_schema` | `state["error"]` set | `handle_error` |
+| `profile_schema` | else | `generate_sql` |
+| `generate_sql` | `state["error"]` set | `handle_error` |
+| `generate_sql` | else | `execute_sql` |
+| `execute_sql` | `state["error"]` set | `handle_error` |
+| `execute_sql` | else | `narrate` |
+| `narrate` | `state["error"]` set | `handle_error` |
+| `narrate` | else | `finalize` |
+
+**Phase-3 expansion (noted, not built in Phase 1):** a `clarify` node before `generate_sql` (HITL checkpoint, routes back to the user when confidence is low) and a `recommend` node after `narrate`. **Phase-2:** a `propose_chart` node after `narrate`. **Phase-4:** `profile_schema` accepts multiple datasets and `generate_sql` emits multi-table SQL.
 
 ---
 
 ## Memory & Context
 
-<!-- FILL IN: How does the agent remember things across turns, steps, or runs? -->
-
 | Scope | Mechanism | What is stored |
 |-------|-----------|----------------|
-| **Within a run** | LangGraph state | All in-progress data |
-| **Across runs** | <!-- DB / vector store / none --> | <!-- e.g. past results, user prefs --> |
-| **Conversation** | <!-- message history / summary / none --> | <!-- if chat-style --> |
+| **Within a run** | LangGraph state | schema context, SQL, capped result, narrative |
+| **Across runs** | SQLAlchemy (metadata) + DuckDB (data) | sessions, datasets, full audit trail; dataset rows in DuckDB |
+| **Conversation** | none in Phase 1 | (multi-turn clarify is Phase 3) |
 
-**Context window management:** <!-- How is the prompt kept within limits? (summary, sliding window, RAG retrieval) -->
+**Context window management:** Enforced upstream — `profile_schema` caps sample rows at `AGENT_MAX_SAMPLE_ROWS` and `narrate` sees only a capped result preview, so prompts stay small regardless of dataset size.
 
 ---
 
 ## Human-in-the-Loop Checkpoints
 
-<!-- FILL IN: Where does execution pause for human input? Delete section if not applicable. -->
-
-| Checkpoint | What is shown to the user | Expected user action | Timeout / default |
-|------------|--------------------------|----------------------|-------------------|
-| <!-- name --> | <!-- what the agent surfaces --> | <!-- approve / edit / abort --> | <!-- timeout action --> |
+None in Phase 1 (the chain runs end-to-end). The Phase-3 `clarify` node introduces the only HITL checkpoint: when SQL-generation confidence is low, the agent returns a clarifying question instead of an answer and waits for the user's reply.
 
 ---
 
 ## Error Handling & Recovery
 
-<!-- FILL IN: How the agent handles failures at each level. -->
+**Node-level:** Each node wraps its work in try/except; on a fatal error it returns `{**state, "error": str(exc)}`.
 
-**Node-level:** <!-- Each node catches its own exceptions; fatal errors set state["error"] and route to handle_error node. -->
+**Graph-level (`handle_error` node):**
+- Reads: `state["error"]`, `state["run_id"]`
+- Sets `status="failed"`; the runner updates the audit row (`status="failed"`, `error_message`, `duration_ms`) and the API returns 502 (LLM) or 400/500 (DuckDB/SQL).
+- Logs the error with `run_id` context; terminates the graph.
 
-**Graph-level (handle_error node):**
-- Reads: `state.error`, `state.run_id`
-- Updates DB: run status → "failed", `error_message`, `completed_at`
-- Logs error with `run_id` context
-- Terminates graph
+**Resume / retry strategy:** No graph-level checkpointing in Phase 1; a failed ask is simply re-asked. LLM calls retry internally (2× back-off).
 
-**Resume / retry strategy:** <!-- Can a failed run be resumed from its last checkpoint? How? -->
-
-**Partial failure:** <!-- If a non-critical step fails, does the agent degrade gracefully or abort? -->
+**Partial failure:** None — the chain is all-or-nothing for a single answer; a failed run yields a clear error and an audit row, never partial fake output.
 
 ---
 
 ## Observability
 
-<!-- FILL IN: What is logged, traced, and measured? -->
-
 | Signal | What | Where |
 |--------|------|-------|
-| **Trace** | One trace per run, one span per node | <!-- OpenTelemetry / LangSmith / stdout --> |
-| **LLM calls** | Prompt tokens, completion tokens, latency, model | <!-- LangSmith / structured log --> |
-| **Tool calls** | Tool name, inputs, success/error, latency | Structured log |
-| **Run outcome** | Status, total duration, error if any | DB + structured log |
+| **Trace** | One audit row per ask, with timing | SQLite `audit_logs` |
+| **LLM calls** | Node name, model, latency, success/error | structured log (structlog) |
+| **Tool calls** | `duckdb_execute` SQL, row count, duration | structured log + audit row |
+| **Run outcome** | status, duration, error | `audit_logs` + structured log |
 
 ---
 
 ## Concurrency Model
 
-<!-- FILL IN: How concurrent agent runs are handled. -->
-
-- **Run isolation:** <!-- one-at-a-time (API returns 409) / queue / parallel with run_id scoping -->
-- **Parallel nodes within a run:** <!-- which nodes run in parallel and why -->
-- **Checkpointing:** <!-- none / SqliteSaver / PostgresSaver — required if human-in-the-loop or long-running -->
+- **Run isolation:** Each ask is a self-contained graph invocation scoped by `run_id`/`session_id`; DuckDB connections are per-call. Local single-user tool — no global run lock needed.
+- **Parallel nodes within a run:** None — the chain is strictly sequential (each node depends on the prior).
+- **Checkpointing:** None in Phase 1 (no long-running or HITL flow yet).
 
 ---
 
-## Graph Assembly (`agent/graph.py`)
-
-<!-- FILL IN: Pseudocode showing how nodes and edges are wired. Must be ≤ 60 lines in the real file. -->
+## Graph Assembly (`src/graph/agent.py`)
 
 ```python
 graph = StateGraph(AgentState)
 
-graph.add_node("node_a", node_a)
-graph.add_node("node_b", node_b)
-graph.add_node("finalize", node_finalize)
-graph.add_node("handle_error", node_handle_error)
+graph.add_node("profile_schema", profile_schema)
+graph.add_node("generate_sql", generate_sql)
+graph.add_node("execute_sql", execute_sql)
+graph.add_node("narrate", narrate)
+graph.add_node("finalize", finalize)
+graph.add_node("handle_error", handle_error)
 
-graph.set_entry_point("node_a")
+graph.set_entry_point("profile_schema")
 
-graph.add_conditional_edges(
-    "node_a",
-    lambda s: "handle_error" if s.get("error") else "node_b",
-)
+def _route(nxt: str):
+    return lambda s: "handle_error" if s.get("error") else nxt
 
-graph.add_edge("node_b", "finalize")
+graph.add_conditional_edges("profile_schema", _route("generate_sql"),
+                            {"generate_sql": "generate_sql", "handle_error": "handle_error"})
+graph.add_conditional_edges("generate_sql", _route("execute_sql"),
+                            {"execute_sql": "execute_sql", "handle_error": "handle_error"})
+graph.add_conditional_edges("execute_sql", _route("narrate"),
+                            {"narrate": "narrate", "handle_error": "handle_error"})
+graph.add_conditional_edges("narrate", _route("finalize"),
+                            {"finalize": "finalize", "handle_error": "handle_error"})
+
 graph.add_edge("finalize", END)
 graph.add_edge("handle_error", END)
 
-compiled_graph = graph.compile()
+agentic_ai = graph.compile()
 ```

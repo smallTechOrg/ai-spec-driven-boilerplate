@@ -1,157 +1,130 @@
-# AI Agent Boilerplate — Spec-Driven, Zero-Shot to Working Agent
+# Senior Data Analyst Agent
 
-Give it a one-line idea. Walk away with a working, tested, phased agent.
+> **All commands in this README run from the repo root.**
 
----
+A web-based AI data analyst: upload CSV, Excel, or JSON datasets, ask questions in plain English, and get rich responses — markdown narrative, sortable tables, and Chart.js charts — backed by real DuckDB SQL and Gemini 2.5 Flash.
 
-## What This Is
+## What It Does
 
-A starting point for building AI agents spec-first. The repo ships with:
+- Upload structured datasets (CSV, Excel .xlsx, JSON) per session
+- Ask natural-language questions — Gemini 2.5 Flash translates to DuckDB SQL
+- Get rich responses: markdown text + sortable data table + auto-selected bar/line/pie chart
+- Sessions persist across page reloads (SQLite-backed)
+- Every SQL query logged with timestamp, SQL text, dataset name, row count, and latency
+- Schema-only context injection — raw data rows never sent to the LLM
 
-- A working **baseline agent** in `src/` (FastAPI + LangGraph + SQLite + Anthropic, `transform_text` as the capability slot) — tests pass out of the box
-- A **spec template** in `spec/` covering product vision, architecture, capabilities, data model, API, and UI
-- Three **zero-shot skills** (`/zero-shot-build`, `/zero-shot-fix`, `/zero-shot-sync`)
-- A four-agent **team** — agent-builder orchestrates (plans, fans out, owns git/PR); spec-writer is the single design authority; code-generator implements one slice per instance (parallelised); qa-auditor reviews and gates
-- Engineering rules in `harness/` so every Claude Code session is consistent
-- **Human testing gate between phases** — autonomous within a phase, you test each increment before the next starts
+## Quick Start
 
----
+### 1. Prerequisites
 
-## How to Use This
+- Python 3.12+ and `uv` (`pip install uv`)
+- Node.js 18+ and `pnpm` (`npm i -g pnpm`)
 
-### Step 1 — Clone
-
-```bash
-git clone https://github.com/smallTechOrg/zero-shot-sdd-harness.git my-agent
-cd my-agent
-```
-
-### Step 2 — Open in Claude Code
-
-```bash
-claude
-```
-
-### Step 3 — Build
-
-```
-/zero-shot-build An agent that monitors my Shopify store for low-inventory products and drafts restock emails to suppliers
-```
-
-One intake round (scope, stack, API keys → fill `.env`), then the agent builds phase by phase and stops at each boundary for you to test.
-
----
-
-## What Happens (Intake → Phase by Phase)
-
-```
-Your idea
-    ↓
-INTAKE — scope, stack, LLM provider, constraints; fill .env with the required API key
-    ↓
-[spec-writer]  → Full spec: architecture + agent-graph + phased plan (self-reviewed)
-    ↓
-[agent-builder] → Feature branch + PR, scaffold
-    ↓
-per phase — all slices concurrently:
-    [code-generator: slice-a]  ──→  [qa-auditor: slice-a]  ─┐
-    [code-generator: slice-b]  ──→  [qa-auditor: slice-b]  ─┤→  commit + push
-    [code-generator: slice-c]  ──→  [qa-auditor: slice-c]  ─┘
-    ↓
-HUMAN TESTING GATE — exact run commands + expected result; you confirm before next phase
-    ↓
-(issue → qa-auditor classifies SPEC-vs-CODE → code-generator fixes → re-gate)
-    ↓
-repeat per phase → SHIP
-```
-
-Phase 1 is the smallest first-time-right win — real on the tested path, with labelled stubs for everything coming later. Each later phase wires one more stub into real functionality.
-
----
-
-## Repo Layout
-
-```
-src/agent/          ← baseline agent (FastAPI + LangGraph + SQLite + Anthropic)
-  api/              ← FastAPI routers (create_app, health, runs)
-  config/           ← Pydantic BaseSettings
-  db/               ← SQLAlchemy models + session
-  domain/           ← Pydantic request/response models
-  graph/            ← LangGraph nodes, edges, state, runner  ← CAPABILITY SLOT
-  llm/              ← LLM client wrapper
-  prompts/          ← prompt templates (.md)
-  observability/
-frontend/           ← Next.js static export (served by FastAPI at /app)
-tests/
-  unit/             ← passes with no API key
-  integration/      ← requires real key in .env
-spec/               ← your product spec (fill this in or let /zero-shot-build fill it)
-harness/            ← engineering rules and patterns
-.claude/
-  skills/           ← /zero-shot-build, /zero-shot-fix, /zero-shot-sync
-  agents/           ← agent-builder, spec-writer, code-generator, qa-auditor
-CLAUDE.md
-pyproject.toml
-alembic.ini
-agent.py              ← run server (--check-setup to verify)
-.env.example
-```
-
-**Capability slot** — the three files to replace for your agent:
-- `src/agent/graph/nodes.py` — replace `transform_text` with your logic
-- `src/agent/prompts/transform.md` — replace with your system prompt
-- `frontend/src/app/page.tsx` — replace the transform form with your UI
-
-Everything else (graph wiring, API, DB, settings, tests) is already working.
-
----
-
-## Running the Baseline
+### 2. Configure environment
 
 ```bash
 cp .env.example .env
-# edit .env: set AGENT_ANTHROPIC_API_KEY=<your key>
-uv sync
-python agent.py                        # migrations + frontend build + start server
-python agent.py --check-setup          # verify tools, .env, deps, tests
+# Edit .env: set AGENT_GEMINI_API_KEY=<your Gemini API key>
+# AGENT_DATABASE_URL defaults to sqlite:///./data/analyst.db
 ```
 
-Once running:
-
-| URL | What |
-|-----|------|
-| `http://localhost:8001/app/` | **UI** — transform form (the capability slot) |
-| `http://localhost:8001/health` | API health check |
-| `http://localhost:8001/docs` | Interactive API docs (Swagger) |
-
-Tests:
+### 3. Install Python dependencies
 
 ```bash
-uv run pytest tests/unit/ -v          # no key needed
-uv run pytest tests/ -v               # requires real key in .env
+uv sync
 ```
 
----
+### 4. Run database migrations
 
-## Rules AI Agents Follow
+```bash
+uv run alembic upgrade head
+uv run alembic current
+```
 
-Full rules in `harness/rules/ai-agents.md`. Summary:
+`alembic current` must show a revision hash (e.g. `0002 (head)`). Blank output means the migration did not run.
 
-- Read the full spec before writing any code
-- Never skip a phase; commit every logical unit
-- Tests run against the real LLM/API using keys from `.env` — stubbed runs do not count as passing
-- Each phase is tested by the human before the next phase starts
-- The build record is git history + the PR + the per-phase test-handoffs
+### 5. Build the frontend
 
----
+```bash
+cd frontend && pnpm install && pnpm build && cd ..
+```
 
-## FAQ
+### 6. Start the server
 
-**What if I already have a stack in mind?**
-State it in the idea: `/zero-shot-build [idea] — use Python + FastAPI + PostgreSQL`. Stack choices are binding.
+```bash
+uv run python -m src
+```
 
-**What if something breaks?**
-Run `/zero-shot-fix [what's broken]` — qa-auditor classifies the problem (SPEC vs CODE), the right generator fixes it, qa-auditor re-gates.
+The server starts on `http://localhost:8001`.
 
-**What if spec and code drift?**
-Run `/zero-shot-sync` — qa-auditor classifies each divergence, generators fix, spec wins.
+### 7. Open the UI
+
+Open `http://localhost:8001/app/` in your browser.
+
+## Testing
+
+```bash
+# Phase 1 gate tests (no LLM key required)
+uv run pytest tests/phase1/ -q
+
+# Unit tests only (no LLM key required)
+uv run pytest tests/unit/ -q
+
+# All tests (requires AGENT_GEMINI_API_KEY in .env for LLM tests)
+uv run pytest tests/ -q
+```
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Liveness check |
+| POST | `/sessions` | Create a new analyst session |
+| GET | `/sessions` | List all sessions |
+| GET | `/sessions/{id}` | Get session with datasets + messages |
+| POST | `/datasets` | Upload a dataset file (multipart) |
+| GET | `/datasets?session_id=...` | List datasets for a session |
+| GET | `/chat?session_id=...&q=...` | SSE stream: NL question → rich response |
+| GET | `/audit?session_id=...` | Query audit log for a session |
+| GET | `/app/` | Web UI (static Next.js export) |
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `AGENT_GEMINI_API_KEY` | Yes | — | Gemini API key |
+| `AGENT_DATABASE_URL` | No | `sqlite:///./data/analyst.db` | SQLite database path |
+| `AGENT_LLM_MODEL` | No | `gemini-2.5-flash` | Gemini model name |
+| `PORT` | No | `8001` | Server port |
+
+## Stack
+
+- **Backend:** Python 3.12 + FastAPI + LangGraph + google-genai (Gemini 2.5 Flash) + DuckDB + SQLite/SQLAlchemy + Alembic
+- **Frontend:** Next.js 15 + React 19 + Tailwind CSS v4 + Chart.js
+- **Managed by:** `uv` (Python) + `pnpm` (frontend)
+
+## Project Layout
+
+```
+src/                 ← Python package (FastAPI + LangGraph agent)
+  api/               ← FastAPI routers (sessions, datasets, chat, audit)
+  config/            ← Pydantic settings (AGENT_ prefix)
+  db/                ← SQLAlchemy models + DuckDB loader
+  domain/            ← Pydantic domain models
+  graph/             ← LangGraph analyst graph (nodes, edges, state, runner)
+  llm/               ← LLM client + Gemini provider
+  prompts/           ← System prompt (analyst.md)
+frontend/            ← Next.js static export (served at /app)
+tests/
+  unit/              ← no LLM key needed
+  integration/       ← requires AGENT_GEMINI_API_KEY
+  phase1/            ← Phase 1 gate tests
+data/uploads/        ← uploaded dataset files (gitignored)
+spec/                ← agent spec
+alembic/             ← DB migrations
+```
+
+## Phase Status
+
+- **Phase 1** — All 6 capabilities live: dataset upload, NL querying, rich responses, sessions, audit log, token economy
+- **Phase 2** — Audit log UI viewer + session rename/delete (stubs in Phase 1 UI)

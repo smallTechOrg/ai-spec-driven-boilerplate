@@ -2,190 +2,127 @@
 
 ## Storage Technology
 
-**SQLite** (via SQLAlchemy 2.0 + Alembic) for all persistent metadata: sessions, datasets, messages, and query audit log. File path configured as `AGENT_DATABASE_URL=sqlite:///./data/analyst.db`.
+**SQLite** (via SQLAlchemy 2.0 Mapped types + Alembic) for all persistence: session metadata, dataset metadata, audit log, and dynamic data tables created from uploaded files. DB file path: `./data/agent.db` (configurable via `AGENT_DATABASE_URL=sqlite:///./data/agent.db`).
 
-**DuckDB** (in-process, in-memory per request) for analytical query execution. No persistent DuckDB file. DuckDB reads uploaded files directly from the filesystem.
+**Dynamic data tables** (not in the ORM): created by `pandas.DataFrame.to_sql()` at upload time, named `{session_id_underscored}_{sanitized_name}`. These tables are queried by the agent graph via `sqlalchemy.text()`. They are never accessed through the ORM.
 
-**Filesystem** (`data/uploads/<session_id>/`) for raw dataset files (CSV, Excel, JSON).
-
-The existing `RunRow` table (from the boilerplate skeleton) is retained but unused by the analyst agent. It stays in the schema to avoid breaking the initial migration.
+No DuckDB. No filesystem dataset storage. No external database.
 
 ---
 
-## Entities
+## ORM Entities
 
 ### Entity: `Session`
 
-Represents one user's analytical workspace. A session owns datasets and messages and persists across browser sessions via `localStorage`.
+Represents one visitor's isolated workspace. Created on first page load (client-side UUID); upserted on every API call via `last_seen_at`.
 
 **SQLite table:** `sessions`
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `id` | TEXT (UUID) | yes | Primary key, server-generated |
-| `name` | TEXT | yes | Display name, default "Session {n}" |
-| `created_at` | TIMESTAMP WITH TIMEZONE | yes | UTC creation time |
-| `updated_at` | TIMESTAMP WITH TIMEZONE | yes | UTC last modification time |
+| Field | SQLAlchemy Mapped type | Required | Description |
+|-------|------------------------|----------|-------------|
+| `id` | `Mapped[str]` (TEXT, PK) | yes | UUID string, browser-generated |
+| `created_at` | `Mapped[datetime]` | yes | UTC creation timestamp |
+| `last_seen_at` | `Mapped[datetime]` | yes | UTC timestamp of most recent API call; updated on every request bearing this session_id |
+
+```python
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
+
+    datasets: Mapped[list["Dataset"]] = relationship("Dataset", back_populates="session", cascade="all, delete-orphan")
+    audit_logs: Mapped[list["AuditLog"]] = relationship("AuditLog", back_populates="session", cascade="all, delete-orphan")
+```
 
 ---
 
 ### Entity: `Dataset`
 
-Represents one uploaded file within a session. Stores schema metadata (column names + types + row count) so the agent can build schema context without re-reading the file.
+Metadata record for one uploaded file. The actual data lives in a dynamic SQLite table named `table_name`.
 
 **SQLite table:** `datasets`
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `id` | TEXT (UUID) | yes | Primary key, server-generated |
-| `session_id` | TEXT (UUID FK → sessions.id) | yes | Owning session |
-| `name` | TEXT | yes | Original filename (e.g. `sales.csv`) |
-| `file_path` | TEXT | yes | Absolute filesystem path to the uploaded file |
-| `file_type` | TEXT | yes | `csv` \| `xlsx` \| `json` |
-| `row_count` | INTEGER | yes | Number of rows in the dataset (from DuckDB at upload time) |
-| `columns_json` | TEXT (JSON) | yes | JSON array of `{"name": str, "type": str}` objects — column names and DuckDB-inferred types |
-| `size_bytes` | INTEGER | no | File size in bytes |
-| `uploaded_at` | TIMESTAMP WITH TIMEZONE | yes | UTC upload time |
+| Field | SQLAlchemy Mapped type | Required | Description |
+|-------|------------------------|----------|-------------|
+| `id` | `Mapped[str]` (TEXT, PK) | yes | UUID string, server-generated (uuid4) |
+| `session_id` | `Mapped[str]` (TEXT, FK → sessions.id) | yes | Owning session |
+| `table_name` | `Mapped[str]` (TEXT, UNIQUE) | yes | SQLite table holding the data: `{session_id_underscored}_{sanitized_name}` |
+| `original_filename` | `Mapped[str]` (TEXT) | yes | Original upload filename (e.g. `sales report.xlsx`) |
+| `row_count` | `Mapped[int]` (INTEGER) | yes | Number of rows loaded into the dynamic table |
+| `column_names` | `Mapped[str]` (TEXT) | yes | JSON-serialised list of column name strings |
+| `created_at` | `Mapped[datetime]` (DateTime) | yes | UTC upload timestamp |
 
-**Index:** `(session_id)` for fast dataset lookup per session.
-
----
-
-### Entity: `Message`
-
-Represents one turn in the conversation. Both user questions and assistant responses are stored here. Assistant messages store the full `RichResponseModel` as JSON.
-
-**SQLite table:** `messages`
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `id` | TEXT (UUID) | yes | Primary key, server-generated |
-| `session_id` | TEXT (UUID FK → sessions.id) | yes | Owning session |
-| `role` | TEXT | yes | `user` \| `assistant` |
-| `content` | TEXT | yes | User: plain text question. Assistant: JSON-serialized `RichResponseModel` |
-| `status` | TEXT | yes | `pending` \| `completed` \| `failed` (assistant only; user messages are always `completed`) |
-| `error` | TEXT | no | Error message if `status=failed` |
-| `created_at` | TIMESTAMP WITH TIMEZONE | yes | UTC creation time |
-
-**Index:** `(session_id, created_at)` for ordered conversation history fetch.
-
----
-
-### Entity: `QueryLog`
-
-Audit record for every SQL query the agent executes via DuckDB. Written by the `execute_query` node regardless of success or failure.
-
-**SQLite table:** `query_logs`
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `id` | TEXT (UUID) | yes | Primary key, server-generated |
-| `session_id` | TEXT (UUID FK → sessions.id) | yes | Session that originated the query |
-| `message_id` | TEXT (UUID FK → messages.id) | yes | Assistant message this query belongs to |
-| `dataset_name` | TEXT | yes | Name of the primary dataset queried (first table in FROM clause, or all if multi-dataset) |
-| `sql` | TEXT | yes | The exact SQL string executed |
-| `row_count` | INTEGER | no | Number of rows returned (null on error) |
-| `latency_ms` | INTEGER | no | Query execution time in milliseconds (null on error) |
-| `error` | TEXT | no | DuckDB error message if execution failed |
-| `created_at` | TIMESTAMP WITH TIMEZONE | yes | UTC timestamp of query execution |
-
-**Index:** `(session_id, created_at)` for audit log listing.
-
----
-
-### Entity: `RunRow` (retained from boilerplate skeleton)
-
-The original boilerplate table. Retained to avoid conflicts with the existing Alembic migration `0001_initial.py`. Not used by the analyst agent.
-
-**SQLite table:** `runs`
-
-See `src/db/models.py` (existing definition unchanged).
-
----
-
-## Pydantic Domain Models (not stored — used for type safety at API and graph boundaries)
-
-### `ColumnSchema`
 ```python
-class ColumnSchema(BaseModel):
-    name: str
-    type: str  # DuckDB type string, e.g. "VARCHAR", "DOUBLE", "DATE"
-```
+class Dataset(Base):
+    __tablename__ = "datasets"
 
-### `DatasetModel`
-```python
-class DatasetModel(BaseModel):
-    dataset_id: str
-    session_id: str
-    name: str
-    file_path: str
-    file_type: str
-    row_count: int
-    columns: list[ColumnSchema]
-    uploaded_at: datetime
-```
+    id: Mapped[str] = mapped_column(Text, primary_key=True, default=lambda: str(uuid4()))
+    session_id: Mapped[str] = mapped_column(Text, ForeignKey("sessions.id"), nullable=False)
+    table_name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    original_filename: Mapped[str] = mapped_column(Text, nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    column_names: Mapped[str] = mapped_column(Text, nullable=False)  # JSON list
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow())
 
-### `MessageModel`
-```python
-class MessageModel(BaseModel):
-    message_id: str
-    session_id: str
-    role: str  # "user" | "assistant"
-    content: str
-    status: str  # "pending" | "completed" | "failed"
-    error: str | None = None
-    created_at: datetime
-```
-
-### `QueryResultModel`
-```python
-class QueryResultModel(BaseModel):
-    columns: list[str]
-    rows: list[list[Any]]  # up to 500 rows
-    row_count: int          # total rows from DuckDB (may exceed 500)
-```
-
-### `ChartSpec`
-```python
-class ChartSpec(BaseModel):
-    type: str           # "bar" | "line" | "pie"
-    labels: list[str]   # X-axis labels or pie slice labels
-    datasets: list[dict]  # Chart.js dataset objects: {"label": str, "data": list[float]}
-```
-
-### `RichResponseModel`
-```python
-class RichResponseModel(BaseModel):
-    narrative: str               # markdown text
-    query_result: QueryResultModel | None = None
-    chart_spec: ChartSpec | None = None
-    sql: str | None = None       # the SQL that was executed (shown in UI on hover)
-    query_log_id: str | None = None
-```
-
-### `SessionModel`
-```python
-class SessionModel(BaseModel):
-    session_id: str
-    name: str
-    created_at: datetime
-    dataset_count: int = 0
-    message_count: int = 0
+    session: Mapped["Session"] = relationship("Session", back_populates="datasets")
 ```
 
 ---
 
-## DuckDB View Registration (runtime, not persisted)
+### Entity: `AuditLog`
 
-When the `execute_query` node runs, it registers each dataset in the session as a named DuckDB view using the dataset's `name` (without extension) as the view name:
+One row per `POST /query` call — regardless of success or failure. Written by the `audit_logger` node.
 
-| Dataset file | DuckDB view name |
-|-------------|-----------------|
-| `sales.csv` | `sales` |
-| `customers.xlsx` | `customers` |
-| `orders.json` | `orders` |
+**SQLite table:** `audit_log`
 
-The LLM is told the view names in the schema context so it references them correctly in SQL. If two datasets have the same base name, a `_2` suffix is appended.
+| Field | SQLAlchemy Mapped type | Required | Description |
+|-------|------------------------|----------|-------------|
+| `id` | `Mapped[str]` (TEXT, PK) | yes | UUID string, server-generated |
+| `session_id` | `Mapped[str]` (TEXT, FK → sessions.id) | yes | Requesting session |
+| `dataset_table` | `Mapped[str]` (TEXT) | yes | The SQLite table that was queried |
+| `question` | `Mapped[str]` (TEXT) | yes | The natural-language question asked |
+| `sql_generated` | `Mapped[str | None]` (TEXT, nullable) | no | The SQL generated by Gemini; null if query_planner failed |
+| `row_count` | `Mapped[int | None]` (INTEGER, nullable) | no | Rows returned; null if sql_executor did not run |
+| `duration_ms` | `Mapped[int | None]` (INTEGER, nullable) | no | SQL execution wall-clock time in ms; null if execution did not run |
+| `error` | `Mapped[str | None]` (TEXT, nullable) | no | Error message if the query failed; null on success |
+| `created_at` | `Mapped[datetime]` (DateTime) | yes | UTC timestamp of the query attempt |
+
+```python
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True, default=lambda: str(uuid4()))
+    session_id: Mapped[str] = mapped_column(Text, ForeignKey("sessions.id"), nullable=False)
+    dataset_table: Mapped[str] = mapped_column(Text, nullable=False)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    sql_generated: Mapped[str | None] = mapped_column(Text, nullable=True)
+    row_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.utcnow())
+
+    session: Mapped["Session"] = relationship("Session", back_populates="audit_logs")
+```
+
+---
+
+## Dynamic Data Tables (not in ORM)
+
+Created at upload time by `pandas.DataFrame.to_sql(table_name, engine, if_exists="replace", index=False)`. Not tracked by Alembic. Column types are SQLite defaults inferred by pandas (TEXT for strings, INTEGER for ints, REAL for floats).
+
+**Naming convention:**
+
+1. Take the session UUID: `550e8400-e29b-41d4-a716-446655440000`
+2. Replace hyphens with underscores: `550e8400_e29b_41d4_a716_446655440000`
+3. Take the original filename stem (no extension): `sales report`
+4. Lowercase, replace all non-alphanumeric characters with underscores, strip leading/trailing underscores: `sales_report`
+5. Concatenate: `550e8400_e29b_41d4_a716_446655440000_sales_report`
+
+The resulting `table_name` is stored in the `datasets` row and is the value the frontend passes as `dataset_table` in `POST /query`.
+
+**Row limit:** Files with more than 500,000 rows are rejected with HTTP 422 before `DataFrame.to_sql()` is called. The row count is checked after parsing, before ingestion.
 
 ---
 
@@ -193,10 +130,10 @@ The LLM is told the view names in the schema context so it references them corre
 
 ```
 Session 1 ──── N Dataset
-Session 1 ──── N Message
-Session 1 ──── N QueryLog
-Message  1 ──── N QueryLog   (one assistant turn may generate multiple SQL queries in Phase 2+; Phase 1 = one query per turn)
+Session 1 ──── N AuditLog
 ```
+
+Datasets and AuditLog rows cascade-delete when the owning Session is deleted (future phase; not implemented in Phase 1 — sessions are never deleted in Phase 1).
 
 ---
 
@@ -204,22 +141,17 @@ Message  1 ──── N QueryLog   (one assistant turn may generate multiple S
 
 | Entity | Created | Updated | Deleted |
 |--------|---------|---------|---------|
-| `Session` | On `POST /sessions` | On rename (Phase 2) | On `DELETE /sessions/{id}` (Phase 2) |
-| `Dataset` | On `POST /datasets` | Never (immutable after upload) | Cascade on session delete (Phase 2); file removed from filesystem |
-| `Message` | User message: on `GET /chat` request received. Assistant message: created as `pending` at start of graph, updated to `completed` or `failed` at `finalize`/`handle_error` | Status + content updated by `finalize`/`handle_error` | Cascade on session delete (Phase 2) |
-| `QueryLog` | On `execute_query` node completion | Never (immutable audit record) | Cascade on session delete (Phase 2) |
-
----
-
-## Sensitive Data
-
-No PII or credentials are stored in the database. Uploaded dataset files may contain user data — they are stored locally on the user's machine (single-user tool) and never transmitted to external services except as SQL-derived results (not raw rows) interpreted by Gemini. No encryption or access control is in scope for Phase 1.
+| `Session` | Upserted by first API call bearing a new session_id | `last_seen_at` updated on every API call | Not in Phase 1 |
+| `Dataset` | On successful `POST /datasets/upload` | Never (immutable after upload) | Not in Phase 1 |
+| `AuditLog` | On every `POST /query` call (success or failure) | Never (immutable audit record) | Not in Phase 1 |
+| Dynamic table | Created/replaced on `POST /datasets/upload` | `if_exists='replace'` on re-upload of same name | Not in Phase 1 |
 
 ---
 
 ## Alembic Migration Plan
 
-| Migration | File | Changes |
+| Migration | File | Creates |
 |-----------|------|---------|
-| `0001_initial` | `alembic/versions/0001_initial.py` | Creates `runs` table (existing, unchanged) |
-| `0002_analyst` | `alembic/versions/0002_analyst.py` | Creates `sessions`, `datasets`, `messages`, `query_logs` tables + indexes |
+| `001_initial` | `alembic/versions/001_initial.py` | `sessions`, `datasets`, `audit_log` tables |
+
+> **Assumed:** The boilerplate `runs` table from the skeleton is not carried forward. The `001_initial` migration creates the three analyst tables from scratch. If the boilerplate migration already exists, it is superseded — a clean `alembic upgrade head` on a fresh `./data/agent.db` must succeed.

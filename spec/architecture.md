@@ -2,111 +2,97 @@
 
 ## System Overview
 
-The analyst agent is a single-origin web application: a FastAPI backend (port 8001) serves both the REST/SSE API and the statically-exported Next.js frontend (mounted at `/app`). The user's browser is the only client. When the user asks a question, a LangGraph agent translates it into DuckDB SQL, executes the query against uploaded dataset files, logs the operation, and streams a rich response (markdown text + table rows + chart spec) back over Server-Sent Events.
+The Data Analyst Agent is a single-origin web application: a FastAPI backend (port 8001) serves both the REST API and the statically-exported Next.js frontend (mounted at `/app`). The user's browser is the only client. When a user uploads a file, FastAPI parses it with pandas and loads it into a session-namespaced SQLite table. When the user asks a question, a LangGraph agent sends schema context to Gemini 2.5 Flash via structured tool-use, receives a SQL string back, executes it against SQLite, logs the operation to the audit_log table, and returns a formatted markdown + table response. No DuckDB, no external database, no filesystem dataset storage beyond the SQLite DB file.
 
 ## Component Map
 
 ```
 Browser
   │
-  │  GET /app/*          (static Next.js export)
-  │  POST /sessions      (REST)
-  │  POST /datasets      (multipart upload)
-  │  GET  /chat          (SSE stream)
-  │  GET  /audit         (REST)
+  │  GET  /app/*              (static Next.js export)
+  │  POST /datasets/upload    (multipart — X-Session-ID header)
+  │  GET  /datasets           (X-Session-ID header)
+  │  POST /query              (JSON body — X-Session-ID header)
+  │  GET  /audit              (X-Session-ID header)
+  │  GET  /health
   ▼
 FastAPI  (port 8001)
-  ├── StaticFiles → frontend/out/
-  ├── SessionsRouter
+  ├── StaticFiles → frontend/out/   (mounted at /app)
   ├── DatasetsRouter
-  ├── ChatRouter  ─────────────────────► LangGraph Analyst Graph
-  └── AuditRouter                              │
-                                               ├── build_schema_context  → SQLite (datasets metadata)
-                                               ├── call_llm_with_tools   → Gemini 2.5 Flash
-                                               └── execute_query         → DuckDB (data/uploads/)
-                                                        │
-                                                        └── audit log → SQLite (query_logs)
+  │     └── ingest/parser.py  ──► ingest/loader.py ──► SQLite (dynamic tables)
+  ├── QueryRouter
+  │     └── LangGraph Analyst Graph
+  │           ├── query_planner  ──► Gemini 2.5 Flash (generate_sql tool, forced)
+  │           ├── sql_executor   ──► SQLite (dynamic table, raw text() query)
+  │           ├── response_formatter
+  │           └── audit_logger   ──► SQLite (audit_log table)
+  └── AuditRouter              ──► SQLite (audit_log table, read-only)
 ```
-
-## Layers
-
-| Layer | Responsibility |
-|-------|----------------|
-| Frontend (Next.js) | Session sidebar, dataset upload panel, SSE chat thread, rich response rendering (markdown + sortable table + Chart.js chart) |
-| API (FastAPI) | REST endpoints for sessions/datasets/audit; SSE endpoint for streaming chat; mounts static frontend |
-| Agent Graph (LangGraph) | Classify intent, build schema context, call Gemini with tool-use, execute DuckDB query, format rich response |
-| LLM (Gemini 2.5 Flash) | Translate natural-language question + schema context into a SQL tool call |
-| Analytical Engine (DuckDB) | In-process SQL execution against uploaded CSV/Excel/JSON files |
-| Metadata Store (SQLite) | Persist sessions, dataset records, messages, and query audit log |
-| Filesystem | Raw uploaded files at `data/uploads/<session_id>/` |
 
 ## Data Flow
 
-1. **Trigger:** User types a natural-language question in the chat input and presses Enter.
-2. Frontend opens a Server-Sent Events connection to `GET /chat?session_id=<id>&q=<question>`.
-3. FastAPI invokes `run_analyst(session_id, question)` as a streaming generator.
-4. LangGraph executes the analyst graph:
-   - `classify_intent`: determine if this is a data query, clarification, or off-topic.
-   - `build_schema_context`: load dataset column names, types, and row count from SQLite; assemble compact schema string — no raw rows.
-   - `call_llm_with_tools`: send system prompt + schema context + conversation history + question to Gemini 2.5 Flash with the `execute_sql` tool declared; receive a tool call containing a SQL string.
-   - `execute_query`: validate and run the SQL via DuckDB in-memory against the session's dataset files; record to `QueryLog` (timestamp, sql, dataset_name, row_count, latency_ms).
-   - `format_response`: determine chart type from result shape (aggregation → bar/pie; time-series → line; else table-only); assemble `RichResponseModel`.
-5. Runner yields SSE events: `status` (node transitions), `chunk` (markdown text tokens), `table` (JSON rows), `chart` (ChartSpec JSON), `done`.
-6. Frontend `ChatThread` consumes the stream; `RichResponse` renders each event type as it arrives.
-7. Completed message is persisted to `messages` table in SQLite.
+### File Upload Flow
 
-## External Dependencies
+1. Browser POSTs multipart file + `X-Session-ID` header to `POST /datasets/upload`.
+2. FastAPI validates file extension (`.csv` or `.xlsx`) and row count (≤ 500,000 rows; reject 422 otherwise).
+3. `ingest/parser.py` reads the file into a pandas DataFrame; infers column names and types.
+4. `ingest/loader.py` calls `DataFrame.to_sql()` with the session-namespaced table name (`{session_id_underscored}_{sanitized_filename}`) into the SQLite DB, `if_exists='replace'`.
+5. A `datasets` row is inserted recording table_name, original_filename, row_count, column_names (JSON list), session_id. The metadata is returned to the browser.
 
-| Dependency | Purpose | Failure Mode |
-|------------|---------|--------------|
-| Gemini 2.5 Flash (`google-genai` SDK) | NL → SQL tool call generation | Graph transitions to `handle_error`; SSE `error` event sent to client; message saved with `status=failed` |
-| DuckDB (in-process) | SQL execution against uploaded files | `execute_query` catches `duckdb.Error`; returns error message in SSE stream; query logged with `error` field |
-| Filesystem (`data/uploads/`) | Dataset file storage | Upload endpoint returns 500 if directory write fails; startup validates/creates directory |
+### NL Query Flow
+
+1. Browser POSTs `{question, dataset_table}` + `X-Session-ID` header to `POST /query`.
+2. FastAPI validates that `dataset_table` starts with the requesting session's prefix (403 otherwise). Invokes the LangGraph analyst graph.
+3. Graph executes:
+   a. **query_planner** — runs `PRAGMA table_info({dataset_table})` on SQLite to fetch schema; builds a schema-context string; calls Gemini 2.5 Flash with `generate_sql` tool forced (tool_config mode=ANY); extracts the SQL string from the tool call. Retries up to 3× on Gemini error.
+   b. **sql_executor** — executes the SQL via `sqlalchemy.text()` against SQLite; caps results at 1,000 rows; records duration_ms.
+   c. **response_formatter** — assembles markdown answer text and a list-of-dicts table; falls back gracefully on empty results or null values.
+   d. **audit_logger** — writes one `audit_log` row (session_id, dataset_table, question, sql_generated, row_count, duration_ms, error); non-fatal if write fails.
+4. FastAPI returns `{answer, table, sql, audit_id}` as JSON, or `{error}` on 502.
+
+## Session Isolation
+
+Every dataset table in SQLite is named `{session_id_underscored}_{sanitized_name}`, where `session_id_underscored` is the session UUID with hyphens replaced by underscores. `POST /query` validates that the `dataset_table` field in the request body starts with the calling session's prefix before executing any SQL — a mismatch returns 403. The `sessions`, `datasets`, and `audit_log` ORM tables are filtered by `session_id` on every read. No authentication is used; isolation is enforced solely by this naming convention and API-layer validation.
+
+## Frontend Serving
+
+The Next.js frontend is built with `output: 'export'` and `basePath: '/app'` set in `next.config.js`. The static output lands in `frontend/out/`. FastAPI mounts this directory with `StaticFiles(directory="frontend/out", html=True)` at the path `/app`. All API calls from the frontend use relative paths (e.g. `/datasets/upload`) — single-origin, no CORS configuration needed.
+
+> **Assumed:** The frontend is always built before starting the server in the test/handoff path (`pnpm build` then `uv run python -m src`). The `frontend/out/` directory must exist at server startup.
 
 ## Stack
 
-> This project's concrete technology choices (captured at intake, filled by the spec-writer). The generic, every-project rules — model-naming, DB driver, dev port, test environment — live in `harness/patterns/tech-stack.md`; this section is only what **this** project picked.
+> Concrete technology choices for this project. Generic every-project rules live in `harness/patterns/tech-stack.md`.
 
 - **Language:** Python 3.12+
-- **Agent framework:** LangGraph (tool-use loop pattern: `call_llm_with_tools` → conditional edge → `execute_query` → `format_response`)
+- **Agent framework:** LangGraph — StateGraph with prompt-chaining + tool-use + exception-handling pattern
 - **LLM provider + model:** Google Gemini via `google-genai` SDK; model `gemini-2.5-flash` (configurable via `AGENT_LLM_MODEL`)
-- **Backend:** FastAPI 0.115+ with `StreamingResponse` (text/event-stream) for SSE
-- **Database + ORM:** SQLite (single-user local tool) + SQLAlchemy 2.0 sync ORM + Alembic migrations
-- **Analytical engine:** DuckDB in-process, in-memory per request; reads files via `read_csv_auto` / `read_json_auto` / openpyxl-exported temp parquet
-- **Frontend:** Next.js 15.3 + React 19, static export (`output: 'export'`), mounted at `/app`
-- **Styling:** Tailwind CSS v4 with `postcss.config.mjs` (`@tailwindcss/postcss` plugin — required for utility class generation)
-- **Dependency management:** `uv` (Python) + `pyproject.toml`; `pnpm` (frontend)
+- **Backend:** FastAPI 0.115+
+- **Database + ORM:** SQLite + SQLAlchemy 2.0 Mapped types + Alembic migrations; DB file at `./data/agent.db` (configurable via `AGENT_DATABASE_URL`)
+- **Frontend:** Next.js 15 + React 19, static export (`output: 'export'`), `basePath: '/app'`, mounted by FastAPI StaticFiles at `/app`
+- **Styling:** Tailwind CSS v4 with `postcss.config.mjs` (`@tailwindcss/postcss` plugin)
+- **Dependency management:** `uv` (Python) + `pnpm` (frontend)
 
 | Key library | Version | Purpose |
 |-------------|---------|---------|
 | `langgraph` | ≥0.1 | Agent graph orchestration |
-| `google-genai` | ≥2.9.0 | Gemini API client (already in pyproject.toml) |
-| `duckdb` | ≥1.0 | In-process analytical SQL engine |
-| `openpyxl` | ≥3.1 | Excel (.xlsx) file parsing for DuckDB ingestion |
-| `python-multipart` | ≥0.0.9 | FastAPI `UploadFile` multipart form parsing |
-| `sqlalchemy` | ≥2.0 | ORM for SQLite metadata tables |
+| `google-genai` | ≥2.9.0 | Gemini API client |
+| `sqlalchemy` | ≥2.0 | ORM + raw text() queries against SQLite |
 | `alembic` | ≥1.13 | Database migrations |
-| `chart.js` | ^4.x | Client-side chart rendering |
-| `react-chartjs-2` | ^5.x | React wrapper for Chart.js |
-| `structlog` | ≥24.1 | Structured logging (already in skeleton) |
+| `pandas` | ≥2.0 | CSV/Excel parsing and DataFrame.to_sql() ingestion |
+| `openpyxl` | ≥3.1 | Excel (.xlsx) backend for pandas read_excel |
+| `python-multipart` | ≥0.0.9 | FastAPI UploadFile multipart form parsing |
+| `structlog` | ≥24.1 | Structured logging |
+| `pytest` | ≥8.0 | Test runner |
+| `httpx` | ≥0.27 | Async test client for FastAPI |
 
 **Avoid:**
-- Dumping raw dataset rows into LLM prompts — schema-only context only (column names, types, row count).
-- A persistent DuckDB database file — use in-memory connections per request to keep data lifecycles simple.
-- Replacing SQLite with PostgreSQL — this is a single-user local tool; SQLite is the stated and appropriate choice.
-- Third-party SSE libraries — use FastAPI `StreamingResponse` with `text/event-stream` directly.
-- `pnpm dev` as the test/handoff path — the single-origin path is `pnpm build` + `uv run python -m src` + `http://localhost:8001/app/`.
+- Any DuckDB dependency — all SQL runs against SQLite via SQLAlchemy.
+- Storing uploaded files on the filesystem — data lives in SQLite dynamic tables only.
+- Replacing SQLite with PostgreSQL — this is a fully-local single-user tool.
+- Raw `sqlite3` module — use SQLAlchemy `text()` for all queries so parameterisation is consistent.
+- `pnpm dev` as the handoff path — single-origin path is `pnpm build` + `uv run python -m src` + `http://localhost:8001/app/`.
 
-## Deployment Model
+> **Assumed:** Excel files are read with `pandas.read_excel(openpyxl)` and ingested via `DataFrame.to_sql()` into SQLite, the same path as CSV. No intermediate file storage.
 
-Local single-user service. User runs `uv run python -m src` after building the frontend with `cd frontend && pnpm build`. FastAPI serves everything on `http://localhost:8001`. No containerization, cloud deployment, or reverse proxy is in scope.
-
-> **Assumed:** DuckDB is used in-process (not as a persistent server). Each chat request opens a new DuckDB in-memory connection, registers the session's datasets as views, executes the query, and closes the connection.
-
-> **Assumed:** Uploaded files are kept on the filesystem for the lifetime of the session. No TTL or automatic cleanup is implemented in Phase 1.
-
-> **Assumed:** Multi-user isolation is session-based only (no authentication). Each session has a UUID stored in browser `localStorage`. All datasets are namespaced by `session_id` on disk.
-
-> **Assumed:** Excel files are converted to a temporary Parquet or in-memory buffer via `openpyxl` before DuckDB reads them, since DuckDB's native Excel support requires the non-free `spatial` extension. The loader uses `openpyxl` → pandas DataFrame → `duckdb.register()` for Excel files.
-
-> **Assumed:** `data/uploads/` is created at application startup if it does not exist (the `data/` directory already exists per the brief).
+> **Assumed:** `data/` directory is created at application startup if it does not exist.

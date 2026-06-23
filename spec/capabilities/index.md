@@ -4,12 +4,11 @@
 
 | Capability | File | Phase |
 |-----------|------|-------|
-| Dataset Management | [dataset-management.md](dataset-management.md) | Phase 1 |
-| Natural Language Querying | [natural-language-querying.md](natural-language-querying.md) | Phase 1 |
-| Rich Responses | [rich-responses.md](rich-responses.md) | Phase 1 |
-| Persistent Sessions | [persistent-sessions.md](persistent-sessions.md) | Phase 1 |
-| SQL / Data Audit Log | [sql-audit-log.md](sql-audit-log.md) | Phase 1 |
-| Token Economy | [token-economy.md](token-economy.md) | Phase 1 |
+| Dataset Management | [dataset_management.md](dataset_management.md) | Phase 1 |
+| NL Query | [nl_query.md](nl_query.md) | Phase 1 |
+| Response Formatting | [response_formatting.md](response_formatting.md) | Phase 1 |
+| Audit Log | [audit_log.md](audit_log.md) | Phase 1 |
+| Session Management | [session_management.md](session_management.md) | Phase 1 |
 
 ## How to Add a New Capability
 

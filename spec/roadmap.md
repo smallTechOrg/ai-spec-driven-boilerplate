@@ -2,125 +2,168 @@
 
 ## What This Agent Does
 
-A web-based senior data analyst agent that lets users upload structured datasets (CSV, Excel, JSON), ask natural-language questions about them, and receive rich analytical responses — formatted markdown narrative, sortable data tables, and auto-selected Chart.js charts (bar, line, or pie). The agent translates each question into DuckDB SQL, executes it against the uploaded data, and streams a composed answer back in real time. Every SQL operation is logged for auditability. Sessions persist across page reloads so users can return to prior analyses.
+The Data Analyst Agent lets users upload CSV and Excel files through a web interface, asks natural-language questions about the data, and receives formatted text answers plus HTML tables backed by real SQL. Internally it follows a senior-analyst workflow: Gemini plans the SQL using structured tool-use, the executor runs it against SQLite, and the formatter assembles a markdown + table response. Every SQL and data operation is written to an audit log that is itself queryable through the UI. Each visitor gets an isolated workspace namespaced by a browser-generated session ID — no login required.
 
 ## Who Uses It
 
-Data analysts, business users, and researchers who need to interrogate structured datasets without writing SQL themselves. They upload one or more files, ask questions in plain English, and expect analyst-quality answers with evidence (tables and charts), not just text summaries.
+Data analysts, product managers, and non-technical stakeholders who need to explore CSV/Excel exports without writing SQL or setting up a local database. Their goal: ask plain-English questions and get answers in seconds.
 
 ## Core Problem Being Solved
 
-Analysts spend significant time writing ad-hoc SQL queries, formatting results, and producing charts for stakeholders. This agent eliminates that loop: the user describes what they want to know; the agent writes and runs the query, selects an appropriate chart type, and composes a complete response — all while keeping token usage minimal by injecting only schema context (never raw rows) into the LLM prompt.
+Exploring CSV/Excel data today requires either SQL knowledge and a database tool, or expensive cloud BI services. This agent removes both barriers: upload a file, ask a question, get an answer — fully local, no data leaves the machine except the Gemini API call.
 
 ## Success Criteria
 
-- [ ] A user uploads a CSV and asks a natural-language question; the agent returns a correct SQL-backed answer with a rendered table within 10 seconds.
-- [ ] Chart.js charts render correctly for aggregation questions (bar/line/pie auto-selected based on response shape).
-- [ ] Sessions persist: refreshing the page restores prior conversation and dataset list.
-- [ ] Every SQL query the agent executes appears in the audit log with timestamp, dataset name, SQL text, row count, and latency.
-- [ ] The LLM prompt never contains raw dataset rows — only column names, types, and row count.
-- [ ] Dataset upload accepts CSV, Excel (.xlsx), and JSON files and makes them immediately queryable.
+- [ ] A user can upload a CSV or Excel file and see it listed in the sidebar within 5 seconds
+- [ ] A natural-language question returns a correct SQL-backed answer (text + table) within 15 seconds on gemini-2.5-flash
+- [ ] Every SQL execution appears in the audit log with session_id, query, row_count, and duration_ms
+- [ ] Two browser tabs with different session IDs cannot see each other's datasets
+- [ ] The app runs entirely locally (only outbound connection: Gemini API)
 
 ## What This Agent Does NOT Do (Out of Scope)
 
-- Scheduled or automated reports (no cron, webhooks, or push notifications)
-- User authentication or multi-user access control (single-user session model)
-- Modifying or writing back to the uploaded datasets
-- Connecting to external databases, warehouses, or live APIs
-- Natural-language chart customization (chart type is auto-selected, not user-controlled)
-- Exporting results to PDF, Excel, or BI tools
-- Vector-search or semantic retrieval over dataset content
+- Connect to external databases (PostgreSQL, MySQL, BigQuery, etc.)
+- Send data to any service other than the Gemini API
+- Authenticate users or persist sessions beyond a browser reset
+- Schedule or automate recurring queries
+- Export results as new files
+- Support SQL dialects other than SQLite
 
 ## Key Constraints
 
-- The LLM prompt must never contain raw dataset rows — schema-only context (column names, types, sample row count) only.
-- Every SQL operation logged: timestamp, dataset name, SQL, row count, latency in ms.
-- Sessions are persistent across page reloads (SQLite-backed).
-- Uploaded datasets stored in `data/uploads/` at repo root; DuckDB reads files directly from disk.
-- LLM: `gemini-2.5-flash` via `google-genai` SDK; key is `AGENT_GEMINI_API_KEY` in `.env`.
-- Dev port: 8001 (mandatory per harness rules).
+- SQLite only — no external DB connections
+- Fully local — no outbound connections except the Gemini API (AGENT_GEMINI_API_KEY)
+- All settings use the AGENT_ env prefix
+- DB path: ./data/agent.db
+- Dev port: 8001
+- Multi-user isolation: session_id namespaced table names ({session_id}_{dataset_name})
 
 ---
 
 ## Phases of Development
 
-> Phase 1 is the full set of six capabilities, all delivered together as one user-testable increment. Each independent slice builds concurrently; only true dependencies serialize the fan-out.
+> Phase 1 is the smallest first-time-right user-testable win. It must work perfectly on the first try — zero rough edges on the tested path. Backend is minimal but REAL. Frontend is visually complete with clearly-labelled stubs for unbuilt phases.
 
-### Phase 1 — Full Analyst Agent (all six capabilities)
+---
 
-**Goal:** A user opens the web UI, uploads a CSV dataset, types a natural-language question, and receives a streamed response containing markdown text, a sortable data table, and a Chart.js chart — backed by real DuckDB SQL, persisted in a SQLite session, and logged to the audit log. All six capabilities are live on this path.
+### Phase 1 — Upload + NL Query (Core Path)
+
+**Goal:** A user uploads a CSV or Excel file, asks a natural-language question, and receives a formatted text + table answer backed by real Gemini-generated SQL. The audit log records the event. Charts and Dashboards panels are visible but labelled stubs.
 
 **Independent slices (parallel build units):**
 
-- `slice-a` (backend-foundation) — SQLite data models (Session, Dataset, Message, QueryLog) + Alembic migration + DuckDB file storage in `data/uploads/` + dataset loader utility (CSV/Excel/JSON → DuckDB view). **deps: none. Must complete before slice-b and slice-c begin.**
-- `slice-b` (backend-agent) — LangGraph analyst graph: nodes `classify_intent`, `build_schema_context`, `call_llm_with_tools`, `execute_query`, `format_response`; Gemini tool-use API; DuckDB query execution; audit logging to `QueryLog`. **deps: slice-a (needs models + DuckDB loader).**
-- `slice-c` (backend-api) — FastAPI endpoints: sessions CRUD, dataset upload, SSE streaming chat/query endpoint, audit log endpoint; mounts frontend static export. **deps: slice-a + slice-b.**
-- `slice-d` (frontend) — Next.js page: session sidebar (list + create + switch), dataset upload panel, chat thread with streaming display, rich response rendering (markdown + sortable table + Chart.js chart), labelled stubs for audit log viewer. **deps: none — builds against API contract in `spec/api.md` concurrently with slice-a/b/c.**
+- `slice-backend` (backend) — ALL backend work: Alembic migrations for sessions/datasets/audit_log tables; dataset ingestion (CSV/Excel → dynamic SQLite table, POST /datasets/upload, GET /datasets); NL→SQL pipeline (LangGraph graph: query_planner → sql_executor → response_formatter → audit_logger, POST /query); GET /audit endpoint; GET /health; multi-user session isolation. Surfaces: src/db/models.py, src/config/settings.py, src/ingest/parser.py, src/ingest/loader.py, src/graph/state.py, src/graph/nodes.py, src/graph/agent.py, src/graph/edges.py, src/api/datasets.py, src/api/query.py, src/api/audit.py, src/api/health.py, src/api/__init__.py, src/__main__.py, src/llm/providers/gemini.py, src/prompts/query_planner.md, alembic/versions/001_initial.py; tests: tests/unit/, tests/integration/
 
-**Declared dependency order:**
-```
-slice-a  →  slice-b  →  slice-c
-slice-d  (independent, runs in parallel with slice-a/b/c)
-```
+- `slice-frontend` (frontend) — full Next.js UI: sidebar (dataset list + upload button), chat-style query input + response panel, Audit tab (calls GET /audit), Charts stub card, Dashboards stub card, session ID in footer sent as X-Session-ID header on every call. Surfaces: frontend/src/app/page.tsx, frontend/src/app/layout.tsx, frontend/src/components/Sidebar.tsx, frontend/src/components/QueryPanel.tsx, frontend/src/components/AuditTab.tsx, frontend/src/components/StubCard.tsx, frontend/postcss.config.mjs
 
 **Key surfaces / files:**
 
 | Slice | Owns |
 |-------|------|
-| slice-a | `src/db/models.py` (extend), `alembic/versions/0002_analyst.py` (new), `src/db/duckdb_loader.py` (new), `data/uploads/` (directory) |
-| slice-b | `src/graph/state.py` (replace), `src/graph/nodes.py` (replace), `src/graph/edges.py` (replace), `src/graph/agent.py` (replace), `src/graph/runner.py` (replace), `src/prompts/analyst.md` (new, replaces transform.md), `src/domain/analyst.py` (new) |
-| slice-c | `src/api/sessions.py` (new), `src/api/datasets.py` (new), `src/api/chat.py` (new), `src/api/audit.py` (new), `src/api/__init__.py` (extend to mount new routers), `src/api/runs.py` (replace with stub or remove) |
-| slice-d | `frontend/src/app/page.tsx` (replace), `frontend/src/components/SessionSidebar.tsx` (new), `frontend/src/components/DatasetPanel.tsx` (new), `frontend/src/components/ChatThread.tsx` (new), `frontend/src/components/RichResponse.tsx` (new), `frontend/src/components/DataTable.tsx` (new), `frontend/src/components/AnalystChart.tsx` (new), `frontend/src/lib/api.ts` (new), `frontend/package.json` (add chart.js, react-chartjs-2), `pyproject.toml` (add duckdb, openpyxl, python-multipart) |
+| slice-backend | src/db/models.py, src/graph/nodes.py, src/graph/agent.py, src/api/datasets.py, src/api/query.py, src/api/audit.py |
+| slice-frontend | frontend/src/app/page.tsx, frontend/src/components/Sidebar.tsx, frontend/src/components/QueryPanel.tsx, frontend/src/components/AuditTab.tsx |
 
 **Gate command:**
 ```
-uv run alembic upgrade head && uv run pytest tests/phase1/ -q --tb=short
+uv run alembic upgrade head && uv run pytest tests/ -x -q
 ```
+Runs against the real Gemini API (AGENT_GEMINI_API_KEY in .env) and the SQLite DB at ./data/agent.db.
 
-Tests in `tests/phase1/` cover: dataset upload + DuckDB load, agent graph end-to-end with real Gemini key, SSE streaming endpoint shape, session persistence round-trip, and audit log record creation. Real `AGENT_GEMINI_API_KEY` must be set in `.env`.
+**How the user tests it:**
+1. From repo root: `cd frontend && pnpm build && cd .. && uv run python -m src`
+2. Open `http://localhost:8001/app/` in a browser
+3. Click "Upload" in the left sidebar, pick any .csv or .xlsx file — the file should appear in the dataset list within 5 seconds
+4. Type a natural-language question about the dataset in the chat input (e.g. "What are the top 5 values in the first column?") and press Send
+5. A formatted answer (text + table) should appear in the response panel
+6. Click the "Audit" tab — a table of logged SQL operations should appear
+7. The "Charts" and "Dashboards" cards are visible with labels "Charts — coming in Phase 2" and "Dashboards — coming in Phase 3" — these are expected stubs, not bugs
 
-**How the user tests it (handoff seed):**
+---
 
-1. Ensure `.env` contains `AGENT_GEMINI_API_KEY=<real key>` and `AGENT_DATABASE_URL=sqlite:///./data/analyst.db`.
-2. Run migrations: `uv run alembic upgrade head`
-3. Build the frontend: `cd frontend && pnpm install && pnpm build`
-4. Start the server: `uv run python -m src`
-5. Open `http://localhost:8001/app/` in a browser.
-6. **What you see:** A two-column layout — left sidebar lists sessions (starts empty), right area shows a chat panel with a dataset upload zone at the top.
-7. **Test the core path:**
-   - Click "New Session" in the sidebar — a new session appears and is selected.
-   - Drag a CSV file onto the upload zone (or click "Upload Dataset") — the file name appears in the dataset list below the upload zone with a "Ready" badge.
-   - Type a question such as "What are the top 5 rows by [any numeric column]?" and press Enter.
-   - Watch the response stream in: first a text narrative, then a sortable table of results, then a bar chart.
-8. **Labelled stubs (not bugs):**
-   - "Audit Log" tab in the right panel — clicking shows "Audit log coming soon [stub]" placeholder text. This is intentional; the backend logs are written but the UI viewer is a stub.
-   - Session rename and delete buttons in the sidebar show a "Not yet implemented" tooltip on hover.
-9. **Verify persistence:** Refresh the page — your session and dataset list reappear; the chat history is restored.
+### Phase 2 — Charts in Responses
 
-### Phase 2 — Audit Log UI + Session Management
-
-**Goal:** Wire the labelled stubs from Phase 1: the audit log viewer shows real query history (SQL, dataset, row count, latency), and session rename/delete work.
+**Goal:** Query responses optionally include a bar, line, or pie chart rendered by the frontend charting library. The backend returns chart-ready data; the frontend renders it.
 
 **Independent slices (parallel build units):**
 
-- `slice-a` (backend) — audit log read endpoint pagination; session rename (PATCH) and delete (DELETE) endpoints. **deps: Phase 1 slice-c.**
-- `slice-b` (frontend) — audit log viewer component (real data, paginated table); session rename inline edit; session delete with confirm dialog. **deps: Phase 1 slice-d API client.**
+- `slice-chart-backend` (backend) — extend POST /query response to include chart_data: {type, labels, values} when the result set is chart-renderable (numeric column + label column); extend response_formatter node; deps: none
+- `slice-chart-frontend` (frontend) — replace Charts stub card with real chart component (Recharts); render chart_data from query response inline in the response panel; deps: none
 
 **Key surfaces / files:**
 
 | Slice | Owns |
 |-------|------|
-| slice-a | `src/api/audit.py` (extend with pagination), `src/api/sessions.py` (extend with PATCH + DELETE) |
-| slice-b | `frontend/src/components/AuditLogViewer.tsx` (new), `frontend/src/components/SessionSidebar.tsx` (extend) |
+| slice-chart-backend | src/graph/nodes.py (response_formatter), src/api/query.py |
+| slice-chart-frontend | frontend/src/components/ChartPanel.tsx, frontend/src/components/QueryPanel.tsx |
 
 **Gate command:**
 ```
-uv run pytest tests/phase2/ -q --tb=short
+uv run pytest tests/ -x -q
 ```
 
-**How the user tests it (handoff seed):**
+**How the user tests it:**
+1. Start the app: `cd frontend && pnpm build && cd .. && uv run python -m src`
+2. Open `http://localhost:8001/app/`
+3. Upload a CSV with numeric columns, ask "Show me a bar chart of sales by region"
+4. A bar chart appears below the text answer
+5. The Dashboards card still shows "Dashboards — coming in Phase 3" stub
 
-1. Server already running from Phase 1 setup.
-2. Open `http://localhost:8001/app/` — click the "Audit Log" tab; it now shows a table of real queries with SQL text, dataset name, row count, and latency.
-3. In the sidebar, double-click a session name to rename it; press Enter to save.
-4. Click the trash icon on a session; a confirm dialog appears; confirm — the session and its datasets/messages are removed.
+---
+
+### Phase 3 — Pinned Dashboards
+
+**Goal:** Users can save queries (with their charts) to a named dashboard, then revisit and refresh them.
+
+**Independent slices (parallel build units):**
+
+- `slice-dashboard-db` (backend) — Alembic migration for dashboards and dashboard_items tables; deps: none
+- `slice-dashboard-api` (backend) — POST /dashboards, GET /dashboards, GET /dashboards/{id}, DELETE /dashboards/{id}/items/{item_id}; deps: slice-dashboard-db
+- `slice-dashboard-frontend` (frontend) — replace Dashboards stub with real Dashboards panel: create/list/view dashboards, pin query+chart to a dashboard; deps: none
+
+**Key surfaces / files:**
+
+| Slice | Owns |
+|-------|------|
+| slice-dashboard-db | alembic/versions/003_dashboards.py, src/db/models.py |
+| slice-dashboard-api | src/api/dashboards.py |
+| slice-dashboard-frontend | frontend/src/components/DashboardsPanel.tsx |
+
+**Gate command:**
+```
+uv run pytest tests/ -x -q
+```
+
+**How the user tests it:**
+1. Start the app: `cd frontend && pnpm build && cd .. && uv run python -m src`
+2. Run a query, click "Pin to Dashboard", name the dashboard
+3. Navigate to the Dashboards tab — the pinned query + chart appears
+4. Click "Refresh" — the query re-runs and updates the result
+
+---
+
+### Phase 4 — Audit Log UI
+
+**Goal:** The audit log is browsable and filterable through a dedicated UI view in the app.
+
+**Independent slices (parallel build units):**
+
+- `slice-audit-filter-api` (backend) — extend GET /audit with query params: dataset_table, from_date, to_date, limit, offset; deps: none
+- `slice-audit-frontend` (frontend) — replace basic audit table with full Audit UI: filter bar, pagination, detail drawer showing full SQL + row_count + duration; deps: none
+
+**Key surfaces / files:**
+
+| Slice | Owns |
+|-------|------|
+| slice-audit-filter-api | src/api/audit.py |
+| slice-audit-frontend | frontend/src/components/AuditTab.tsx, frontend/src/components/AuditDetailDrawer.tsx |
+
+**Gate command:**
+```
+uv run pytest tests/ -x -q
+```
+
+**How the user tests it:**
+1. Start the app: `cd frontend && pnpm build && cd .. && uv run python -m src`
+2. Run several queries, click the "Audit" tab
+3. Filter by dataset name — only matching rows appear
+4. Click any row — a detail drawer opens showing the full SQL, row count, and duration

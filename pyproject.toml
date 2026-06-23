@@ -9,14 +9,12 @@ dependencies = [
     "pydantic-settings>=2.3",
     "sqlalchemy>=2.0",
     "alembic>=1.13",
-    "anthropic>=0.28",
     "structlog>=24.1",
     "langgraph>=0.1",
     "google-genai>=2.9.0",
-    "duckdb>=1.0",
+    "pandas>=2.2",
     "openpyxl>=3.1",
     "python-multipart>=0.0.9",
-    "pandas>=2.0",
 ]
 
 [project.optional-dependencies]

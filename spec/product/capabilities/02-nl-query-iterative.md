@@ -74,7 +74,9 @@ FINAL ANSWER: <the complete answer in plain text>
 ## Query Execution Rules (generic `query` via DuckDB)
 
 - Only `SELECT`/`WITH` statements are allowed. Anything else is a recoverable `isError=True` (never run).
-- The SELECT guard also rejects `;` stacking and `ATTACH`/`COPY`/`PRAGMA`/`INSTALL`/`LOAD`.
+- The SELECT guard also rejects `;` stacking, `ATTACH`/`COPY`/`PRAGMA`/`INSTALL`/`LOAD`, and DuckDB
+  file-reading table functions (`read_text`/`read_csv`/`read_parquet`/`read_blob`/`glob`/…) so a query
+  can only touch the dataset's registered views — not arbitrary host files.
 - A server's MCP server opens **one** DuckDB connection and registers a `CREATE VIEW` per table; a query
   may reference any of the server's tables and JOIN them.
 - Results are capped at `DATAANALYSIS_MCP_MAX_RESULT_ROWS` (default 200) and returned as compact CSV.

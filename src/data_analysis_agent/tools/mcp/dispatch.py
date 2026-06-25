@@ -4,6 +4,10 @@ Answers the MCP read surface (tools/list+call, resources/list+read, prompts/list
 the server's stored capability rows — it does NOT use FastMCP (which cannot represent custom
 inputSchema / resources / prompts). Canned tools execute via the shared DuckDB read-only path with
 parameter binding. This is a different surface from the agent's session pool (``tools/mcp/pool.py``).
+
+It also serves the Phase-B write surface — ``tools|prompts|resources add/update`` (``MUTATION_METHODS``)
+— each applying a client-supplied capability + an ADDITIVE downstream cascade in one transaction
+(``_mutate`` rolls back on any failure); the route bumps the version once and refreshes pools post-commit.
 """
 from __future__ import annotations
 

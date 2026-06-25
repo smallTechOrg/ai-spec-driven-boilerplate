@@ -14,6 +14,18 @@ DEFAULT_MAX_ROWS = 200
 _FORBIDDEN = ("ATTACH", "DETACH", "COPY", "PRAGMA", "INSTALL", "LOAD", "EXPORT", "IMPORT")
 _WORD = re.compile(r"[A-Za-z_]+")
 
+# DuckDB filesystem table functions read ARBITRARY files inside an ordinary SELECT (e.g.
+# `SELECT * FROM read_text('/etc/passwd')`) — they use none of the forbidden KEYWORDS, so they must
+# be blocked by name. Legitimate queries reference the dataset's registered VIEWS by name; only the
+# view definitions (built by us) use read_parquet, never the user/agent/tool SQL. This guard is the
+# single chokepoint for every read path (agent free-SQL, generated tools, and write-time validation).
+_FORBIDDEN_FUNCS = frozenset({
+    "read_text", "read_blob", "read_csv", "read_csv_auto", "read_parquet", "parquet_scan",
+    "read_json", "read_json_auto", "read_json_objects", "read_ndjson", "read_ndjson_auto",
+    "read_ndjson_objects", "glob", "sniff_csv", "read_xlsx", "read_csvgz",
+})
+_FUNC_CALL = re.compile(r"\b([a-z_][a-z0-9_]*)\s*\(")
+
 
 class RecoverableQueryError(ValueError):
     """A query problem the LLM can fix by retrying.
@@ -37,6 +49,11 @@ def _guard_select(query: str) -> str:
     bad = sorted(set(_WORD.findall(upper)) & set(_FORBIDDEN))
     if bad:
         raise RecoverableQueryError(f"Disallowed keyword(s): {', '.join(bad)}. Read-only SELECT only.")
+    bad_funcs = sorted({f for f in _FUNC_CALL.findall(q.lower())} & _FORBIDDEN_FUNCS)
+    if bad_funcs:
+        raise RecoverableQueryError(
+            f"Disallowed function(s): {', '.join(bad_funcs)}. Query the dataset's tables by name only."
+        )
     return q
 
 

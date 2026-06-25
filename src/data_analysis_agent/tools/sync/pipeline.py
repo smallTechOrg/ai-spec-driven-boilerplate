@@ -190,25 +190,47 @@ def _apply_one(db: Session, server: McpServerRow, new_version: int, child: str, 
     key_val = definition.get(key)
     if not key_val:
         raise ValidationError(f"missing '{key}'")
-    if child == "tool":
-        _validate_tool_definition(server, definition)
     existing = _active_one(db, model, server.id, key, key_val)
     if op == "add":
         if existing is not None:
             raise ValidationError(f"{child} '{key_val}' already exists; use {child}s/update")
+        if child == "resource" and definition.get("kind") == "schema":
+            raise ValidationError("the 'schema' resource is managed by sync and cannot be added")
+        effective = definition
+        if child == "tool":
+            _validate_tool_definition(server, effective)
         row = model()
         row.server_id = server.id
         row.created_version = new_version
-        set_fields(row, definition)
+        set_fields(row, effective)
         db.add(row)
     elif op == "update":
         if existing is None:
             raise ValidationError(f"unknown {child} '{key_val}'")
-        set_fields(existing, definition)
+        if child == "resource" and existing.kind == "schema":
+            raise ValidationError("the 'schema' resource is managed by sync and cannot be edited")
+        # PATCH semantics: keep fields the client didn't supply (don't reset to defaults).
+        effective = {**_row_to_def(child, existing), **definition}
+        if child == "tool":
+            _validate_tool_definition(server, effective)
+        set_fields(existing, effective)
     else:
         raise ValidationError(f"unknown op: {op!r}")
     db.flush()
     return key_val
+
+
+def _row_to_def(child: str, row) -> dict:
+    """Project a capability row back to its stage-shaped definition (for patch-merge on update)."""
+    if child == "tool":
+        return {"name": row.name, "title": row.title, "description": row.description,
+                "input_schema": row.input_schema, "output_schema": row.output_schema,
+                "annotations": row.annotations, "sql_template": row.sql_template}
+    if child == "resource":
+        return {"uri": row.uri, "name": row.name, "title": row.title, "description": row.description,
+                "mime_type": row.mime_type, "kind": row.kind, "content": row.content}
+    return {"name": row.name, "title": row.title, "description": row.description,
+            "arguments": row.arguments, "template": row.template}
 
 
 def _cascade_tools(db: Session, server: McpServerRow, new_version: int) -> tuple[bool, bool]:

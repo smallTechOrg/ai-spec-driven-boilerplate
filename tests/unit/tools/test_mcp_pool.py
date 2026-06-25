@@ -135,6 +135,18 @@ def test_unknown_capability_is_recoverable(tmp_path, patch_servers):
     assert is_error is True and "Unknown capability" in text and "free SQL" in text
 
 
+def test_free_sql_blocks_file_reading_functions(tmp_path, patch_servers):
+    patch_servers["s1"] = [_server(tmp_path, "d", {"t": {"x": [1]}})]
+    mgr = SessionPoolManager(8, 1000)
+
+    async def body():
+        await mgr.acquire("s1")
+        return await mgr.call_tool("s1", "d", {"query": "SELECT * FROM read_text('/etc/hosts')"})
+
+    text, is_error = asyncio.run(body())
+    assert is_error is True and "Disallowed function" in text   # arbitrary file read blocked
+
+
 def test_generated_tool_blocks_non_select(tmp_path, patch_servers):
     gt = [_gen_tool("danger", "DROP TABLE products")]
     patch_servers["s1"] = [_server(tmp_path, "shop", {"products": {"name": ["A"]}}, gt)]

@@ -93,9 +93,11 @@ Rules (differ deliberately from the full `/sync`):
   IntegrityError); an unknown key on update → `-32602`. A name whose only match is a tombstone re-inserts
   a fresh active row (partial-unique is over active rows).
 - **Write-time `sql_template` guard** (`tools/add`/`update`): the SQL is `_guard_select`-checked
-  (single-statement read-only SELECT/WITH; no `ATTACH`/`COPY`/`PRAGMA`/`INSTALL`/`LOAD`); zero-param SQL is
-  compile-checked (`LIMIT 0`); every `$param` in the SQL must be declared in `input_schema.properties`.
-  A bad template → `-32602`, never persisted.
+  (single-statement read-only SELECT/WITH; no `ATTACH`/`COPY`/`PRAGMA`/`INSTALL`/`LOAD`; no file-reading
+  table functions like `read_text`/`read_csv`/`read_parquet`/`glob` — these would otherwise read arbitrary
+  host files); zero-param SQL is compile-checked (`LIMIT 0`); every `$param` in the SQL must be declared in
+  `input_schema.properties`. A bad template → `-32602`, never persisted. The same guard runs at execution
+  (agent free-SQL, `tools/call`, generated tools), so a query can only touch the dataset's views.
 - **Transaction + pool refresh.** A failed mutation rolls back (nothing persists); a successful one
   commits, then closes the pools of sessions attached to the server (`close_sessions_for_server`,
   post-commit) so the agent re-reads the new capabilities.

@@ -123,6 +123,22 @@ resource needs explicit confirmation).
     rows; write-time compile-check rejected a bad table ref (`-32602`); dup/bad-sql `-32602`, `tools/delete`
     `-32601`; agent still answers after a mutation invalidates pools; 0 tracebacks.
 
+- [x] Phase B adversarial review (11-agent workflow: 5 dimensions, each finding verified) → 4 confirmed,
+  2 dismissed (correctly: parameterized-compile skip is spec-intended + recoverable; cascade bool is a
+  naming nit). Fixes:
+  - **HIGH (security, 2 findings, one root):** the read-only guard blocked keywords but **not DuckDB
+    file-reading table functions** (`read_text`/`read_csv`/`read_parquet`/`read_blob`/`glob`/…), so a
+    `SELECT … FROM read_text('/etc/passwd')` read arbitrary host files via agent free-SQL, generated
+    tools, **and** a persisted `tools/add` template. Fixed in `server.py _guard_select` (one chokepoint →
+    closes write-time + every runtime path); verified the exploit is refused and legit view queries still
+    pass (no false positive).
+  - **MEDIUM:** granular `update` used replace semantics (omitted fields reset) and could clobber the
+    auto-managed schema resource → switched `update` to **patch** semantics (`_row_to_def` merge) and
+    reject editing/adding a `kind='schema'` resource.
+  - **LOW:** refreshed the stale `dispatch.py` module docstring (now notes the write surface).
+  - +4 tests (file-fn blocked at write-time + runtime, patch-update, schema protection); guard wording
+    synced in spec 02/04 + tech-stack. **`uv run pytest` = 82 passed, 1 skipped.**
+
 ## Session End State
 
 - Branch `feature/data-analysis-agent-v0.1` (PR #57). Phase 0 (spec) + Phase A (full clean-rebuild

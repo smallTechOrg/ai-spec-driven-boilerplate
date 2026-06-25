@@ -15,6 +15,7 @@ from data_analysis_agent.tools.sync import (
     add_tool,
     apply_sync_result,
     run_sync,
+    update_resource,
     update_tool,
 )
 
@@ -185,6 +186,42 @@ def test_add_resource_bumps_version_and_keeps_siblings(db, tmp_path):
     # a pure entity (no physical table) adds no tool, and the cascade never drops existing tools
     assert {t.name for t in _active(db, McpToolRow, srv.id)} == tools_before
     assert _tombstoned(db, McpToolRow, srv.id) == 0
+
+
+def test_add_tool_rejects_file_reading_functions(db, tmp_path):
+    srv = _synced(db, tmp_path)
+    for bad in (
+        {"name": "leak", "sql_template": "SELECT content FROM read_text('/etc/passwd')"},
+        {"name": "leak2", "sql_template": "SELECT * FROM read_csv('/etc/hosts')"},
+        # parameterized path skips the compile-check but the guard must still block the function
+        {"name": "leak3", "sql_template": "SELECT * FROM read_blob($p)",
+         "input_schema": {"type": "object", "properties": {"p": {"type": "string"}}}},
+    ):
+        with pytest.raises(ValidationError):
+            add_tool(db, srv, bad)
+        db.rollback()
+
+
+def test_update_tool_is_patch_not_replace(db, tmp_path):
+    srv = _synced(db, tmp_path)
+    tool = _active(db, McpToolRow, srv.id)[0]
+    original_sql = tool.sql_template
+    update_tool(db, srv, {"name": tool.name, "description": "updated desc only"})
+    db.commit()
+    refreshed = next(t for t in _active(db, McpToolRow, srv.id) if t.name == tool.name)
+    assert refreshed.description == "updated desc only"
+    assert refreshed.sql_template == original_sql        # omitted field preserved (patch, not replace)
+
+
+def test_schema_resource_is_protected(db, tmp_path):
+    srv = _synced(db, tmp_path)
+    schema_uri = f"dataset://{srv.name}/schema"
+    with pytest.raises(ValidationError):
+        update_resource(db, srv, {"uri": schema_uri, "description": "hijack"})
+    db.rollback()
+    with pytest.raises(ValidationError):
+        add_resource(db, srv, {"uri": "entity://x/y", "name": "y", "kind": "schema"})
+    db.rollback()
 
 
 def test_stub_handles_all_node_tags():

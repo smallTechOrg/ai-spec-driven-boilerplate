@@ -2,157 +2,152 @@
 
 ## What This Agent Does
 
-A data-analysis agent that accepts a CSV file upload, loads it into a local SQLite table, and lets the user ask natural-language questions about the data via a web chat interface. For each question the agent runs a five-node LangGraph pipeline: it introspects the table schema, generates a safe SELECT query with Gemini, executes the query, selects the right chart type, and writes a plain-English insight. Every answer shows the SQL that was run, an interactive Recharts chart, and a one-paragraph insight summary. Every graph node is traced end-to-end through LangSmith.
+A browser-based chat interface where users upload a CSV file and ask natural-language questions about their data. The agent reads the CSV into an in-memory pandas DataFrame, sends the column schema and a sample of rows to Gemini, and returns a plain-English answer. In Phase 2 the agent also generates and sandboxed-executes pandas/matplotlib code to produce a chart (returned as a base64 PNG) alongside the executed code and agent reasoning trace.
 
 ## Who Uses It
 
-Data analysts, business stakeholders, and technical users who have a CSV and want fast answers without writing SQL or configuring a BI tool. They upload once and ask many questions in a chat-style panel.
+Data analysts, business stakeholders, and technical users who have a CSV and want fast answers without writing code or configuring a BI tool. They upload once per session and ask many questions in a chat-style panel.
 
 ## Core Problem Being Solved
 
-Users with CSV data spend time hand-writing SQL or wrangling pivot tables to answer ad-hoc questions. This agent removes that friction: one upload, then natural-language questions that return charts, SQL, and plain-English insight in seconds.
+Users with CSV data spend time hand-writing pandas queries or wrangling pivot tables to answer ad-hoc questions. This agent removes that friction: one upload, then natural-language questions that return a text answer (and, in Phase 2, a chart plus the code that produced it).
 
 ## Success Criteria
 
 - [ ] A user can upload any well-formed CSV and receive a `session_id` plus a column schema preview within 3 seconds.
-- [ ] A natural-language question over the uploaded data returns a valid SELECT query, a rendered Recharts chart, and an insight paragraph within 15 seconds.
-- [ ] SQL safety guardrails block every INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, and TRUNCATE — confirmed by automated tests that attempt each forbidden keyword.
-- [ ] Every graph node entry/exit and every LLM call appears as a trace span in LangSmith when `LANGCHAIN_TRACING_V2=true`.
-- [ ] The backend returns a structured error (not a 500 crash) when the CSV is malformed, the query returns zero rows, or Gemini refuses to generate SQL.
+- [ ] A natural-language question over the uploaded data returns a correct text answer within 15 seconds.
+- [ ] The CSV data never leaves the server process — it is held in an in-memory dict keyed by `session_id` and is never written to disk.
+- [ ] The backend returns a structured error (not a 500 crash) when the CSV is malformed or Gemini returns an unusable response.
+- [ ] In Phase 2, a chart is returned as a base64 PNG alongside the executed Python code and a node trace for every successful answer.
 
 ## What This Agent Does NOT Do (Out of Scope)
 
-- Multi-file joins across more than one uploaded CSV.
+- NL-to-SQL or any SQLite-backed data storage of CSV content.
+- LangChain, LangSmith, or langchain-google-genai — the `google-genai` SDK is used directly.
 - User authentication or per-user data isolation.
-- Saving or "pinning" charts to a dashboard.
-- Writing back to the CSV or any mutating SQL operation.
-- Ingesting data from cloud databases, S3, or URLs — only local file upload.
-- Asynchronous / long-poll query execution — the HTTP response is synchronous.
+- Saving or persisting charts across sessions.
+- Multi-file joins across more than one uploaded CSV.
+- Writing back to the CSV or any data mutation.
+- Ingesting data from cloud storage, S3, or URLs — only local file upload.
 - Streaming token output from Gemini to the browser.
 
 ## Key Constraints
 
-- SQLite is the only database; `data/agent.db` for persistent session metadata; per-upload dynamic tables live in the same file.
-- All SQL execution is read-only. DDL/DML is blocked at the execution node, not just by prompt.
-- LLM provider: Gemini via `langchain-google-genai` so LangSmith traces LLM calls automatically.
-- Default model: `gemini-2.5-flash` (configurable via `AGENT_LLM_MODEL`).
-- LangSmith tracing requires `LANGCHAIN_API_KEY`, `LANGCHAIN_TRACING_V2=true`, `LANGCHAIN_PROJECT` in `.env`.
+- CSV is held in-memory only: a `dict[session_id, pd.DataFrame]` on the server process. No disk write of CSV data.
+- LLM provider: Google Gemini via the `google-genai` Python SDK (`google-genai>=2.9.0`). No LangChain.
+- Model: `gemini-2.0-flash` (configurable via `AGENT_LLM_MODEL`).
+- SQLite (`data/agent.db`) is used only for session and conversation metadata, not for CSV data.
 - Dev port: 8001.
-- Frontend: static export (`output: 'export'`, `basePath: '/app'`) served by FastAPI at `/app`; single-origin run path.
+- Frontend: Next.js static export (`output: 'export'`, `basePath: '/app'`) served by FastAPI at `/app`; single-origin run path.
 
 ---
 
 ## Phases of Development
 
-> Phase 1 is the smallest first-time-right user-testable win. Its backend is minimal but REAL on the one core path. Its frontend is visually complete: real UI for the working path PLUS clearly-labelled non-functional stubs for later phases.
+> Phase 1 is the smallest first-time-right user-testable win. Its backend is minimal but REAL on the one core path. Its frontend is visually complete: real UI for the working path PLUS clearly-labelled non-functional stubs for Phase 2 features.
 
 ---
 
-### Phase 1 — CSV Upload + NL Query (First Win)
+### Phase 1 — CSV Upload + Text Answer (First Win)
 
-- **Goal:** A user uploads a CSV, asks one natural-language question, and receives the SQL query, a rendered Recharts chart, and an insight paragraph — end-to-end against the real Gemini API, with LangSmith traces captured.
+**Goal:** A user uploads a CSV, asks one natural-language question, and receives a plain-English text answer — end-to-end against the real Gemini API. No charts yet. The UI shows the answer plus clearly-labelled stubs for the chart panel and code panel.
 
-- **Independent slices (parallel build units):**
-  - `slice-a` (backend) — rewires the entire `src/` skeleton for data-analysis: new AgentState, five graph nodes, SQLite CSV loader, upload and query API endpoints, updated domain models and DB models, Gemini via `langchain-google-genai`, LangSmith env wiring, SQL safety guardrails, structlog observability, unit + integration tests. **deps: none**
-  - `slice-b` (frontend) — replaces `frontend/src/app/page.tsx` with the two-panel CSV-upload + chat UI, adds `recharts` dependency, implements real upload flow and real query/answer panel (SQL code block, Recharts chart, insight text). Stubs for dashboard pinning, multi-file joins, and auth are present as clearly-labelled disabled elements. **deps: none**
+**Independent slices (parallel build units):**
 
-- **Key surfaces / files:**
-  - `slice-a` owns (disjoint from frontend):
-    - `src/graph/state.py`
-    - `src/graph/nodes.py`
-    - `src/graph/edges.py`
-    - `src/graph/agent.py`
-    - `src/graph/runner.py`
-    - `src/api/upload.py` (new file)
-    - `src/api/query.py` (new file)
-    - `src/api/runs.py` (replaced — re-exports or removed)
-    - `src/api/__init__.py` (router registration updated)
-    - `src/domain/run.py` (replaced with upload + query domain models)
-    - `src/db/models.py` (add UploadSession, QueryRun; keep/remove RunRow)
-    - `src/config/settings.py` (add `langchain_api_key`, `langchain_tracing_v2`, `langchain_project`, `llm_model` default `gemini-2.5-flash`)
-    - `src/prompts/transform.md` (replaced with SQL-generation system prompt)
-    - `tests/conftest.py` (update for new models)
-    - `tests/unit/test_sql_safety.py`
-    - `tests/unit/test_csv_loader.py`
-    - `tests/integration/test_upload.py`
-    - `tests/integration/test_query_pipeline.py`
-    - `tests/e2e/test_full_flow.py`
-  - `slice-b` owns (disjoint from backend):
-    - `frontend/src/app/page.tsx`
-    - `frontend/src/app/layout.tsx`
-    - `frontend/src/components/UploadPanel.tsx`
-    - `frontend/src/components/ChatPanel.tsx`
-    - `frontend/src/components/AnswerCard.tsx`
-    - `frontend/src/components/StubBadge.tsx`
-    - `frontend/package.json` (add `recharts`, `@types/recharts`)
+- `slice-a` (backend) — all Python code: in-memory session store, 4-node LangGraph pipeline (`parse_csv` → `answer_question` → `handle_error` / `finalize`), sessions API router (`POST /sessions`, `POST /sessions/{session_id}/questions`, `GET /health`), DB models for session and run metadata, Alembic migration, system prompt, structlog observability, integration tests. **deps: none**
 
-- **Gate command:**
-  ```
-  uv run pytest tests/ -x -q
-  ```
-  Run from repo root. Requires `.env` with `AGENT_GEMINI_API_KEY`, `LANGCHAIN_API_KEY`, `LANGCHAIN_TRACING_V2=true`, `LANGCHAIN_PROJECT`. Tests call the real Gemini API and write to a temp SQLite DB.
+- `slice-b` (frontend) — all Next.js code: two-panel layout, CSV upload component (real), chat component (real), text answer display (real), chart panel stub (labelled), code panel stub (labelled). **deps: none**
 
-- **How the user tests it (handoff seed):**
-  1. `cd frontend && pnpm install && pnpm build` — builds static export to `frontend/out/`
-  2. `uv run python -m src` — starts FastAPI at `http://localhost:8001`
-  3. Open `http://localhost:8001/app/` (trailing slash required)
-  4. **Upload screen (REAL):** drag or pick any CSV file → click "Upload" → see table name + column list appear below the button
-  5. **Chat screen (REAL):** type a question (e.g. "What are the top 5 values by count?") → click "Ask" → within ~15 s see three panels: SQL code block, Recharts bar/line chart, insight paragraph
-  6. **Stubs (labelled, non-functional):** "Pin to Dashboard" button (grey, tooltip "Coming in Phase 2") · "Join another file" link (grey, tooltip "Coming in Phase 3") · "Sign in" link (grey, tooltip "Coming in Phase 3")
-  7. **LangSmith:** open the LangSmith project — confirm a trace with five spans (schema_introspection, sql_generation, sql_execution, chart_selection, insight_generation) appears.
+**Key surfaces / files:**
 
-- **Cross-cutting Definition of Done (every slice):**
-  README delta (applied serially after the parallel slices land) · a structured log line per new operation (node entry/exit, LLM call, CSV load, SQL execution) · error handling + timeout on each new external call (Gemini API, SQLite execution) · a real behaviour-asserting test (shape + content assertions on real Gemini responses) · an incremental drift check — see `harness/patterns/phases.md` Horizontal Axis.
+`slice-a` owns (disjoint from frontend):
+- `src/sessions/store.py` — in-memory DataFrame dict
+- `src/graph/state.py` — extend AgentState
+- `src/graph/nodes.py` — replace all nodes with: `parse_csv`, `answer_question`, `handle_error`, `finalize`
+- `src/graph/edges.py` — conditional routing
+- `src/graph/agent.py` — rewire graph
+- `src/graph/runner.py` — extend runner
+- `src/db/models.py` — extend/replace models (Session, ConversationRun)
+- `src/api/sessions.py` — new router
+- `src/api/__init__.py` — register new router
+- `src/prompts/answer_question.md` — new system prompt
+- `alembic/versions/` — new migration
+- `tests/test_phase1.py` — integration tests
+- `pyproject.toml` — add `pandas` if missing
 
----
+`slice-b` owns (disjoint from backend):
+- `frontend/src/app/page.tsx`
+- `frontend/src/components/UploadPanel.tsx`
+- `frontend/src/components/ChatPanel.tsx`
+- `frontend/src/components/AnswerCard.tsx`
+- `frontend/src/components/StubBadge.tsx`
 
-### Phase 2 — Dashboard Pinning
+**Gate command:**
+```
+uv run alembic upgrade head && uv run pytest tests/test_phase1.py -v --tb=short
+```
+Run from repo root. Requires `.env` with `AGENT_GEMINI_API_KEY`. Tests call the real Gemini API and write to the SQLite DB.
 
-- **Goal:** A user can pin any answer card to a personal dashboard tab that persists across page reloads. The pinned view shows the chart and insight re-rendered from stored `chart_spec` JSON, without re-running the query.
+**How the user tests it (handoff seed):**
+1. `cd frontend && pnpm install && pnpm build` — builds static export to `frontend/out/`
+2. `uv run alembic upgrade head` — applies DB migration
+3. `uv run python -m src` — starts FastAPI at `http://localhost:8001`
+4. Open `http://localhost:8001/app/` (trailing slash required)
+5. **Upload panel (REAL):** drag or pick any CSV file → click "Upload" → see session ID + column list appear below the button
+6. **Chat panel (REAL):** type a question (e.g. "What is the average value in each column?") → click "Ask" → within ~15 s see a text answer appear in the chat thread
+7. **Chart panel stub (LABELLED):** a greyed-out section labelled "Chart — Coming in Phase 2" appears below the text answer
+8. **Code panel stub (LABELLED):** a greyed-out section labelled "Executed Code — Coming in Phase 2" appears below the chart stub
 
-- **Independent slices (parallel build units):**
-  - `slice-a` (backend) — `GET /sessions/{session_id}/pins` and `POST /sessions/{session_id}/pins` endpoints reading from `QueryRun` rows marked `pinned=true`. Add `pinned` boolean column via Alembic migration. **deps: none**
-  - `slice-b` (frontend) — wire the "Pin to Dashboard" button to the new endpoint; render a `/dashboard` route that lists pinned cards with stored chart specs. **deps: none**
-
-- **Key surfaces / files:**
-  - `slice-a`: `src/api/pins.py`, `src/api/__init__.py`, Alembic migration file, `tests/integration/test_pins.py`
-  - `slice-b`: `frontend/src/app/dashboard/page.tsx`, `frontend/src/components/PinnedCard.tsx`, `frontend/src/components/AnswerCard.tsx` (add pin button wiring)
-
-- **Gate command:**
-  ```
-  uv run pytest tests/integration/test_pins.py -x -q
-  ```
-
-- **How the user tests it (handoff seed):**
-  1. Upload a CSV and ask a question as in Phase 1.
-  2. Click "Pin to Dashboard" on an answer card → button turns blue → count badge on Dashboard tab increments.
-  3. Click "Dashboard" tab → see pinned chart and insight, re-rendered from stored spec without a new LLM call.
-  4. Reload the page → pinned card persists.
-
-- **Cross-cutting Definition of Done (every slice):** README delta (applied serially) · structured log line per new operation (pin write, pin list read) · error handling on DB writes · a real behaviour-asserting test · incremental drift check.
+**Cross-cutting Definition of Done (every slice):**
+- README updated with what this phase added (run commands, env vars required)
+- A structured log line emitted per new operation (CSV parse, Gemini call, session create, run create)
+- Error handling on each external call (Gemini API, file parse)
+- At least one real behaviour-asserting test per new capability (shape + content assertions on real Gemini responses)
+- Incremental drift check: code matches spec for every file the slice touches
 
 ---
 
-### Phase 3 — Multi-File Joins
+### Phase 2 — Charts + Executed Code
 
-- **Goal:** A user can upload a second CSV in the same session and ask questions that join across both tables. The SQL-generation node receives the schema of all tables in the session.
+**Goal:** Every answer now includes a matplotlib chart (returned as a base64 PNG) plus the Python code the agent executed to produce it, surfaced in the UI alongside the text answer.
 
-- **Independent slices (parallel build units):**
-  - `slice-a` (backend) — `UploadSession` extended to track multiple tables per session; `schema_introspection` node reads all session tables; SQL-generation prompt updated to include all schemas. **deps: none**
-  - `slice-b` (frontend) — wire the "Join another file" stub into a real multi-upload panel showing both schemas. **deps: none**
+**Independent slices (parallel build units):**
 
-- **Key surfaces / files:**
-  - `slice-a`: `src/db/models.py`, `src/graph/nodes.py` (schema node), `src/prompts/transform.md`, Alembic migration, `tests/integration/test_multi_table.py`
-  - `slice-b`: `frontend/src/components/UploadPanel.tsx` (multi-file), `frontend/src/app/page.tsx`
+- `slice-a` (backend) — add two new graph nodes (`generate_code`, `execute_code`), extend `AgentState` with `chart_base64`, `executed_code`, `chart_type` fields, extend `ConversationRun` model with those columns, extend the `/sessions/{session_id}/questions` response to include `chart_base64`, `executed_code`, `chart_type`, add sandbox safety to the execute node, extend tests. **deps: none**
 
-- **Gate command:**
-  ```
-  uv run pytest tests/integration/test_multi_table.py -x -q
-  ```
+- `slice-b` (frontend) — wire the chart panel stub into a real `<img>` element rendering the base64 PNG, wire the code panel stub into a real syntax-highlighted code block, add `node_trace` collapsible section. **deps: none**
 
-- **How the user tests it (handoff seed):**
-  1. Upload a first CSV → see schema A.
-  2. Click "Join another file" → upload a second CSV → see schema A + B.
-  3. Ask a join question (e.g. "Join orders to customers and show total spend by region") → receive SQL with a JOIN, a chart, and an insight.
+**Key surfaces / files:**
 
-- **Cross-cutting Definition of Done (every slice):** README delta (applied serially) · structured log line per new table loaded · error handling on second upload and join SQL · a real behaviour-asserting test · incremental drift check.
+`slice-a` owns:
+- `src/graph/nodes.py` — add `generate_code`, `execute_code` nodes
+- `src/graph/state.py` — extend with `chart_base64`, `executed_code`, `chart_type`, `node_trace`
+- `src/graph/agent.py` — rewire graph with new nodes
+- `src/db/models.py` — add `chart_data` (JSON), `executed_code` columns
+- `alembic/versions/` — new migration for new columns
+- `src/prompts/generate_code.md` — new system prompt for code generation
+- `tests/test_phase2.py` — integration tests
+
+`slice-b` owns:
+- `frontend/src/components/AnswerCard.tsx` — wire chart image + code block stubs into real panels
+- `frontend/src/components/ChartPanel.tsx` — new component
+- `frontend/src/components/CodePanel.tsx` — new component
+
+**Gate command:**
+```
+uv run alembic upgrade head && uv run pytest tests/ -v --tb=short
+```
+Requires `.env` with `AGENT_GEMINI_API_KEY`. Tests call the real Gemini API and exercise the chart generation and code execution paths.
+
+**How the user tests it (handoff seed):**
+1. Build frontend and start backend as in Phase 1.
+2. Upload a CSV, ask a question (e.g. "Show me a bar chart of total sales by region").
+3. Within ~20 s: text answer appears, a real chart image (bar/line/scatter) renders below it, and the Python code the agent ran appears in a code block beneath the chart.
+4. A collapsible "Reasoning trace" section shows which nodes ran and in what order.
+
+**Cross-cutting Definition of Done (every slice):**
+- README updated with Phase 2 additions
+- Structured log line per new operation (code generation, code execution, chart render)
+- Sandbox error handling — if executed code raises, `handle_error` is triggered and the user sees a readable message
+- Real behaviour-asserting tests for chart generation and code execution paths
+- Incremental drift check

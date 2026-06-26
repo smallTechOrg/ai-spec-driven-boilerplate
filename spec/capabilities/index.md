@@ -4,21 +4,15 @@
 
 | Capability | File | Phase |
 |-----------|------|-------|
-| CSV Upload | [csv-upload.md](csv-upload.md) | Phase 1 |
-| Natural Language to SQL | [nl-to-sql.md](nl-to-sql.md) | Phase 1 |
-| Chart Rendering | [chart-rendering.md](chart-rendering.md) | Phase 1 |
-| Insight Generation | [insight-generation.md](insight-generation.md) | Phase 1 |
-| Observability | [observability.md](observability.md) | Phase 1 (cross-cutting) |
+| CSV Analysis (upload + text answer) | [csv_analysis.md](csv_analysis.md) | Phase 1 |
+| Chart Generation (code gen + sandboxed exec + PNG) | [chart_generation.md](chart_generation.md) | Phase 2 |
 
 ## What Is a Capability?
 
 A capability is a single, discrete action or behavior the agent performs:
 
-- **CSV Upload** — accept a file, parse it, load into SQLite, return schema
-- **Natural Language to SQL** — convert a question + schema into a safe SELECT query and execute it
-- **Chart Rendering** — deterministically choose a chart type and build a Recharts JSON spec from query rows
-- **Insight Generation** — call Gemini to write a plain-English paragraph summarising the results
-- **Observability** — emit structured logs per operation and propagate LLM calls to LangSmith
+- **CSV Analysis** — accept a CSV upload, hold it in memory as a pandas DataFrame, answer natural-language questions by sending the schema and sample rows to Gemini and returning a plain-English text answer
+- **Chart Generation** — have Gemini write pandas/matplotlib code, execute it in a sandboxed environment, and return the resulting chart as a base64 PNG alongside the executed code
 
 ## How to Add a New Capability
 

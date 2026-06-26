@@ -1,29 +1,52 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { StubBanner } from '@/components/StubBanner'
 import { AnalyseTab } from '@/components/analyse/AnalyseTab'
 import { DatabaseTab } from '@/components/database/DatabaseTab'
+import { api } from '@/lib/api'
 
 type Tab = 'analyse' | 'database'
 
 /**
- * AppShell — the Phase-1 stub shell for the Data Analysis Agent.
+ * AppShell — the shell for the Data Analysis Agent.
  *
- * Header (app name + tagline + a labelled "Project notes" button + the static
- * yellow stub-mode banner), a two-tab switcher [Analyse] (default) / [Database],
- * and the responsive panel layout for the active tab.
+ * Header (app name + tagline + a labelled "Project notes" stub + the
+ * conditional yellow stub-mode banner), a two-tab switcher [Analyse] (default)
+ * / [Database], and the responsive panel layout for the active tab.
  *
- * Tab switching is purely local UI state (no API call). Every interactive
- * control inside the tabs is a clearly-labelled, non-functional placeholder.
+ * Health is fetched once on mount: its `provider` drives the stub banner (shown
+ * only in stub mode) and a subtle "live" indicator when a real provider is set.
+ * The Database tab and the Project-notes button remain labelled stubs in Phase 2.
  */
 export function AppShell() {
   const [tab, setTab] = useState<Tab>('analyse')
+  // undefined = still loading health; string = resolved provider.
+  const [provider, setProvider] = useState<string | undefined>(undefined)
+
+  useEffect(() => {
+    let cancelled = false
+    api
+      .health()
+      .then(h => {
+        if (!cancelled) setProvider(h.provider)
+      })
+      .catch(() => {
+        // Health failed (e.g. server not reachable yet) — leave provider
+        // unresolved so we neither flash a stub banner nor claim "live".
+        if (!cancelled) setProvider(undefined)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const isLive = provider === 'gemini' || provider === 'openrouter' || provider === 'anthropic'
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Static stub-mode banner — shown so demo output is never mistaken for real. */}
-      <StubBanner />
+      {/* Stub-mode banner — shown only when the backend runs without an LLM key. */}
+      <StubBanner provider={provider} />
 
       {/* Header */}
       <header className="border-b border-gray-200 bg-white">
@@ -36,15 +59,26 @@ export function AppShell() {
               Upload data, ask questions in plain English, get explainable answers.
             </p>
           </div>
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            title="Coming in Phase 3"
-            className="cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-medium text-gray-400"
-          >
-            Project notes
-          </button>
+          <div className="flex items-center gap-3">
+            {isLive && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700"
+                title={`Live provider: ${provider}`}
+              >
+                <span aria-hidden="true" className="h-2 w-2 rounded-full bg-green-500" />
+                Live · {provider}
+              </span>
+            )}
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              title="Coming in Phase 3"
+              className="cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-medium text-gray-400"
+            >
+              Project notes
+            </button>
+          </div>
         </div>
 
         {/* Tab switcher (local UI state — allowed in Phase 1) */}
@@ -74,7 +108,7 @@ export function AppShell() {
           aria-labelledby="tab-analyse"
           hidden={tab !== 'analyse'}
         >
-          {tab === 'analyse' && <AnalyseTab />}
+          {tab === 'analyse' && <AnalyseTab provider={provider} />}
         </div>
         <div
           role="tabpanel"

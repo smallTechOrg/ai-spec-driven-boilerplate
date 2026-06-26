@@ -43,8 +43,8 @@ def test_upload_csv_returns_counts(api_client):
     assert data["row_count"] == 3
     assert data["col_count"] == 2
     assert data["columns"] == ["value", "label"]
-    # Phase 2 does NOT trigger async notes.
-    assert data["auto_notes_status"] is None
+    # Phase 4 (C30): upload marks notes pending and fires the async notes job.
+    assert data["auto_notes_status"] == "pending"
 
 
 def test_upload_rejects_bad_extension(api_client):

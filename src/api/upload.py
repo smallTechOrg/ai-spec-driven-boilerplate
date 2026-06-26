@@ -1,9 +1,11 @@
-"""`POST /upload` — register an uploaded data file as a dataset (Phase 2).
+"""`POST /upload` — register an uploaded data file as a dataset (Phase 2 + 4).
 
 Parses the file with pandas by extension, computes a sha256 of the raw bytes,
 duplicate-checks against existing `datasets` rows (C10), persists a CSV + Parquet
-copy under `uploads/`, and creates a `DatasetRow` (origin=uploaded). The async
-auto-notes trigger (C30) is Phase 4 — `auto_notes_status` is left `None` here.
+copy under `uploads/`, and creates a `DatasetRow` (origin=uploaded). Phase 4 (C30):
+the new row is marked `auto_notes_status="pending"` and an async fire-and-forget
+notes job (`trigger_describe_async`) is started after the dataset is committed —
+it never blocks or fails the upload.
 """
 from __future__ import annotations
 
@@ -19,6 +21,7 @@ from sqlalchemy.orm import Session
 from api._common import ok, api_error
 from db.models import DatasetRow
 from db.session import get_session
+from graph.describe import trigger_describe_async
 from observability.events import get_logger
 
 router = APIRouter()
@@ -127,7 +130,7 @@ async def upload(
         format=fmt,
         context=context,
         origin="uploaded",
-        auto_notes_status=None,  # Phase 4 triggers C30; Phase 2 leaves it null
+        auto_notes_status="pending",  # C30: async notes job is fired below
     )
     session.add(row)
     session.flush()  # assigns row.id
@@ -148,6 +151,15 @@ async def upload(
 
     logger.info("upload_ok", dataset_id=dataset_id, rows=row.row_count, cols=row.col_count)
 
+    # C30: commit the dataset NOW so the async notes job (its own DB session) can
+    # see the row, then fire it fire-and-forget. The trigger never raises/blocks;
+    # if it somehow fails, the upload still succeeds.
+    try:
+        session.commit()
+        trigger_describe_async(dataset_id)
+    except Exception as exc:  # noqa: BLE001 — notes trigger must not fail the upload
+        logger.warning("upload_notes_trigger_failed", dataset_id=dataset_id, error=str(exc))
+
     return ok(
         {
             "dataset_id": dataset_id,
@@ -157,6 +169,6 @@ async def upload(
             "col_count": row.col_count,
             "columns": columns,
             "context": context,
-            "auto_notes_status": None,
+            "auto_notes_status": "pending",
         }
     )

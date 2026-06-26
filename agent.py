@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-agent.py — run the agent or check local setup
+agent.py — verify local setup or run the agent
 
 Usage:
-  python agent.py        # verify all tools, .env, deps, and tests (default)
-  python agent.py --run  # build frontend + apply migrations + start server
+  python agent.py        # verify all tools, .env, deps, and tests
+  python agent.py --run  # verify + apply migrations + build frontend + start server
 """
 import argparse
 import os
@@ -76,7 +76,15 @@ def check_tools() -> None:
     else: fail("claude CLI not found — install Claude Code")
 
     if which("node"):
-        ok(f"node {cmd_version(['node', '--version'])}")
+        nv = cmd_version(["node", "--version"]) or ""
+        try:
+            major = int(nv.lstrip("v").split(".")[0])
+            if major >= 20:
+                ok(f"node {nv}")
+            else:
+                fail(f"node {nv} found — need 20+; install from https://nodejs.org/")
+        except ValueError:
+            warn(f"could not parse node version: {nv}")
         v = cmd_version(["pnpm", "--version"])
         if v: ok(f"pnpm {v}")
         else: warn("pnpm not found — needed for frontend build: npm install -g pnpm")
@@ -166,6 +174,9 @@ def check_frontend() -> None:
 
 # ── run ───────────────────────────────────────────────────────────────────────
 def do_run() -> None:
+    # ensure data dir exists before alembic tries to open the sqlite file
+    (ROOT / "data").mkdir(exist_ok=True)
+
     # migrations
     info("applying migrations...")
     r = run(["uv", "run", "alembic", "upgrade", "head"], capture=False)
@@ -194,13 +205,37 @@ def do_run() -> None:
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
+def do_check() -> None:
+    print(f"\n{BOLD}=== Setup Check ==={RESET}")
+    check_tools()
+    check_env()
+    check_python_env()
+    check_db()
+    check_tests()
+    check_frontend()
+    print()
+    if _failures:
+        print(f"{RED}{BOLD}{len(_failures)} issue(s) found — fix before running.{RESET}")
+        for f in _failures:
+            print(f"  {RED}✗{RESET}  {f}")
+        sys.exit(1)
+    else:
+        print(f"{GREEN}{BOLD}All checks passed. Run: python agent.py --run{RESET}\n")
+
+
 def main() -> None:
+<<<<<<< HEAD
     parser = argparse.ArgumentParser(description="Check local setup (default) or run the agent")
     parser.add_argument("--run", action="store_true", help="build frontend + apply migrations + start server")
+=======
+    parser = argparse.ArgumentParser(description="Verify local setup or run the agent")
+    parser.add_argument("--run", action="store_true", help="apply migrations, build frontend, and start server")
+>>>>>>> 599e02c (fix: tighten version requirements and fix agent.py startup)
     args = parser.parse_args()
 
     if args.run:
         do_run()
+<<<<<<< HEAD
         return
 
     print(f"\n{BOLD}=== Setup Check ==={RESET}")
@@ -218,6 +253,10 @@ def main() -> None:
         sys.exit(1)
     else:
         print(f"{GREEN}{BOLD}All checks passed. Run: python agent.py --run{RESET}\n")
+=======
+    else:
+        do_check()
+>>>>>>> 599e02c (fix: tighten version requirements and fix agent.py startup)
 
 
 if __name__ == "__main__":

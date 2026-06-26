@@ -1,32 +1,31 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   api,
   type ColumnSchema,
   type DatasetSummary,
 } from '@/lib/api'
+import { CleanModal } from '@/components/database/CleanModal'
 
 /**
- * Datasets / "Tables" card — REAL, multi-select in Phase 3.
+ * Datasets / "Tables" card — REAL, multi-select; derived-aware in Phase 4.
  *
  * Fetches GET /datasets on mount and whenever `datasetsVersion` changes (the
  * parent bumps it after each upload and each completed ask, surfacing new /
- * derived datasets). Each row shows filename + rows×cols + format, a checkbox to
- * include the dataset in the next question, a "cols" toggle that lazily fetches
- * GET /datasets/{id} for the column schema, and a delete action with an inline
- * confirm → DELETE /datasets/{id}.
+ * derived datasets). Each row shows filename + rows×cols + format + origin/stale
+ * badges, a checkbox to include the dataset in the next question, a "cols"
+ * toggle that lazily fetches GET /datasets/{id} for the column schema, a
+ * **Clean** action (uploaded rows → the C24 clean modal), a **Re-derive** action
+ * (stale derived rows → POST /datasets/{id}/re-derive), and a delete action with
+ * an inline confirm → DELETE /datasets/{id}.
  *
- * Phase-3 sessions can span MULTIPLE datasets. Selection is now multi-select:
- *  - select one or more datasets to pin them for the next ask, OR
- *  - select none ("Let the agent pick") so the server's C19 selector chooses
- *    over all uploaded datasets.
- *
- * The filter tabs (All|Uploaded|Derived|This session) remain labelled stubs —
- * there are no derived datasets until Phase 4 — so they are shown disabled.
+ * The filter tabs (All|Uploaded|Derived|This session) are REAL client-side
+ * filters by `origin` / current selection.
  */
 
 const FILTERS = ['All', 'Uploaded', 'Derived', 'This session'] as const
+type Filter = (typeof FILTERS)[number]
 
 interface ColsState {
   loading: boolean
@@ -50,12 +49,17 @@ export function TablesCard({
   const [datasets, setDatasets] = useState<DatasetSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [filter, setFilter] = useState<Filter>('All')
 
   // Per-row "cols" expansion state, keyed by dataset id.
   const [colsById, setColsById] = useState<Record<string, ColsState>>({})
   // Which row is awaiting delete confirmation.
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  // Which derived row is currently re-deriving.
+  const [rederivingId, setRederivingId] = useState<string | null>(null)
+  // The dataset the Clean modal is open for (uploaded rows only).
+  const [cleanTarget, setCleanTarget] = useState<DatasetSummary | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -125,6 +129,44 @@ export function TablesCard({
     [onDeleted],
   )
 
+  // Re-derive a stale derived dataset (C25), then refresh to clear the badge.
+  const reDerive = useCallback(
+    async (id: string) => {
+      setRederivingId(id)
+      setError(null)
+      try {
+        await api.reDerive(id)
+        await load()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to re-derive dataset.')
+      } finally {
+        setRederivingId(null)
+      }
+    },
+    [load],
+  )
+
+  // Client-side filter by origin / current selection (the filter tabs).
+  const visibleDatasets = useMemo(() => {
+    switch (filter) {
+      case 'Uploaded':
+        return datasets.filter(d => d.origin !== 'derived')
+      case 'Derived':
+        return datasets.filter(d => d.origin === 'derived')
+      case 'This session':
+        // No per-session dataset set is plumbed here; approximate by the pinned
+        // selection (the datasets chosen for the next ask). Empty → show all.
+        return selectedDatasetIds.length > 0
+          ? datasets.filter(d => selectedDatasetIds.includes(d.id))
+          : datasets
+      default:
+        return datasets
+    }
+  }, [datasets, filter, selectedDatasetIds])
+
+  const uploadedCount = datasets.filter(d => d.origin !== 'derived').length
+  const derivedCount = datasets.filter(d => d.origin === 'derived').length
+
   return (
     <section
       aria-labelledby="tables-heading"
@@ -169,29 +211,29 @@ export function TablesCard({
         </div>
       )}
 
-      {/* Filter tabs — still labelled stubs (no session/derived concept yet). */}
-      <div
-        role="group"
-        aria-label="Dataset filters (coming in a later phase)"
-        className="mb-3 flex flex-wrap gap-2"
-      >
-        {FILTERS.map((f, i) => (
-          <button
-            key={f}
-            type="button"
-            disabled
-            aria-disabled="true"
-            aria-pressed={i === 0 ? true : false}
-            title="Filtering by origin/session arrives in a later phase"
-            className={`cursor-not-allowed rounded-full border px-3 py-1 text-xs font-medium ${
-              i === 0
-                ? 'border-gray-300 bg-gray-100 text-gray-500'
-                : 'border-gray-200 bg-white text-gray-400'
-            }`}
-          >
-            {f}
-          </button>
-        ))}
+      {/* Filter tabs — REAL client-side filters by origin / selection. */}
+      <div role="group" aria-label="Dataset filters" className="mb-3 flex flex-wrap gap-2">
+        {FILTERS.map(f => {
+          const active = filter === f
+          const count =
+            f === 'Uploaded' ? uploadedCount : f === 'Derived' ? derivedCount : null
+          return (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              aria-pressed={active}
+              className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                active
+                  ? 'border-blue-300 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              {f}
+              {count !== null && <span className="ml-1 text-gray-400">({count})</span>}
+            </button>
+          )
+        })}
       </div>
 
       {/* States: loading / error / empty / list */}
@@ -217,11 +259,17 @@ export function TablesCard({
         <div className="rounded-md border border-dashed border-gray-200 px-3 py-8 text-center text-xs text-gray-400">
           No datasets yet. Upload a CSV below to get started.
         </div>
+      ) : visibleDatasets.length === 0 ? (
+        <div className="rounded-md border border-dashed border-gray-200 px-3 py-8 text-center text-xs text-gray-400">
+          No {filter.toLowerCase()} datasets.
+        </div>
       ) : (
         <ul role="list" className="space-y-2">
-          {datasets.map(ds => {
+          {visibleDatasets.map(ds => {
             const cols = colsById[ds.id]
             const selected = selectedDatasetIds.includes(ds.id)
+            const derived = ds.origin === 'derived'
+            const stale = derived && ds.stale === true
             return (
               <li
                 key={ds.id}
@@ -243,6 +291,20 @@ export function TablesCard({
                     </span>
                   </label>
 
+                  {derived && (
+                    <span className="shrink-0 rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-700">
+                      Derived
+                    </span>
+                  )}
+                  {stale && (
+                    <span
+                      title="A parent changed after this dataset was derived"
+                      className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800"
+                    >
+                      Stale
+                    </span>
+                  )}
+
                   <span className="shrink-0 text-xs tabular-nums text-gray-500">
                     {ds.row_count} × {ds.col_count}
                   </span>
@@ -253,12 +315,37 @@ export function TablesCard({
                   <button
                     type="button"
                     onClick={() => void toggleCols(ds.id)}
-                    aria-expanded={cols ? true : false}
+                    aria-expanded={Boolean(cols)}
                     aria-label={`Toggle columns for ${ds.filename}`}
                     className="shrink-0 rounded border border-gray-200 bg-white px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
                   >
                     cols
                   </button>
+
+                  {/* Clean — uploaded datasets only (C24). */}
+                  {!derived && (
+                    <button
+                      type="button"
+                      onClick={() => setCleanTarget(ds)}
+                      aria-label={`Clean ${ds.filename}`}
+                      className="shrink-0 rounded border border-gray-200 bg-white px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                    >
+                      Clean
+                    </button>
+                  )}
+
+                  {/* Re-derive — stale derived datasets only (C25). */}
+                  {stale && (
+                    <button
+                      type="button"
+                      onClick={() => void reDerive(ds.id)}
+                      disabled={rederivingId === ds.id}
+                      aria-label={`Re-derive ${ds.filename}`}
+                      className="shrink-0 rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+                    >
+                      {rederivingId === ds.id ? 'Re-deriving…' : 'Re-derive'}
+                    </button>
+                  )}
 
                   {confirmingId === ds.id ? (
                     <span className="flex shrink-0 items-center gap-1">
@@ -322,6 +409,18 @@ export function TablesCard({
           })}
         </ul>
       )}
+
+      {/* NL data-cleaning modal (C24) — opened from a uploaded row's Clean button. */}
+      <CleanModal
+        datasetId={cleanTarget?.id ?? null}
+        filename={cleanTarget?.filename ?? null}
+        open={cleanTarget !== null}
+        onClose={() => setCleanTarget(null)}
+        onApplied={() => {
+          setCleanTarget(null)
+          void load()
+        }}
+      />
     </section>
   )
 }

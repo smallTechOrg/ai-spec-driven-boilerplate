@@ -12,6 +12,7 @@ import {
 import { api, type AskResponse, type AskStep, type SessionDetail, type TurnView } from '@/lib/api'
 import type { LastQueryTokens } from '@/components/analyse/AnalyseTab'
 import { Markdown } from '@/components/analyse/Markdown'
+import { ChartRender } from '@/components/analyse/ChartRender'
 import { StepsInspector } from '@/components/analyse/StepsInspector'
 import { ProgressBar } from '@/components/analyse/ProgressBar'
 import { SuggestionChips } from '@/components/analyse/SuggestionChips'
@@ -92,6 +93,7 @@ function turnFromView(v: TurnView): Turn {
     steps: v.steps ?? [],
     suggested_questions: v.suggested_questions ?? [],
     prompt_breakdown: v.prompt_breakdown,
+    charts: v.charts ?? [],
   }
   return {
     id: v.run_id || nextTurnId(),
@@ -467,6 +469,11 @@ function AnswerView({
       </div>
 
       <Markdown>{markdown}</Markdown>
+
+      {/* Inline Plotly charts captured during analysis (C4). */}
+      {answer.charts && answer.charts.length > 0 && (
+        <ChartRender charts={answer.charts} />
+      )}
 
       {/* Datasets used disclosure */}
       {answer.datasets_used && answer.datasets_used.length > 0 && (

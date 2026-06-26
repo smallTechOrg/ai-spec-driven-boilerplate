@@ -131,8 +131,16 @@ export interface DatasetSummary {
   row_count: number
   col_count: number
   format: string
+  /** `uploaded` | `derived`. */
   origin: string
+  /** A derived dataset whose parent changed after derivation (C25). */
   stale?: boolean
+  /** Lineage: parent dataset ids this derived set was built from (C25). */
+  derived_from_dataset_ids?: string[] | null
+  /** The run that produced this derived dataset. */
+  derived_from_run_id?: string | null
+  /** Plain-language summary of how a derived dataset was produced. */
+  derivation_description?: string | null
   [key: string]: unknown
 }
 
@@ -144,8 +152,53 @@ export interface ColumnSchema {
 export interface DatasetDetail extends DatasetSummary {
   columns_schema: ColumnSchema[]
   context: string | null
+  /** The pandas code that produced a derived dataset (C25 re-derive). */
   derivation_code: string | null
+  /** C30 notes generation state: `pending` | `done` | `failed` | null. */
   auto_notes_status: string | null
+  /** C31 compressed facts (≤20) extracted from the context notes. */
+  context_facts?: string[] | null
+}
+
+/** POST /datasets/{id}/re-derive (C25) — re-run derivation vs current parents. */
+export interface ReDeriveResponse {
+  dataset_id: string
+  stale: boolean
+  row_count: number
+  col_count: number
+  [key: string]: unknown
+}
+
+/**
+ * POST /datasets/{id}/clean (C24) — NL cleaning PREVIEW. The server runs the
+ * generated pandas on a COPY and returns the code + before/after counts +
+ * sample previews; it never mutates the dataset.
+ */
+export interface CleanPreviewResponse {
+  code: string
+  before_row_count: number
+  after_row_count: number
+  before_col_count: number
+  after_col_count: number
+  /** A few sample rows before/after the clean, mirroring /preview's shape. */
+  before_preview?: PreviewResponse | null
+  after_preview?: PreviewResponse | null
+  [key: string]: unknown
+}
+
+/** POST /datasets/{id}/clean/apply (C24) — applied result (updated counts). */
+export interface CleanApplyResponse {
+  dataset_id: string
+  row_count: number
+  col_count: number
+  [key: string]: unknown
+}
+
+/** POST /datasets/{id}/describe (C30) — trigger; returns the pending status. */
+export interface DescribeResponse {
+  dataset_id: string
+  auto_notes_status: string
+  [key: string]: unknown
 }
 
 export interface PreviewResponse {
@@ -184,6 +237,8 @@ export interface AskResponse {
   steps?: AskStep[]
   suggested_questions?: string[]
   prompt_breakdown?: Record<string, unknown>
+  /** Inline Plotly figures captured during analysis, each a JSON string (C4). */
+  charts?: string[]
   // Clarification variant (type === "clarification"):
   clarification_question?: string
 }
@@ -254,6 +309,8 @@ export interface TurnView {
   datasets_used?: string[]
   selector_reasoning?: string | null
   prompt_breakdown?: Record<string, unknown>
+  /** Inline Plotly figures (JSON strings) captured for this turn (C4). */
+  charts?: string[]
   created_at?: string | null
   [key: string]: unknown
 }
@@ -306,6 +363,53 @@ export const api = {
     getJson<PreviewResponse>(`/datasets/${encodeURIComponent(id)}/preview?rows=${rows}`),
 
   deleteDataset: (id: string) => del<unknown>(`/datasets/${encodeURIComponent(id)}`),
+
+  // --- Datasets: Phase-4 operations (charts / derived / clean / notes) ------
+
+  /** DELETE /datasets — clear the whole data universe (cascade). */
+  clearAllDatasets: () => del<unknown>('/datasets'),
+
+  /**
+   * POST /datasets/{id}/re-derive (C25) — re-run a derived dataset's
+   * `derivation_code` against its current parents and clear its stale flag.
+   * 400 `not_derived` / 404 `parent_not_found` / 400 `re_derive_error` surface
+   * as `ApiError`s the caller can branch on.
+   */
+  reDerive: (id: string) =>
+    postJson<ReDeriveResponse>(`/datasets/${encodeURIComponent(id)}/re-derive`, {}),
+
+  /**
+   * POST /datasets/{id}/clean (C24) — NL cleaning PREVIEW. Sends the user's
+   * plain-English `instruction`; the server generates pandas, runs it on a COPY,
+   * and returns the code + before/after counts + previews. Never mutates.
+   */
+  cleanPreview: (id: string, instruction: string) =>
+    postJson<CleanPreviewResponse>(`/datasets/${encodeURIComponent(id)}/clean`, {
+      instruction,
+    }),
+
+  /**
+   * POST /datasets/{id}/clean/apply (C24) — apply the cleaning in place. Pass the
+   * previewed `code` to apply exactly what was shown (preferred), or fall back to
+   * the original `instruction` so the server re-derives the code.
+   */
+  cleanApply: (id: string, codeOrInstruction: { code?: string; instruction?: string }) =>
+    postJson<CleanApplyResponse>(
+      `/datasets/${encodeURIComponent(id)}/clean/apply`,
+      codeOrInstruction,
+    ),
+
+  /**
+   * POST /datasets/{id}/describe (C30) — trigger async notes generation. Sets
+   * `auto_notes_status=pending`; the caller polls GET /datasets/{id} for the
+   * pending → done/failed transition.
+   */
+  describeDataset: (id: string) =>
+    postJson<DescribeResponse>(`/datasets/${encodeURIComponent(id)}/describe`, {}),
+
+  /** PATCH /datasets/{id}/context (C12) — save the dataset's context notes. */
+  patchContext: (id: string, context: string) =>
+    patchJson<DatasetDetail>(`/datasets/${encodeURIComponent(id)}/context`, { context }),
 
   /**
    * POST /ask — the analysis entry point (spec/api.md).

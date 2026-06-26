@@ -49,7 +49,7 @@ For pure-unit isolation, prefer a thin real implementation (in-memory queue, fak
 
 - Stubs **compose** and survive refactors; mocks encode call sequences and break on them.
 - IF a stub LLM provider is used (unit tests or optional offline dev), it should produce **distinct, node-tagged output** (see `rules/ai-agents.md` rule 8) so it is credible and node cross-contamination is caught.
-- Use the production DB driver in integration tests (PostgreSQL via `conftest.py` setup/teardown) — **never** SQLite-as-a-substitute (`rules/ai-agents.md` rule 5).
+- Integration tests use the **production DB driver** — whatever the spec chose — never a different driver as a substitute (`rules/ai-agents.md` rule 5). **This boilerplate's baseline is SQLite** (`conftest.py` provisions an isolated SQLite DB), so do **not** stand up PostgreSQL for the baseline or for a build whose `spec/architecture.md` says SQLite. Only when the chosen production DB is PostgreSQL do integration tests run against PostgreSQL (via `conftest.py` setup/teardown). Match the test driver to the spec's driver; don't assume Postgres.
 
 ---
 

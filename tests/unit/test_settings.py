@@ -28,9 +28,11 @@ def test_auto_detects_gemini(monkeypatch, tmp_path):
     assert s.gemini_api_key == "AIza-fake"
 
 
-def test_provider_raises_with_no_key(monkeypatch, tmp_path):
+def test_provider_falls_back_to_stub_with_no_key(monkeypatch, tmp_path):
+    """No key set -> offline stub provider (Phase-2 spec: never raises)."""
     monkeypatch.setenv("AGENT_ANTHROPIC_API_KEY", "")
     monkeypatch.setenv("AGENT_GEMINI_API_KEY", "")
+    monkeypatch.setenv("AGENT_OPENROUTER_API_KEY", "")
     monkeypatch.setenv("AGENT_LLM_PROVIDER", "")
     monkeypatch.setenv("AGENT_DATABASE_URL", f"sqlite:///{tmp_path}/t.db")
 
@@ -38,8 +40,9 @@ def test_provider_raises_with_no_key(monkeypatch, tmp_path):
     m._settings = None
 
     from llm.client import _make_provider
-    with pytest.raises(RuntimeError, match="No LLM provider configured"):
-        _make_provider()
+    name, provider = _make_provider()
+    assert name == "stub"
+    assert provider.__class__.__name__ == "StubProvider"
 
 
 def test_explicit_provider_wins(monkeypatch, tmp_path):

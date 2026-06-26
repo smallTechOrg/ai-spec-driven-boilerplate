@@ -13,11 +13,9 @@ A capability is a single, discrete action or behavior the agent performs. Exampl
 
 ## Capabilities in This Project
 
-<!-- FILL IN: List capabilities here as they are defined. Each entry links to its spec file (no number prefix). -->
-
-| Capability | File |
-|-----------|------|
-| <!-- name --> | [name.md](name.md) |
+| Capability | File | Phase |
+|-----------|------|-------|
+| Analyze uploaded CSV | [analyze-csv.md](analyze-csv.md) | 1 (extended in 2–4) |
 
 ## How to Add a New Capability
 

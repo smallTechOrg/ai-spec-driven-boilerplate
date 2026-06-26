@@ -23,7 +23,7 @@ from config.settings import get_settings
 from db.models import DatasetRow, QueryRunRow
 from db.session import create_db_session
 from graph.agent import agentic_ai
-from graph.nodes import _safe_memory_block
+from graph.nodes import _safe_memory_block, get_derived_created, release_derived_created
 from graph.preflight import check_clarification, select_datasets
 from graph.state import AgentState
 from graph.suggestions import generate_suggestions
@@ -144,8 +144,9 @@ def run_agent(
       `{"type":"clarification","run_id","clarification_question","session_id"}`
     - an answer:
       `{"type":"answer", run_id, status, answer, iteration_count, tokens_input,
-        tokens_output, action_history, charts, dataset_ids, is_best_effort,
-        selector_reasoning, suggested_questions, prompt_breakdown, session_id}`
+        tokens_output, action_history, charts, derived_dataset_ids, dataset_ids,
+        is_best_effort, selector_reasoning, suggested_questions,
+        prompt_breakdown, session_id}`
     """
     settings = get_settings()
     cap = max_iterations if max_iterations is not None else settings.max_iterations
@@ -251,6 +252,10 @@ def run_agent(
     error_message = final.get("error_message") or final.get("error")
     selector_reasoning = final.get("selector_reasoning", selector_reasoning)
     charts = final.get("charts") or []
+    # Derived datasets the agent persisted via save_dataset this run (C25). Read
+    # the run-scoped registry, then release it.
+    derived_dataset_ids = get_derived_created(run_id)
+    release_derived_created(run_id)
     dataset_context = final.get("dataset_context") or ""
     is_best_effort = status == "completed" and error_message in (
         "max_iterations",
@@ -312,6 +317,7 @@ def run_agent(
         "tokens_output": tokens_output,
         "action_history": action_history,
         "charts": charts,
+        "derived_dataset_ids": derived_dataset_ids,
         "dataset_ids": list(resolved_ids),
         "is_best_effort": is_best_effort,
         "selector_reasoning": selector_reasoning,

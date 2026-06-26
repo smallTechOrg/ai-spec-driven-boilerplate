@@ -21,7 +21,7 @@ import pandas as pd
 from db.models import DatasetRow, QueryRunRow
 from db.session import create_db_session
 from graph.memory import get_memory_block  # owned by slice-3c; 3b only imports it
-from graph.sandbox import build_namespace, eval_expression
+from graph.sandbox import build_namespace, eval_expression, make_save_dataset
 from graph.state import AgentState
 from llm.client import LLMClient
 from observability.events import get_logger
@@ -36,6 +36,12 @@ _FINALIZE_PROMPT_PATH = _PROMPTS_DIR / "finalize.md"
 # Phase 2 single-turn loads here and releases on finalize/error. Phase 3 adds the
 # session-keyed cache below (C27) for multi-turn sessions.
 _dataframes: dict[str, dict[str, Any]] = {}
+
+# Run-scoped registry of derived dataset ids created by `save_dataset` during a
+# run (C25), keyed by `run_id` — mirrors `_dataframes`. The runner reads this via
+# `get_derived_created(run_id)` to surface `derived_dataset_ids` in the payload,
+# and it is cleared when the run's DataFrames are released.
+_derived_created: dict[str, list[str]] = {}
 
 # Session DataFrame cache (C27): {session_id: {"frames": {dataset_id: df},
 #   "order": [dataset_id, ...]}}. Reused across turns of the same conversation so
@@ -302,6 +308,19 @@ def execute_action(state: AgentState) -> AgentState:
     filenames = bundle.get("filenames", [])
     namespace = build_namespace(frames, filenames)
 
+    # Override the module-level stub with a run-aware `save_dataset` that knows the
+    # producing run_id + parent dataset_ids and records each created derived id
+    # (C25). The closure captures the current action expression as derivation_code
+    # via `eval_expression` (it calls `.set_code` before eval).
+    parent_ids = list(state.get("dataset_ids") or [])
+
+    def _on_registered(new_id: str) -> None:
+        _derived_created.setdefault(run_id, []).append(new_id)
+
+    namespace["save_dataset"] = make_save_dataset(
+        run_id=run_id, parent_ids=parent_ids, on_registered=_on_registered
+    )
+
     result_str, new_charts, is_error, error_str = eval_expression(expr, namespace)
     if new_charts:
         charts.extend(new_charts)
@@ -337,6 +356,20 @@ def _strip_final_answer(text: str) -> str:
     if idx == -1:
         return text.strip()
     return text[idx + len(marker):].strip()
+
+
+def get_derived_created(run_id: str) -> list[str]:
+    """Derived dataset ids created by `save_dataset` during `run_id` (C25).
+
+    Read by the runner to surface `derived_dataset_ids` in the `/ask` payload.
+    Returns a fresh copy; empty when nothing was saved (or already released).
+    """
+    return list(_derived_created.get(run_id, []))
+
+
+def release_derived_created(run_id: str) -> None:
+    """Drop the run's derived-id registry once the runner has read it."""
+    _derived_created.pop(run_id, None)
 
 
 def _release_dataframe(run_id: str) -> None:

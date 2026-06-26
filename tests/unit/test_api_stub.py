@@ -175,7 +175,11 @@ def test_ask_single_dataset_returns_answer(api_client):
     assert len(data["steps"]) >= 1
     assert data["status"] == "completed"
     assert data["suggested_questions"] == []
-    assert data["prompt_breakdown"] == {}
+    # C29 prompt_breakdown is built from token estimates for every run regardless
+    # of provider (spec/api.md), so it is a populated dict — not {} — in Phase 3.
+    assert isinstance(data["prompt_breakdown"], dict)
+    assert data["prompt_breakdown"]  # non-empty: carries the measured components
+    assert "total_prompt" in data["prompt_breakdown"]
 
 
 def test_ask_404_when_dataset_missing(api_client):

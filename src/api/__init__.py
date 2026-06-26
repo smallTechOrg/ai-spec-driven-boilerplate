@@ -18,11 +18,13 @@ async def _lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Agent", version="0.1.0", lifespan=_lifespan)
-    from api import ask, datasets, health, runs, stats, upload
+    from api import ask, datasets, health, memory, runs, sessions, stats, upload
     app.include_router(health.router)
     app.include_router(upload.router)
     app.include_router(datasets.router)
     app.include_router(ask.router)
+    app.include_router(sessions.router)
+    app.include_router(memory.router)
     app.include_router(stats.router)
     app.include_router(runs.router)
 

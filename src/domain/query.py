@@ -1,15 +1,15 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import List, Optional, Any
 
 
-class RunRequest(BaseModel):
-    input_text: str
+class QueryRequest(BaseModel):
+    question: str
+    dataset_id: str
 
 
-class RunResponse(BaseModel):
+class QueryResponse(BaseModel):
     run_id: str
     status: str
-    output_text: Optional[str] = None
     answer_text: Optional[str] = None
     table_data: Optional[List[dict]] = None
     chart_b64: Optional[str] = None

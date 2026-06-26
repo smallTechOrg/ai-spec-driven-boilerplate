@@ -1,77 +1,83 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { FilePanel } from '@/components/FilePanel'
+import { ChatPanel } from '@/components/ChatPanel'
+import { DatasetResponse, createSession } from '@/lib/api'
 
 export default function Home() {
-  const [input, setInput] = useState('')
-  const [result, setResult] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [datasets, setDatasets] = useState<DatasetResponse[]>([])
+  const [activeDatasetId, setActiveDatasetId] = useState<string | null>(null)
+  const [sessionError, setSessionError] = useState<string | null>(null)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!input.trim()) return
-    setLoading(true)
-    setError(null)
-    setResult(null)
-    try {
-      const res = await fetch('/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input_text: input }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.detail?.message ?? `Request failed (${res.status})`)
-      } else if (data.data?.error) {
-        setError(data.data.error)
-      } else {
-        setResult(data.data.output_text)
-      }
-    } catch {
-      setError('Network error — is the server running?')
-    } finally {
-      setLoading(false)
-    }
+  useEffect(() => {
+    createSession()
+      .then((sess) => setSessionId(sess.session_id))
+      .catch((err) =>
+        setSessionError(
+          err instanceof Error ? err.message : 'Failed to create session',
+        ),
+      )
+  }, [])
+
+  function handleDatasetUploaded(ds: DatasetResponse) {
+    setDatasets((prev) => [...prev, ds])
+    // Auto-select the first uploaded file
+    if (!activeDatasetId) setActiveDatasetId(ds.dataset_id)
+  }
+
+  if (sessionError) {
+    return (
+      <main className="flex items-center justify-center h-screen">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700 max-w-md text-center">
+          <p className="font-semibold mb-1">Could not connect to the server</p>
+          <p>{sessionError}</p>
+          <p className="mt-2 text-xs text-red-500">
+            Make sure the FastAPI server is running at port 8001.
+          </p>
+        </div>
+      </main>
+    )
+  }
+
+  if (!sessionId) {
+    return (
+      <main className="flex items-center justify-center h-screen">
+        <div className="text-sm text-gray-400">Starting session…</div>
+      </main>
+    )
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-16">
-      <h1 className="mb-8 text-3xl font-bold tracking-tight">Agent</h1>
+    <div className="flex flex-col h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-6 py-3 flex-none">
+        <h1 className="text-lg font-semibold text-gray-900">Data Analyst Agent</h1>
+      </header>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <textarea
-          className="w-full rounded-lg border border-gray-300 p-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          rows={4}
-          placeholder="Enter text to transform…"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          disabled={loading}
-        />
-        <button
-          type="submit"
-          disabled={loading || !input.trim()}
-          className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? 'Running…' : 'Run'}
-        </button>
-      </form>
+      {/* Two-panel layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left panel */}
+        <aside className="w-72 border-r border-gray-200 bg-white flex-none overflow-y-auto">
+          <FilePanel
+            sessionId={sessionId}
+            datasets={datasets}
+            activeDatasetId={activeDatasetId}
+            onDatasetUploaded={handleDatasetUploaded}
+            onSelectDataset={setActiveDatasetId}
+          />
+        </aside>
 
-      {error && (
-        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {result && (
-        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 text-sm whitespace-pre-wrap shadow-sm">
-          {result}
-        </div>
-      )}
-
-      {!result && !error && !loading && (
-        <p className="mt-10 text-center text-sm text-gray-400">Results will appear here.</p>
-      )}
-    </main>
+        {/* Chat panel */}
+        <main className="flex-1 overflow-hidden">
+          <ChatPanel
+            sessionId={sessionId}
+            activeDatasetId={activeDatasetId}
+            hasDatasets={datasets.length > 0}
+          />
+        </main>
+      </div>
+    </div>
   )
 }

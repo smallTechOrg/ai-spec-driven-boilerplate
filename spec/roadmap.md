@@ -1,62 +1,103 @@
 # Roadmap
 
-> Fill in each section. Run `/zero-shot-build [your idea]` to have it filled automatically.
-
 ---
 
 ## What This Agent Does
 
-<!-- FILL IN: One paragraph describing what this agent does, who uses it, and what problem it solves. -->
+This agent is a **local-first data analyst**. A user uploads a CSV file and asks a question about it in plain English ("What were total sales by region?", "Which 5 customers spent the most?", "How many orders shipped late?"). The agent inspects the file's column schema and a small sample of rows, has an LLM translate the question into a pandas computation, runs that computation **locally over the full file** in a constrained sandbox, and returns the computed answer together with a plain-English explanation **and the exact pandas code that produced it** — so every answer is auditable. The dataset itself never leaves the machine; only the schema, a capped sample of rows, and the question are sent to the LLM.
 
 ## Who Uses It
 
-<!-- FILL IN: Primary user(s). What is their role? What are they trying to accomplish? -->
+A non-technical or semi-technical analyst, operations person, or founder who has a spreadsheet and a question, but does not want to write pandas/SQL or hand confidential data to a third-party service. They want a correct number with the working shown, fast, without learning a query language.
 
 ## Core Problem Being Solved
 
-<!-- FILL IN: What manual or broken process does this agent replace or improve? -->
+Answering an ad-hoc question about a CSV today means either (a) writing pandas/SQL by hand, (b) building a pivot table by trial and error, or (c) pasting the data into a hosted chatbot — which is slow, error-prone, or leaks the data. This agent removes all three: it generates and runs the computation for you, keeps the raw data local, and shows its work so you can trust the result.
 
 ## Success Criteria
 
-<!-- FILL IN: How do we know the agent is working? List 3-5 measurable outcomes. -->
-
-- [ ] <!-- criterion 1 -->
-- [ ] <!-- criterion 2 -->
-- [ ] <!-- criterion 3 -->
+- [ ] A user can upload a CSV, type a natural-language question, and receive a correct computed answer within one request, with no manual setup.
+- [ ] Every answer includes the exact pandas code that produced it and a tabular/numeric result, visible in the UI.
+- [ ] The full dataset is never transmitted to the LLM — only the schema, a capped row sample (≤ the configured cap), and the question. This is verifiable from the prompt payload.
+- [ ] The four core analytical shapes return correct results against the real LLM: a group-by aggregation, a filter + aggregate, a sort + top-N, and a single-value aggregate (count/sum/mean).
+- [ ] A malformed or non-CSV upload, and a question that cannot be answered from the columns, both fail gracefully with a clear message instead of crashing or returning a wrong number.
 
 ## What This Agent Does NOT Do (Out of Scope)
 
-<!-- FILL IN: Explicit exclusions prevent scope creep. List things the agent will never do. -->
+Out of scope for v1 (each is a clearly-labelled stub in the Phase-1 UI where noted, and a candidate for a later phase):
+
+- **Charts / visualizations** — the answer is numeric/tabular text only. (Labelled stub in UI.)
+- **Multiple files / joins across files** — one CSV per request.
+- **Live database connections** (Postgres/MySQL/warehouse). (Labelled stub in UI.)
+- **Large-file streaming / out-of-core processing** — the file must fit in memory; an enforced size/row cap rejects anything larger.
+- **Conversation / follow-up memory** — each question is independent; no "and now filter that to last year".
+- **Export** of results (CSV/Excel/PDF download).
+- **Editing or writing back** to the dataset — read-only analysis.
+- **Authentication / multi-tenant** — single local user.
 
 ## Key Constraints
 
-<!-- FILL IN: Hard limits — budget, latency, compliance, API rate limits, etc. -->
+These two are **non-negotiable** and the architecture is designed around them:
+
+1. **Data stays local.** The uploaded dataset is processed on-machine. Only minimal context — the column schema and a **capped sample of rows** (default 15, hard cap 20, configurable via `AGENT_SAMPLE_ROWS`) — plus the user's question may be sent to the LLM. The **full** dataset is **never** sent to the LLM or any third party. The actual computation runs locally over the full file.
+2. **Show its work.** Every answer exposes the actual pandas snippet the agent generated and executed, surfaced in the UI alongside the answer, so the result is auditable.
+
+Additional constraints:
+
+- **Sandboxed execution.** The LLM-generated code runs in a restricted namespace (no imports, no file/network/`os`/`open` access, no dunder traversal), with `df` (the full DataFrame) and a curated set of pandas/builtins as the only available names, under a wall-clock timeout and a row/size cap. See [`architecture.md` → Sandbox Security Model](architecture.md#sandbox-security-model).
+- **Real-LLM gates.** All tests and gates run against the **real Gemini API** using `AGENT_GEMINI_API_KEY` from `.env`. No stubbed-LLM run counts as a passing gate.
+- **File limits.** Upload capped at 5 MB and 200,000 rows by default (`AGENT_MAX_UPLOAD_BYTES`, `AGENT_MAX_ROWS`); larger files are rejected with a clear message.
 
 ## Phases of Development
 
-<!-- FILL IN: The spec-writer fills these in. One phase = one user-testable increment, behind a human testing gate. Default each phase's slices to INDEPENDENT so generators build them concurrently; declare a dependency only when a slice truly needs another's output. Use the per-phase template below — one block per phase. -->
+> **Phase 1 is the smallest first-time-right user-testable win.** Backend is minimal but REAL on the one core path (no fake data on the tested path). Frontend is visually complete: real UI for the working path PLUS clearly-labelled NON-FUNCTIONAL stubs for everything coming later.
 
-> **Phase 1 is the smallest first-time-right user-testable win.** It must work perfectly the first time the user tests it — zero rough edges on the tested path. Its backend is minimal but REAL on the one core path (no fake data on the tested path). Its frontend is visually complete: real UI for the one working path PLUS clearly-labelled NON-FUNCTIONAL stubs for everything coming later, so the user sees the vision (a stub must never be mistaken for a bug). Each later phase wires those stubs into real functionality, one increment at a time.
+### Phase 1 — Upload a CSV, ask a question, get an auditable answer
 
-### Phase 1 — <!-- short name -->
-
-- **Goal:** <!-- FILL IN: the single smallest user-testable win this phase delivers. -->
-- **Independent slices (parallel build units):** <!-- FILL IN: each slice is a disjoint unit a single generator owns. Note its surface (frontend / backend) and any declared dependency on another slice (default: none). -->
-  - `slice-a` (backend) — <!-- what it builds; deps: none -->
-  - `slice-b` (frontend) — <!-- what it builds; deps: none -->
-- **Key surfaces / files:** <!-- FILL IN: the files/dirs each slice touches. frontend writes the frontend surface; backend writes src/. Never the same file. -->
-- **Gate command:** <!-- FILL IN: one exact runnable command that proves the phase works — real LLM/API via .env keys, production DB driver (never SQLite-as-substitute). e.g. `uv run pytest tests/test_phase1.py` -->
-- **How the user tests it (handoff seed):** <!-- FILL IN: exact run command(s), what to click / look at, the expected result, and which parts are labelled stubs vs real. -->
-
-### Phase 2 — <!-- short name -->
-
-- **Goal:** <!-- FILL IN: next user-testable increment (typically wires a Phase-1 stub into real functionality). -->
+- **Goal:** A user opens the app, uploads a CSV, types a natural-language question, and gets back a computed answer, a plain-English explanation, the generated pandas code, and the result table — all on the real Gemini API, with the full data processed locally. This is the complete core loop.
 - **Independent slices (parallel build units):**
-  - `slice-a` (backend) — <!-- ...; deps: none -->
-  - `slice-b` (frontend) — <!-- ...; deps: none -->
-- **Key surfaces / files:** <!-- FILL IN -->
-- **Gate command:** <!-- FILL IN: exact runnable command, real LLM/API + production DB driver -->
-- **How the user tests it (handoff seed):** <!-- FILL IN -->
+  - `backend-analyst` (backend) — the entire backend vertical: extend the domain/API/state/prompts, replace the `transform_text` node with the analyst nodes (`profile_csv` → `generate_code` → `execute_code` → `explain_result`), build the **local sandbox executor**, and the CSV profiler. Deps: none.
+  - `backend-tests` (backend) — Phase-1 test suite against real Gemini covering the four analytical shapes plus the two failure guards. Deps: declared dependency on `backend-analyst` (imports its modules); **serialize after `backend-analyst`**.
+  - `frontend-ui` (frontend) — replace `page.tsx` with the analyst UI: CSV upload, question input, answer + explanation display, a "Show its work" panel (generated code + result table), and clearly-labelled non-functional stubs for deferred features. Deps: none (codes against the documented API shape in [`api.md`](api.md); builds in parallel with backend).
+- **Key surfaces / files:**
+  - `backend-analyst` writes: `src/domain/run.py`, `src/graph/state.py`, `src/graph/nodes.py`, `src/graph/edges.py`, `src/graph/agent.py`, `src/graph/runner.py`, `src/api/runs.py`, `src/db/models.py` (add `question`, `generated_code`, `result_table`, `answer`, `explanation` columns to `RunRow`), `alembic/versions/0002_analyst.py` (new migration for those columns), `src/analysis/profiler.py` (new), `src/analysis/sandbox.py` (new), `src/prompts/generate_code.md` (new), `src/prompts/explain_result.md` (new), `src/config/settings.py` (add `sample_rows`, `max_upload_bytes`, `max_rows`, `exec_timeout`, `max_result_rows`), `pyproject.toml` (add `pandas`).
+  - `backend-tests` writes: `tests/integration/test_analyst.py` (new), `tests/fixtures/*.csv` (new). It also updates the now-obsolete transform tests `tests/integration/test_pipeline.py` and `tests/unit/test_api.py` to the analyst contract.
+  - `frontend-ui` writes: `frontend/src/app/page.tsx` only.
+  - Disjoint: backend slices touch only `src/` + `tests/`; frontend touches only `frontend/`. No shared file between backend and frontend.
+- **Gate command:** `uv run alembic upgrade head && uv run pytest tests/integration/test_analyst.py tests/unit/test_api.py -q` (runs against the real Gemini API via `AGENT_GEMINI_API_KEY` in `.env`; SQLite is the production driver for this single-user local tool).
+- **How the user tests it (handoff seed):**
+  1. Build the frontend and start the server: `cd frontend && pnpm build` then (from repo root) `uv run python -m src`.
+  2. Open **http://localhost:8001/app/** (note the port, `/app/`, and trailing slash).
+  3. Upload the sample file `tests/fixtures/sales.csv` (shipped with the build).
+  4. Type: **"What were total sales by region, highest first?"** and submit.
+  5. Expected (REAL): an answer naming the regions with their summed sales in descending order, a one-paragraph plain-English explanation, a "Show its work" panel showing the generated pandas (a `groupby('region')['sales'].sum().sort_values(...)`-style snippet), and a result table of region → total.
+  6. Also try a bad input: upload a `.txt` or a malformed file → expect a clear "couldn't read that as a CSV" message, not a crash.
+  7. **Labelled stubs (NOT bugs):** a greyed-out "Charts (coming soon)" area, a disabled "Connect a database (coming soon)" control, and a disabled "Export results (coming soon)" button. These are intentionally non-functional placeholders showing the roadmap.
 
-<!-- Repeat the per-phase block for every phase. -->
+### Phase 2 — Robustness, retry, and richer result handling
 
+- **Goal:** Harden the core loop: when the generated code errors or returns nothing usable, the agent shows a clear, specific message (and optionally retries once with the error fed back), large result tables are paginated/capped sensibly, and the four analytical shapes plus edge cases (empty result, all-null column, division-by-zero) are covered end-to-end.
+- **Independent slices (parallel build units):**
+  - `backend-resilience` (backend) — one bounded retry of `generate_code` when `execute_code` raises (feeding the error back to the LLM), result-size capping/truncation with a "truncated" flag, and clearer sandbox error categorization. Deps: none.
+  - `backend-edgetests` (backend) — edge-case integration tests (empty result, all-null, divide-by-zero, question unanswerable from columns) against real Gemini. Deps: declared dependency on `backend-resilience`; serialize after it.
+  - `frontend-polish` (frontend) — render the "truncated" flag, the retry/error states, and an empty-result state cleanly in the UI. Deps: none.
+- **Key surfaces / files:**
+  - `backend-resilience` writes: `src/graph/nodes.py`, `src/graph/edges.py`, `src/graph/agent.py`, `src/analysis/sandbox.py`, `src/domain/run.py`.
+  - `backend-edgetests` writes: `tests/integration/test_analyst_edges.py` (new), `tests/fixtures/*.csv` (new).
+  - `frontend-polish` writes: `frontend/src/app/page.tsx`.
+- **Gate command:** `uv run alembic upgrade head && uv run pytest tests/integration -q` (real Gemini via `.env`).
+- **How the user tests it (handoff seed):** Start the app as in Phase 1, open http://localhost:8001/app/, upload `tests/fixtures/sales.csv`, and ask a deliberately impossible question ("What is the average customer satisfaction score?" when no such column exists) → expect a clear "I don't see a column for that" style message, not a wrong number or a crash. Then ask a filter that matches no rows ("total sales where region = 'Atlantis'") → expect a clean "no matching rows" answer. The code panel still shows what was attempted.
+
+### Phase 3 — Charts (wire the first deferred stub)
+
+- **Goal:** Turn the "Charts (coming soon)" stub into a real, optional chart for results that are naturally chartable (a group-by series), rendered locally from the computed result table — no new data leaves the machine.
+- **Independent slices (parallel build units):**
+  - `backend-chartspec` (backend) — emit a small, declarative chart spec (type + x/y from the result table) when the result is chartable. Deps: none.
+  - `frontend-charts` (frontend) — render the chart spec with a local chart library; remove the stub label. Deps: declared dependency on `backend-chartspec`'s response field; serialize the chart-render test after it, but the component scaffold can start in parallel.
+- **Key surfaces / files:**
+  - `backend-chartspec` writes: `src/graph/nodes.py`, `src/domain/run.py`, `tests/integration/test_chartspec.py` (new).
+  - `frontend-charts` writes: `frontend/src/app/page.tsx`, `frontend/package.json`.
+- **Gate command:** `uv run alembic upgrade head && uv run pytest tests/integration -q` (real Gemini via `.env`).
+- **How the user tests it (handoff seed):** Open http://localhost:8001/app/, upload `tests/fixtures/sales.csv`, ask "total sales by region" → expect the existing answer/code/table PLUS a bar chart of region totals where the "Charts (coming soon)" stub used to be.
+
+> Further deferred work (each its own future phase, currently labelled stubs or out-of-scope): live database connections, multi-file joins, large-file streaming, conversation/follow-up memory, result export.

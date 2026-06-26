@@ -1,34 +1,47 @@
 # Data Model
 
-> Fill in this section — see comments below.
-
 ---
 
 ## Storage Technology
 
-<!-- FILL IN: What database/storage does this project use and why? -->
+SQLite (local file, `sqlite:///./data/agent.db`) via SQLAlchemy 2.0 (`DeclarativeBase`), migrations by Alembic. SQLite is chosen because this is a single-user local tool — no shared/production database is needed, and keeping the DB local reinforces the "data stays local" constraint. The **uploaded CSV is not stored as a dataset** beyond the in-request DataFrame; only the run record (question, generated code, computed result, answer) is persisted.
 
 ## Entities
 
-<!-- FILL IN: One section per major entity. -->
+### Entity: Run
 
-### Entity: <!-- Name -->
-
-<!-- FILL IN: What does this entity represent? -->
+One analysis: a question asked of an uploaded CSV, plus everything needed to audit the answer. Extends the skeleton `RunRow` (table `runs`).
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| id | <!-- type --> | yes | Primary key |
-| <!-- field --> | <!-- type --> | <!-- yes/no --> | <!-- description --> |
+| id | Text (UUID) | yes | Primary key |
+| status | Text | yes | `pending` → `completed` / `failed` |
+| input_text | Text | no | Legacy/back-compat: stores the question (the analyst path uses `question`); kept so existing skeleton code still works |
+| question | Text | no | The natural-language question the user asked |
+| generated_code | Text | no | The exact pandas snippet that was executed (the "show its work" artifact) |
+| result_table | Text (JSON) | no | The computed result serialized as JSON: `{"columns": [...], "rows": [[...]]}` or a scalar wrapper |
+| output_text | Text | no | Compact answer + explanation summary (back-compat with the skeleton response field) |
+| answer | Text | no | The short answer line |
+| explanation | Text | no | The plain-English explanation |
+| error_message | Text | no | Set when `status = failed`; the categorized failure reason |
+| created_at | TIMESTAMP(tz) | yes | Row creation time |
+| updated_at | TIMESTAMP(tz) | yes | Last update time (on completion) |
+
+> The uploaded **CSV text itself is intentionally NOT persisted** as a column — it is held only in memory for the duration of the request, consistent with the local-data constraint. (If a future phase wants reproducibility, persisting it locally is a deliberate, separate decision.)
 
 ### Relationships
 
-<!-- FILL IN: How do entities relate to each other? -->
+None — a single flat `runs` table. (No multi-file, no joins, no users.)
 
 ## Data Lifecycle
 
-<!-- FILL IN: When is data created, updated, and deleted? Is anything time-boxed or archived? -->
+- **Create:** a `Run` row is created (`pending`) when `POST /runs` is received.
+- **Update:** the row is updated to `completed` (with answer/explanation/code/result) or `failed` (with `error_message`) when the graph finishes.
+- **Read:** `GET /runs/{id}` returns the stored run.
+- **Delete:** none automatic in v1 (single local user; manual DB file deletion if desired). No archival/time-boxing.
 
 ## Sensitive Data
 
-<!-- FILL IN: What fields contain PII or secrets? How are they protected? -->
+- The **uploaded dataset** may contain PII/confidential data. It is processed **locally** and never sent to the LLM in full — only the schema + a capped sample + the question leave the machine (constraint 1). The full CSV is not persisted to the DB.
+- The **capped sample** that goes to Gemini may contain a few real rows; this is the documented, accepted minimal context. Users should be aware the sample (≤20 rows) is transmitted. (A future phase could add sample redaction/synthesis.)
+- `AGENT_GEMINI_API_KEY` is a secret, loaded from `.env` (gitignored), never logged or echoed.

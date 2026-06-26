@@ -1,38 +1,19 @@
 # Capabilities Index
 
-> **Boilerplate status:** The spec-writer sub-agent creates one file per capability in this directory. Each file describes exactly one discrete thing the agent can do.
+> One file per capability. Each describes exactly one discrete thing the agent can do.
 
 ---
 
-## What Is a Capability?
-
-A capability is a single, discrete action or behavior the agent performs. Examples:
-- "Search the web for companies matching criteria X"
-- "Draft a personalized email given a lead profile"
-- "Send a Slack notification when a threshold is crossed"
-
 ## Capabilities in This Project
 
-<!-- FILL IN: List capabilities here as they are defined. Each entry links to its spec file (no number prefix). -->
+| Capability | File | Phase |
+|-----------|------|-------|
+| Profile uploaded CSV | [profile-csv.md](profile-csv.md) | 1 |
+| Answer question with computed pandas | [answer-question.md](answer-question.md) | 1 |
+| Explain the answer in plain English | [explain-answer.md](explain-answer.md) | 1 |
 
-| Capability | File |
-|-----------|------|
-| <!-- name --> | [name.md](name.md) |
+> Phase-2 work (resilience/retry, edge-case handling) hardens these three rather than adding new capabilities. Phase-3 adds an optional "chart the result" capability (deferred; currently a labelled UI stub).
 
 ## How to Add a New Capability
 
-Run `/zero-shot-build [description]` on the existing spec. The spec-writer sub-agent will:
-1. Create a new file in this directory (`<name>.md`, no number prefix)
-2. Update this index
-3. Flag any dependencies on existing capabilities
-4. Self-review that it fits the architecture and data model before returning
-
-## Capability File Template
-
-Each capability file should answer:
-- **What it does** (one sentence)
-- **Inputs** (what data it receives)
-- **Outputs** (what it produces)
-- **External calls** (APIs, LLMs, databases it touches)
-- **Error cases** (what can go wrong and how it's handled)
-- **Success criteria** (how we test it)
+Run `/zero-shot-build [description]` on the existing spec. The spec-writer creates a `<name>.md` here, updates this index, flags dependencies, and self-reviews fit before returning.

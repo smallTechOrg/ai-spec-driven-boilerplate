@@ -1,14 +1,14 @@
 # Implementation Phases
 
-Agents are built phase by phase, derived from the user's requirements — not a fixed ladder. **Phase 1 is the wow version — a complete, impressive first release, not a thin demo.** Later phases enhance and harden. The agentic stack runs from day one and is upgraded in a dedicated phase. Production concerns trail.
+Agents are built phase by phase, derived from the user's requirements — not a fixed ladder. **Phase 1 ships with enough scope to genuinely delight.** Phases 2–3 complete the user's requirements. Then the agentic stack is upgraded and finalised. Production concerns trail behind the requirements.
 
 ## Core Principle
 
-**Wow first, then enhance, then harden.**
+**Delight first, then complete, then polish.**
 
-Phase 1 is a complete working product the user would be proud to show someone. Every requirement from intake is either working or explicitly deferred with a clear reason — not silently missing. The user tests Phase 1 and thinks "this is it" not "this is a placeholder". Subsequent phases add secondary features, upgrade the agentic architecture, and complete the system.
+Phase 1 is NOT a thin one-path demo. It covers the user's primary requirements with enough depth that the person who briefed the idea is genuinely impressed when they test it. Phases 2–3 fill in the remaining requirements. Phases 4–5 are always the agentic upgrade and complete system. Production concerns (observability, API surface, polish) trail as optional phases only when the spec calls for them.
 
-The spec-writer derives the phase breakdown from `spec/roadmap.md` — count and names come from requirements, not a fixed ladder.
+The spec-writer derives the phase breakdown from `spec/roadmap.md` — the count and names come from the requirements, not a fixed ladder.
 
 ## Phase Structure
 
@@ -16,31 +16,31 @@ Four roles are always present; the middle phases are derived from requirements:
 
 ---
 
-### Phase 1 — The Wow Version
+### Phase 1 — First Delight
 
-Phase 1 is a **complete, working product** — not a prototype, not a thin demo. Every primary requirement from intake works end-to-end. The user opens it for the first time and is genuinely impressed.
+Phase 1 covers the user's **primary requirements** with enough depth to impress — not a single thin mechanism, but a working version of the main user journey the user can immediately appreciate.
 
-- **No half-done primary requirements.** Everything the user said they needed at intake either works in Phase 1, or is explicitly deferred with a labelled stub and a written reason. A requirement that's "partially there" is a failing gate.
-- **The agentic stack is wired from day one.** Graph framework, state type, core nodes, and assembly are set up in Phase 1. The agent loop runs end-to-end. Never defer the agentic skeleton to a later phase.
-- **The UI is polished enough to show someone.** Real data, real responses, real layout — not a "functional skeleton". Stubs for secondary features are clearly labelled, but nothing on the primary path looks broken or placeholder.
-- All calls hit the real LLM/API (keys from `.env`) — no fake data on any tested path.
+- **More scope than a thin slice.** If the user asked for analysis + answers + charts, Phase 1 covers the core of all three. Secondary requirements and production polish can be deferred — primary ones cannot.
+- **Agentic stack is wired from day one.** The graph framework (LangGraph or equivalent), state type, core nodes, and assembly are set up in Phase 1 even if some capability nodes are stubs. Never defer the agentic skeleton.
+- Frontend is visually complete: real UI for everything Phase 1 delivers, PLUS clearly-labelled stubs for what's coming. Stubs are never mistaken for bugs.
+- All calls on the tested path hit the real LLM/API (keys from `.env`) — no fake data on what the user tests.
 - **Gate (all must pass):**
   1. `pyproject.toml` declares the DB driver in `[project.dependencies]` (e.g. `psycopg2-binary` for PostgreSQL) — never dev-only
   2. `uv run alembic upgrade head` succeeds against the configured database — run and confirmed, not assumed
-  3. Every primary requirement from intake works end-to-end against the real LLM/API; tests pass
-  4. **Agentic stack gate:** graph compiles, state flows through nodes, agent runs end-to-end — confirmed by the Phase 1 test
+  3. Primary user journey works end-to-end against the real LLM/API; tests pass
+  4. **Agentic stack gate:** graph compiles, state flows through nodes, agent is invocable — confirmed by the Phase 1 test
   5. Working tree is clean and committed
   6. Phase test-handoff published; the human has tested and approved (see Human Testing Gate)
 
 ---
 
-### Phases 2–N — Enhancement Phases *(spec-writer derives these)*
+### Phases 2–N — Requirements Phases *(spec-writer derives these)*
 
-Each phase adds secondary features, remaining integrations, or capabilities that were intentionally deferred from Phase 1. The spec-writer **names these phases after what they add**, not after generic concerns.
+Each phase covers a chunk of remaining user requirements from `spec/roadmap.md`. The spec-writer **names these phases after what they deliver**, not after generic production concerns. Aim for all user requirements covered by phase 3–4.
 
-- Phase 1 delivered the wow version; these phases make it more capable, more complete, or more robust.
-- All external calls hit the real provider using keys from `.env`; tests assert on real responses.
-- **Gate:** The phase's increment works end-to-end against the real LLM/API; tests pass; working tree clean; human approved.
+- Each phase wires Phase-1 stubs into real functionality — one user-testable increment at a time.
+- All external calls hit the real provider using keys from `.env`; tests assert on real responses (shape/content), not hardcoded strings.
+- **Gate:** The phase's user-testable increment works end-to-end against the real LLM/API; tests pass; working tree clean; human approved.
 
 ---
 
@@ -121,14 +121,14 @@ The current phase is recorded in git commit messages (`phase-N: [description]`).
 
 The spec-writer derives the phases from `spec/roadmap.md`. What is fixed:
 
-- **Phase 1 is always the Wow Version** — a complete working product, not a thin demo; every primary requirement from intake works or is explicitly deferred
+- **Phase 1 is always First Delight** — never a thin one-path demo; covers the user's primary requirements
 - **The agentic stack is always wired in Phase 1** — graph, state, nodes, assembly; never deferred
-- **There is always an Agentic Stack Upgrade phase** and a **Complete Agentic System phase** — in that order, after the enhancement phases
+- **There is always an Agentic Stack Upgrade phase** and a **Complete Agentic System phase** — in that order, after the requirements phases
 - **Trailing phases are only added when the spec explicitly requires them**
 
 What varies (derived from requirements):
-- How many enhancement phases (2–N) — count comes from `spec/roadmap.md`
-- Names of enhancement phases — named after what they add (e.g. "Export + Sharing", "Advanced Filters", "Scheduled Reports"), not generic concerns
+- How many requirements phases (2–N) — count comes from `spec/roadmap.md`
+- Names of requirements phases — named after what they deliver (e.g. "Upload + Analysis", "Chat Interface", "Report Export"), not generic concerns
 
 ---
 

@@ -1,12 +1,12 @@
 # Implementation Phases
 
-Agents are built phase by phase, derived from the user's requirements — not a fixed ladder. **Phase 1 ships with enough scope to genuinely delight.** Phases 2–3 complete the user's requirements. Then the agentic stack is upgraded and finalised. Production concerns trail behind the requirements.
+Agents are built phase by phase, derived from the user's requirements — not a fixed ladder. **Phase 1 is the smallest user-testable win that works first time;** each later phase wires a stub into a real feature. Production concerns trail behind the requirements.
 
 ## Core Principle
 
-**Delight first, then complete, then polish.**
+**Smallest win first, then complete, then polish.**
 
-Phase 1 is NOT a thin one-path demo. It covers the user's primary requirements with enough depth that the person who briefed the idea is genuinely impressed when they test it. Phases 2–3 fill in the remaining requirements. Phases 4–5 are always the agentic upgrade and complete system. Production concerns (observability, API surface, polish) trail as optional phases only when the spec calls for them.
+Phase 1 is the SMALLEST user-testable win that works the FIRST time the user tests it — real on the one core path, with clearly-labelled stubs for everything else (this is the same rule the spec-writer applies; the two must agree). It is fine for Phase 1 to be smaller than "complete" — what matters is that the one path it delivers is real and impresses, not that it covers every requirement. Later phases wire the labelled stubs into real features, one human-tested increment at a time. Do NOT over-scope Phase 1 to cover "all the primary requirements" — that is the over-build that doubles build time and breaks first-time-right.
 
 The spec-writer derives the phase breakdown from `spec/roadmap.md` — the count and names come from the requirements, not a fixed ladder.
 
@@ -16,21 +16,23 @@ Four roles are always present; the middle phases are derived from requirements:
 
 ---
 
-### Phase 1 — First Delight
+### Phase 1 — First Win
 
-Phase 1 covers the user's **primary requirements** with enough depth to impress — not a single thin mechanism, but a working version of the main user journey the user can immediately appreciate.
+Phase 1 is the **smallest user-testable win** — the one core path of the main user journey, real and working the first time, that the person who briefed the idea immediately appreciates. Not every primary requirement: the single most important path, done right, with the rest as labelled stubs.
 
-- **More scope than a thin slice.** If the user asked for analysis + answers + charts, Phase 1 covers the core of all three. Secondary requirements and production polish can be deferred — primary ones cannot.
+- **Smallest real path, not "all the primary requirements."** Pick the one core path that proves the idea (e.g. upload → ask → answer-with-chart) and make it real first-time. Defer every other requirement to a later phase as a clearly-labelled stub. Over-scoping Phase 1 to cover everything is the failure mode, not the goal.
 - **Agentic stack is wired from day one.** The graph framework (LangGraph or equivalent), state type, core nodes, and assembly are set up in Phase 1 even if some capability nodes are stubs. Never defer the agentic skeleton.
-- Frontend is visually complete: real UI for everything Phase 1 delivers, PLUS clearly-labelled stubs for what's coming. Stubs are never mistaken for bugs.
+- Frontend is visually complete: real UI for the one path Phase 1 delivers, PLUS clearly-labelled stubs for what's coming. Stubs are never mistaken for bugs.
 - All calls on the tested path hit the real LLM/API (keys from `.env`) — no fake data on what the user tests.
 - **Gate (all must pass):**
   1. `pyproject.toml` declares the DB driver in `[project.dependencies]` (e.g. `psycopg2-binary` for PostgreSQL) — never dev-only
   2. `uv run alembic upgrade head` succeeds against the configured database — run and confirmed, not assumed
-  3. Primary user journey works end-to-end against the real LLM/API; tests pass
-  4. **Agentic stack gate:** graph compiles, state flows through nodes, agent is invocable — confirmed by the Phase 1 test
-  5. Working tree is clean and committed
-  6. Phase test-handoff published; the human has tested and approved (see Human Testing Gate)
+  3. **Boots via the documented run command** — the app starts on its exact README/roadmap run command from the project root (e.g. `uv run python -m src`) with no `ImportError`/`ModuleNotFoundError`. A green pytest run does NOT prove this (pytest's path masks `src.`-prefixed import bugs); the test path must equal the run path.
+  4. Primary user journey works end-to-end against the real LLM/API; tests pass
+  5. **Agentic stack gate:** graph compiles, state flows through nodes, agent is invocable — confirmed by the Phase 1 test
+  6. **Styled-render (any static-export UI):** after `pnpm build`, the served page at the single-origin path (`:8001/app/`) is rendered AND styled — the built CSS bundle contains real utility selectors and no unexpanded `@tailwind`/`@source` remains. An unstyled 200 fails the gate.
+  7. Working tree is clean and committed
+  8. Phase test-handoff published; the human has tested and approved (see Human Testing Gate)
 
 ---
 
@@ -44,9 +46,9 @@ Each phase covers a chunk of remaining user requirements from `spec/roadmap.md`.
 
 ---
 
-### Phase N+1 — Agentic Stack Upgrade + Resilience
+### Phase N+1 — Agentic Stack Upgrade + Resilience *(only if `spec/agent.md` calls for patterns beyond the base loop)*
 
-After user requirements are covered, upgrade the agentic architecture and harden external calls.
+If the spec's agent graph needs more than the base ReAct loop, add a phase to upgrade the agentic architecture and harden external calls. A simple single-loop agent that already meets its requirements does not need this phase — do not add it by default.
 
 - **Upgrade the agentic stack** per `spec/agent.md`: wire in the patterns it calls for beyond the base ReAct loop — planning, reflection, multi-agent coordination, memory, or whatever the spec requires. Phase 1 laid the skeleton; this phase promotes it to the production-grade architecture.
 - Add error handling to all external calls: try/except, retries, timeouts. Agent continues (degraded, not crashed) on non-critical failures.
@@ -56,9 +58,9 @@ After user requirements are covered, upgrade the agentic architecture and harden
 
 ---
 
-### Phase N+2 — Complete Agentic System
+### Phase N+2 — Complete Agentic System *(the final requirements phase — every capability real)*
 
-All spec-required agent patterns are active and the system runs fully end-to-end.
+The last phase turns the remaining labelled stubs into real features so every capability in `spec/roadmap.md` is active and the system runs fully end-to-end. (When the agent is simple, this is just the last requirements phase — not a separate agentic milestone.)
 
 - Every capability in `spec/roadmap.md` is real — no stubs on any active path.
 - Complete any remaining integrations; system runs against all real services.
@@ -121,9 +123,9 @@ The current phase is recorded in git commit messages (`phase-N: [description]`).
 
 The spec-writer derives the phases from `spec/roadmap.md`. What is fixed:
 
-- **Phase 1 is always First Delight** — never a thin one-path demo; covers the user's primary requirements
-- **The agentic stack is always wired in Phase 1** — graph, state, nodes, assembly; never deferred
-- **There is always an Agentic Stack Upgrade phase** and a **Complete Agentic System phase** — in that order, after the requirements phases
+- **Phase 1 is always the smallest user-testable win** — the one core path real and first-time-right, the rest as labelled stubs (this matches `spec-writer.md` exactly; the two never disagree)
+- **The agentic stack is always wired in Phase 1** — graph, state, nodes, assembly; never deferred (the skeleton is wired even though most nodes start as stubs)
+- **An Agentic Stack Upgrade phase and a Complete Agentic System phase are added only when `spec/agent.md` calls for patterns beyond the base loop** — a simple agent that meets its requirements does not get them by default
 - **Trailing phases are only added when the spec explicitly requires them**
 
 What varies (derived from requirements):

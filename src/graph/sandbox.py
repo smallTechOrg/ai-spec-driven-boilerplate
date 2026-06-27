@@ -240,6 +240,37 @@ def _capture_charts(result: Any) -> list[str]:
     return charts
 
 
+def _capture_matplotlib_charts() -> list[str]:
+    """Convert any open matplotlib figures to Plotly JSON strings.
+
+    When the LLM uses pandas .plot() or plt.* (matplotlib backend) instead of
+    px/go, the figures are created in memory (Agg backend — headless) but never
+    returned as a go.Figure. This helper converts whatever is open in pyplot's
+    figure manager into Plotly figures so ChartRender can display them.
+    Always closes all matplotlib figures afterwards to reset state between steps.
+    """
+    charts: list[str] = []
+    try:
+        fig_nums = plt.get_fignums()
+        if not fig_nums:
+            return charts
+        try:
+            import plotly.tools as tls  # noqa: PLC0415
+            for fnum in fig_nums:
+                mfig = plt.figure(fnum)
+                try:
+                    pfig = tls.mpl_to_plotly(mfig)
+                    charts.append(pfig.to_json())
+                except Exception:  # noqa: BLE001
+                    pass
+        except Exception:  # noqa: BLE001
+            pass
+        plt.close("all")
+    except Exception:  # noqa: BLE001
+        pass
+    return charts
+
+
 def _collect_namespace_charts(namespace: dict[str, Any]) -> list[str]:
     """Scan the eval namespace for any go.Figure objects assigned to variables.
 
@@ -327,12 +358,11 @@ def eval_expression(
 
         direct_charts = _capture_charts(result)
         ns_charts = _collect_namespace_charts(namespace)
-        # Merge: direct return (expression result) takes priority;
-        # namespace scan adds figures that were assigned to variables and then
-        # shown via fig.show() (which returns None, so result-capture misses them).
+        mpl_charts = _capture_matplotlib_charts()
+        # Merge all three sources. Priority: direct return > namespace scan > mpl.
         seen_json: set[str] = set(direct_charts)
         charts = list(direct_charts)
-        for c in ns_charts:
+        for c in ns_charts + mpl_charts:
             if c not in seen_json:
                 seen_json.add(c)
                 charts.append(c)

@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     anthropic_api_key: str = Field(default="")
     gemini_api_key: str = Field(default="")
 
+    # Maximum accepted upload size for a CSV dataset, in megabytes.
+    max_upload_mb: int = Field(default=25)
+
 
 _settings: Settings | None = None
 

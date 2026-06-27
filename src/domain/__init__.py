@@ -1,3 +1,13 @@
-from domain.run import RunRequest, RunResponse
+from domain.dataset import (
+    ColumnSchema,
+    UploadResponse,
+    AskRequest,
+    AskResponse,
+)
 
-__all__ = ["RunRequest", "RunResponse"]
+__all__ = [
+    "ColumnSchema",
+    "UploadResponse",
+    "AskRequest",
+    "AskResponse",
+]

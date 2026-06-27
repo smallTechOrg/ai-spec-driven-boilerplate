@@ -3,7 +3,9 @@ from google.genai import types
 
 
 class GeminiProvider:
-    DEFAULT_MODEL = "gemini-2.5-pro"
+    # Cost is a dealbreaker for this personal tool — default to the cheap Flash
+    # model. The model is normally set explicitly via AGENT_LLM_MODEL.
+    DEFAULT_MODEL = "gemini-2.5-flash"
 
     def __init__(self, api_key: str, model: str) -> None:
         self._client = genai.Client(api_key=api_key)

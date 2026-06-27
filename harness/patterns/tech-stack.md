@@ -80,4 +80,4 @@ The `DATABASE_URL` in `.env` (or `.env.test`) must point at a real PostgreSQL te
 
 - The build and tests load keys programmatically from `.env` (gitignored); confirm a key by presence (bool) only — never echo, print, paste, or commit a secret value.
 - A stub is permitted only for an integration whose external system isn't built yet — never as a substitute for the real provider on a path that exists.
-- **CI contract:** a runner without secrets cannot pass the real-key gate. Either inject the keys from a secret store, or guard the real-key tests with `pytest.skip` when keys are unset. Skipped is not passed: the Phase 2+ gate is BLOCKED if a required key is missing locally.
+- **CI contract:** a runner without secrets cannot pass the real-key gate. Either inject the keys from a secret store, or guard the real-key tests with `pytest.skip` when keys are unset. Skipped is not passed: the real-provider gate is BLOCKED if a required key is missing locally.

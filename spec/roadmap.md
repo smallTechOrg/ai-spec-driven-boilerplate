@@ -34,7 +34,7 @@
 
 ## Phases of Development
 
-<!-- FILL IN: The spec-writer fills these in. One phase = one user-testable increment, behind a human testing gate. Default each phase's slices to INDEPENDENT so generators build them concurrently; declare a dependency only when a slice truly needs another's output. Use the per-phase template below — one block per phase. -->
+<!-- FILL IN: The spec-writer fills these in. One phase = one user-testable increment, behind a human testing gate. The phase list is DERIVED FROM THE REQUIREMENTS — there is no fixed count and no fixed names; emit only the phases the requirements need (see harness/patterns/phases.md, the Vertical axis). Default each phase's slices to INDEPENDENT so generators build them concurrently; declare a dependency only when a slice truly needs another's output. Use the per-phase template below — one block per phase. -->
 
 > **Phase 1 is the smallest first-time-right user-testable win.** It must work perfectly the first time the user tests it — zero rough edges on the tested path. Its backend is minimal but REAL on the one core path (no fake data on the tested path). Its frontend is visually complete: real UI for the one working path PLUS clearly-labelled NON-FUNCTIONAL stubs for everything coming later, so the user sees the vision (a stub must never be mistaken for a bug). Each later phase wires those stubs into real functionality, one increment at a time.
 
@@ -47,6 +47,7 @@
 - **Key surfaces / files:** <!-- FILL IN: the files/dirs each slice touches. frontend writes the frontend surface; backend writes src/. Never the same file. -->
 - **Gate command:** <!-- FILL IN: one exact runnable command that proves the phase works — real LLM/API via .env keys, production DB driver (never SQLite-as-substitute). e.g. `uv run pytest tests/test_phase1.py` -->
 - **How the user tests it (handoff seed):** <!-- FILL IN: exact run command(s), what to click / look at, the expected result, and which parts are labelled stubs vs real. -->
+- **Cross-cutting Definition of Done (every slice):** README delta (applied serially after the parallel slices land) · a structured log line per new operation · error handling + timeout on each new external call · a real behaviour-asserting test · an incremental drift check — see harness/patterns/phases.md Horizontal Axis.
 
 ### Phase 2 — <!-- short name -->
 
@@ -57,6 +58,7 @@
 - **Key surfaces / files:** <!-- FILL IN -->
 - **Gate command:** <!-- FILL IN: exact runnable command, real LLM/API + production DB driver -->
 - **How the user tests it (handoff seed):** <!-- FILL IN -->
+- **Cross-cutting Definition of Done (every slice):** README delta (applied serially after the parallel slices land) · a structured log line per new operation · error handling + timeout on each new external call · a real behaviour-asserting test · an incremental drift check — see harness/patterns/phases.md Horizontal Axis.
 
-<!-- Repeat the per-phase block for every phase. -->
+<!-- Repeat the per-phase block (including the Definition of Done) for every phase. -->
 

@@ -72,13 +72,14 @@ Defaults when intake is silent:
 
 ## The phased plan (in `spec/roadmap.md` → `## Phases of Development`)
 
-Carve the work into phases, **Phase 1 and Phase 2 at minimum**. Per phase write:
+Phasing is **requirements-driven**: Phase 1 (the First Win) is mandatory; add as many further phases as the requirements need (at least one) — the count and names are derived from the spec, not a fixed ladder. Per phase write:
 
 - **Goal** — the one user-testable increment this phase delivers.
 - **Independent slices** — the parallel build units. **Default every slice independent** so agent-builder can fan out a generator per slice concurrently; mark any TRUE dependency explicitly (slice B needs slice A's output) so it serializes only where it must. **Prefer more, smaller disjoint slices over a few fat ones** — concurrency (and thus phase speed) scales with slice count up to the fan-out cap (~min(16, cores−2)). Split along natural file-path seams rather than bundling: e.g. `db-migration`, `api-routes`, `graph-node`, `frontend-components` as separate slices instead of one "backend" + one "frontend". Keep each slice on disjoint paths, and only collapse slices that genuinely can't be separated without a dependency.
 - **Key surfaces/files** — the files/components each slice owns.
 - **Gate** — an EXACT runnable command (e.g. `uv run pytest tests/phase1 -q`), not "tests pass". It runs against the **real LLM/API via `.env`** and the **production DB driver** — never a stub or SQLite substitute.
 - **How the user tests it** — the test-handoff seed: the run command, what to click/look at, the expected result, and which surfaces are labelled stubs vs real.
+- **Cross-cutting Definition of Done** — copy the DoD block VERBATIM into every phase block of `spec/roadmap.md` (README delta · observability log per new operation · error handling · a real test · drift). Observability, error-handling, README, and tests are **NEVER separate phases** — they ride the Horizontal axis in every slice (see `harness/patterns/phases.md`).
 
 ## Principles
 
@@ -99,6 +100,7 @@ Be your own adversarial reviewer — there is no second pair of eyes, so catch t
 - **Coherence** — vision, capabilities, data-model, architecture, and agent graph agree; each capability's inputs/outputs trace to entities in `data.md`; no capability references data that doesn't exist.
 - **Scope** — 2–4 capabilities for v1; **every capability maps to a phase**; anything failing the core-loop test is in a later phase, not Phase 1.
 - **Phase 1** — the SMALLEST first-time-right win, with the UI stubs planned and labelled, and the backend minimal-but-real on the one tested path.
+- **Cross-cutting DoD** — every phase block carries the Definition of Done (incl. README-updated-for-what-this-phase-added and observability); none of these is deferred to a final phase.
 - **Slices** — genuinely independent, or every true dependency marked, so generators can fan out concurrently.
 - **Gates** — every gate is a concrete runnable command against **real keys + the production DB**, not "tests pass".
 - **Agent graph** — if a framework is used, `agent.md` is complete (state/nodes/edges/error-handler/finalize/concurrency/assembly); an incomplete graph is a CRITICAL BLOCKER.

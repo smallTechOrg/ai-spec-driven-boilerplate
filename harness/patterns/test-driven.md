@@ -87,7 +87,7 @@ For every capability that processes a dataset:
 | Integration | fewer | 100s of ms | real DB and real LLM/API boundary (keys from `.env`) |
 | E2E / smoke | fewest | seconds | a real process, golden-path user journey |
 
-Push assertions **down** the pyramid: if a unit test can catch it, don't wait for the smoke test. The golden-path UI smoke test (Phase 2 gate) runs against the **live provider** and asserts **real response content**, not just status codes — a 200 that renders a broken or stub-looking page is a failing test.
+Push assertions **down** the pyramid: if a unit test can catch it, don't wait for the smoke test. The golden-path UI smoke test (the real-provider gate) runs against the **live provider** and asserts **real response content**, not just status codes — a 200 that renders a broken or stub-looking page is a failing test.
 
 ---
 

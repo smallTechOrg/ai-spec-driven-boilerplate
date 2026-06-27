@@ -20,7 +20,7 @@ These rules are never optional, never skipped, and must survive context compress
 
 5. **No SQLite substitute for PostgreSQL tests.** If the production database is PostgreSQL, tests run against PostgreSQL. Tests that only pass on SQLite do not count as passing.
 
-6. **Golden-path UI smoke test is mandatory before Phase 2 passes.** If the project has any UI or HTTP surface, Phase 2 must include an automated test that walks the full primary user journey end-to-end against the **real LLM/API** (keys from `.env`) via `TestClient` (or equivalent) and asserts **response content**, not just status codes. A build that returns 200 but renders a broken-looking page is a failing build. Edge-case and end-to-end coverage of the journey are required, not optional.
+6. **Golden-path UI smoke test is mandatory before the real-provider gate passes (the first phase whose core loop calls a live provider).** If the project has any UI or HTTP surface, that phase must include an automated test that walks the full primary user journey end-to-end against the **real LLM/API** (keys from `.env`) via `TestClient` (or equivalent) and asserts **response content**, not just status codes. A build that returns 200 but renders a broken-looking page is a failing build. Edge-case and end-to-end coverage of the journey are required, not optional.
 
 7. **Tests and evals run against the real LLM/API using keys loaded from `.env`.** There is no offline-passing requirement; real-key execution is the default and required path for every gate, against the production DB driver (never SQLite if production is PostgreSQL). A stub provider MAY exist as an optional local fallback when a key is genuinely absent, but it is never the gate. The quality bar is perfect, zero errors — edge-case, end-to-end, and UI tests are required, not optional. The gate must exercise the **hard, idiomatic inputs the capability promises** and push the **real LLM's hard outputs through every guard** on the user's path — not just one easy happy-path example (see `harness/patterns/test-driven.md` → "Gate Tests Must Cover the Capability's Hard Cases").
 
@@ -40,7 +40,7 @@ The real provider is the default and what every gate tests. A stub provider MAY 
 - If an active stub is ever used, signal it visibly in the UI so demo output is never mistaken for real output.
 - If implemented, its per-node outputs should be distinct (branch on injected node tags, never on prose keywords) and shaped like real output, so the fallback is not misleading.
 
-None of this is gated — the Phase 2 gate runs against real keys.
+None of this is gated — the real-provider gate runs against real keys.
 
 ---
 

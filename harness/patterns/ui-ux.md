@@ -70,7 +70,7 @@ A view that only handles state 4 is half-built.
 
 ## Verification
 
-The Phase 2 golden-path smoke test is a **live-server** test that runs against the **real provider** using keys from `.env`. It walks the **full primary user journey** and asserts on **real response content**, not status codes (`rules/ai-agents.md` rule 6, `patterns/phases.md`). Extend it to assert that:
+The real-provider golden-path smoke test is a **live-server** test that runs against the **real provider** using keys from `.env`. It walks the **full primary user journey** and asserts on **real response content**, not status codes (`rules/ai-agents.md` rule 6, `patterns/phases.md`). Extend it to assert that:
 
 - the live golden-path smoke runs against the real provider and asserts real response content,
 - the empty state renders its guidance copy,

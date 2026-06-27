@@ -137,7 +137,7 @@ def downgrade() -> None:
     ${downgrades if downgrades else "pass"}
 ```
 
-### Phase 1 alembic sequence (mandatory, in order)
+### DB-scaffold alembic sequence (the first phase that introduces the schema — mandatory, in order)
 
 All commands run from the **repo root** (where `alembic.ini` and `pyproject.toml` live).
 
@@ -152,7 +152,7 @@ uv run alembic upgrade head
 uv run alembic current
 ```
 
-**Phase 1 is not complete until `alembic current` shows a revision.** Blank output from `alembic current` means no migration was applied.
+**The DB-scaffold phase is not complete until `alembic current` shows a revision.** Blank output from `alembic current` means no migration was applied.
 
 ### config/settings.py
 
@@ -271,12 +271,12 @@ class AgentState(TypedDict, total=False):
     # add domain fields here
 ```
 
-### graph/nodes.py (Phase 1 placeholder shape)
+### graph/nodes.py (placeholder shape)
 
 ```python
 from <package>.graph.state import AgentState
 
-STUB_RESULT = {"stub": True}  # placeholder — replaced by real provider calls before the Phase 2 gate
+STUB_RESULT = {"stub": True}  # placeholder — replaced by real provider calls before the real-provider gate
 
 def fetch_data(state: AgentState) -> AgentState:
     return {**state, "data": STUB_RESULT}
@@ -468,4 +468,4 @@ def test_pipeline_runs_end_to_end(_isolated_db, _real_env):
 7. **LLM abstraction** — `LLMClient` wrapper, never call provider SDK directly in nodes
 8. **FastAPI response envelope** — every route returns `ok(data)` or raises `api_error()`
 9. **Settings singleton** must be resettable via `monkeypatch.setattr(m, "_settings", None)`
-10. **Phase 2 gate runs against real services** — tests and the golden-path smoke hit the real LLM/API using keys loaded from `.env` (requested at intake), against the production DB driver (never SQLite if production is PostgreSQL). A stub provider remains only as an optional fallback when a key is genuinely absent; offline-passing is no longer required, and real-key execution is the default and required path for the gate.
+10. **The real-provider gate runs against real services** — tests and the golden-path smoke hit the real LLM/API using keys loaded from `.env` (requested at intake), against the production DB driver (never SQLite if production is PostgreSQL). A stub provider remains only as an optional fallback when a key is genuinely absent; offline-passing is no longer required, and real-key execution is the default and required path for the gate.

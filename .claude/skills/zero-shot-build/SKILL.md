@@ -20,22 +20,26 @@ Intake runs in **two rounds**. Round 1 clarifies what the user wants. Round 2 co
 
 1. Acknowledge the idea in one sentence.
 2. Load the question tool: `ToolSearch` with query `select:AskUserQuestion`.
-3. Ask **exactly 4 questions** via `AskUserQuestion`, all `multiSelect: true` (users can always type "Other" for free text). These are product questions — no stack, no provider, no implementation detail:
-   - **Core capability** *(multiSelect, 4 options)* — what does the agent primarily do? Tailor options to the idea, covering the most likely interpretations. Examples: "Answer questions about data I upload", "Generate or transform content", "Automate a multi-step workflow", "Search and retrieve information".
-   - **Primary output** *(multiSelect, 4 options)* — what does it hand back to the user? Examples: "Text answers or summaries", "Charts or structured reports", "Files or documents", "Actions taken / notifications sent".
-   - **Who uses it and how** *(multiSelect, 4 options)* — usage pattern. Examples: "Just me, from a browser", "A small team, on demand", "End-users / customers", "An automated pipeline, no human in the loop".
-   - **Hard constraints** *(multiSelect, 4 options)* — non-negotiable limits. Always offer: "Data must stay local / no cloud uploads", "Must integrate with a specific external system", "Minimise paid API calls / cost-sensitive", "No hard constraints".
+3. Ask **exactly 4 questions** via `AskUserQuestion`, all `multiSelect: true`. Write questions and option labels in plain, friendly language — no technical jargon. These are product questions; no stack, provider, or implementation detail yet.
+
+   **Critical:** options must be derived from the user's stated idea — specific sub-variations of *their* goal, not abstract category labels. If the idea is "data analysis agent", don't ask "what should it do?" with generic buckets — ask "what kind of data?" and "what kind of analysis?". Read the idea, then write options the user will immediately recognise as being about their thing.
+
+   The four question *themes* (adapt the wording to the idea):
+   - **The input or subject matter** *(multiSelect, 4 options)* — what kind of data/content/domain will it work with? Make options concrete to the idea (e.g. for data analysis: "CSV or spreadsheet files", "A database I connect to", "Documents and PDFs", "Live data from an API").
+   - **The kind of output or insight** *(multiSelect, 4 options)* — what useful thing does it produce? Again, specific to the idea (e.g. "Plain-English answers to my questions", "Charts and visual summaries", "Downloadable reports", "Spotting patterns or anomalies automatically").
+   - **Who uses it and when** *(multiSelect, 4 options)* — usage pattern. Examples: "Just me, when I need it", "My team, on demand", "Our customers", "Runs automatically, no one drives it".
+   - **Any dealbreakers?** *(multiSelect, 4 options)* — non-negotiable limits. Always offer: "My data can't leave my machine", "It needs to connect to something I already use", "Keep costs low", "None — just build it well".
 
 ### Round 2 — What do we need to build it?
 
-4. Read the Round 1 answers. Identify any ambiguities that would block or derail Phase 1 if left unresolved. Load `AskUserQuestion` again if needed.
-5. Ask **Round 2** via `AskUserQuestion` — 3–4 questions total:
-   - **1 follow-up** derived from Round 1 answers only — things that were ambiguous or implied but unconfirmed (e.g. if they said "chat" → does it need to remember prior messages?; if they said "process files" → what formats?). Skip if Round 1 was unambiguous.
-   - **LLM provider** — offer: **Anthropic (API key)**, **Gemini (API key)**, **OpenRouter**, **Other**. (Drives which key the user sets and the default model.)
-   - **Stack** — language, database, hosting? ("no preference" → sensible defaults documented as assumptions.)
-   - **Output/trigger** — how is it invoked and what does it produce? (web UI, CLI, API, webhook, scheduled — and what format: text, JSON, file, notification.)
+4. Read the Round 1 answers. Identify any ambiguities that would cause the build to stall or make a wrong assumption. Load `AskUserQuestion` again if needed.
+5. Ask **Round 2** via `AskUserQuestion` — 3–4 questions total, written in friendly language. Only ask what is genuinely needed to build without interruption:
+   - **1 follow-up** from Round 1 only — something implied but unconfirmed. Keep it conversational (e.g. "You mentioned chat — should it remember what was said earlier in the conversation?"). Skip if Round 1 was clear.
+   - **Which AI should power it?** *(single-select — only one provider can be wired up)* — offer: "Claude by Anthropic", "Gemini by Google", "Any model via OpenRouter", "Something else — I'll tell you which". This drives which API key the user sets.
+   - **Any preference on how it's built?** *(multiSelect)* — offer: "Python", "TypeScript / JavaScript", "No preference — use sensible defaults", "Something specific — I'll say". Default to Python + SQLite if skipped.
+   - **How will you use it?** *(multiSelect)* — offer: "In a browser / web app", "From the command line", "Via an API or integration", "It runs automatically on a schedule".
 
-   Every Round 2 question must be a **build blocker** — something that, unanswered, would force a mid-phase pause or produce a wrong assumption. Do not ask nice-to-have clarifications here.
+   Every Round 2 question must be a genuine blocker — something that, unanswered, forces a wrong assumption or a mid-build pause. Do not ask nice-to-haves here.
 
 6. **API key** (the only manual user step). Read `.env` and check whether the key for the chosen provider is already set (non-empty): `AGENT_ANTHROPIC_API_KEY`, `AGENT_GEMINI_API_KEY`, or `AGENT_OPENROUTER_API_KEY` (for **Other**, ask which env var + base URL). If present and non-empty, skip silently. Only if missing or empty, tell the user to set it in `.env` (from `.env.example`) and wait for confirmation. Never echo, print, paste, or commit a secret value.
 7. Synthesize both rounds into a one-paragraph brief. ("Just build it" → narrow MVP, Python + SQLite defaults, documented as assumptions.)

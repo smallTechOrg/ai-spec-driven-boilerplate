@@ -40,7 +40,7 @@ Today these users either learn pandas/SQL, wait on an analyst, or fight with spr
 - **Conversation cap:** a session is limited to 20 turns.
 - **Context note cap:** dataset context notes ≤ 4000 chars; compressed facts ≤ 20 per scope.
 
-> **Assumed:** Default Gemini model is `gemini-3.1-flash-lite` (per source). It MUST be verified against the real API at the Phase 2/3 real-key gate; on a 404 (model not found) fall back to a known-good model (`gemini-2.5-flash`, the current skeleton default) and record the chosen model in `spec/architecture.md` (`## Stack`) and `README.md`. See `architecture.md` → LLM provider design.
+> **Model:** `gemini-3.1-flash-lite` — verified at the Phase 2/3 real-key gate (no fallback needed). Recorded in README and `spec/architecture.md` → LLM provider design.
 
 > **Assumed:** The source capability list (C1–C32) has no **C28** — it skips from C27 to C29. This is treated as an intentional gap in the source's numbering, not a missing capability. We preserve the source's IDs verbatim (no renumber) and document the gap in `spec/capabilities/index.md`. No `C28` file is created.
 

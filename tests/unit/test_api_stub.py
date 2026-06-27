@@ -407,3 +407,79 @@ def test_peek_columns_falls_back_to_csv(tmp_path):
         runner._uploads_dir = original_uploads_dir
 
     assert cols == ["csv_only_col"]
+
+
+# --- D1: DELETE /datasets/{id} returns 409 when a run is running --------
+
+
+def test_delete_dataset_with_running_run_returns_409(api_client, _isolated_db):
+    """Fix A (D1): DELETE must return 409 `dataset_in_use` when a run is running."""
+    from sqlalchemy.orm import sessionmaker
+    from db.models import QueryRunRow
+
+    # Upload a dataset and run /ask on it (stub; completes OK).
+    up = _upload_csv(api_client)
+    assert up.status_code == 200, up.text
+    dataset_id = up.json()["data"]["dataset_id"]
+
+    ask = api_client.post("/ask", json={"dataset_id": dataset_id, "question": "describe it"})
+    assert ask.status_code == 200, ask.text
+    run_id = ask.json()["data"]["run_id"]
+
+    # Patch the completed run to status="running" using the isolated DB engine.
+    Session = sessionmaker(bind=_isolated_db, autoflush=False, autocommit=False)
+    with Session() as db_session:
+        run_row = db_session.get(QueryRunRow, run_id)
+        assert run_row is not None, "Run row missing after /ask"
+        run_row.status = "running"
+        db_session.commit()
+
+    # DELETE should now fail with 409.
+    r = api_client.delete(f"/datasets/{dataset_id}")
+    assert r.status_code == 409, r.text
+    detail = r.json()["detail"]
+    assert detail["code"] == "dataset_in_use"
+
+
+# --- D2: _delete_one cascades runs listed in dataset_ids_json -----------
+
+
+def test_delete_dataset_cascades_runs_via_dataset_ids_json(api_client, _isolated_db):
+    """Fix B (D2): deleting a secondary dataset also removes runs in dataset_ids_json."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import sessionmaker
+    from db.models import QueryRunRow
+
+    # Upload two datasets.
+    up_a = _upload_csv(api_client, name="a.csv")
+    assert up_a.status_code == 200, up_a.text
+    a_id = up_a.json()["data"]["dataset_id"]
+
+    up_b = _upload_csv(api_client, name="b.csv", body="x,y\n1,2\n3,4\n")
+    assert up_b.status_code == 200, up_b.text
+    b_id = up_b.json()["data"]["dataset_id"]
+
+    # Run /ask with both dataset ids — this run references B as a secondary.
+    ask = api_client.post(
+        "/ask", json={"dataset_ids": [a_id, b_id], "question": "compare them"}
+    )
+    assert ask.status_code == 200, ask.text
+    run_id = ask.json()["data"]["run_id"]
+
+    # Confirm the run was written and completed.
+    Session = sessionmaker(bind=_isolated_db, autoflush=False, autocommit=False)
+    with Session() as db_session:
+        run_row = db_session.get(QueryRunRow, run_id)
+        assert run_row is not None, "Run row missing after /ask"
+
+    # Delete dataset B (the secondary participant).
+    r = api_client.delete(f"/datasets/{b_id}")
+    assert r.status_code == 200, r.text
+
+    # The run referencing B must now be gone from the DB.
+    with Session() as db_session:
+        orphaned = db_session.get(QueryRunRow, run_id)
+        assert orphaned is None, (
+            f"Run {run_id} still present after deleting dataset B "
+            "(dataset_ids_json cascade missed it)"
+        )

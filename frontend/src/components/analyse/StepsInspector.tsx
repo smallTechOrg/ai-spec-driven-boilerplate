@@ -3,6 +3,25 @@
 import { useState } from 'react'
 import type { AskStep } from '@/lib/api'
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      className="rounded px-1.5 py-0.5 text-[10px] font-medium text-gray-400 hover:bg-gray-700 hover:text-gray-100"
+    >
+      {copied ? 'Copied!' : 'Copy'}
+    </button>
+  )
+}
+
 const RESULT_PREVIEW_CHARS = 3000
 
 function StepResult({ text, isError }: { text: string; isError: boolean }) {
@@ -65,21 +84,23 @@ export function StepsInspector({ steps }: { steps: AskStep[] }) {
         <ol className="mt-2 space-y-2" aria-label="Agent steps">
           {steps.map((step, i) => (
             <li key={i} className="rounded-md border border-gray-200">
-              <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-2 py-1">
-                <span className="text-[11px] font-medium text-gray-500">
-                  Step {i + 1}
-                </span>
-                {step.is_error && (
-                  <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
-                    Error
-                  </span>
-                )}
+              {/* Action — dark code block with inline header */}
+              <div className="overflow-hidden rounded-t-md bg-gray-900">
+                <div className="flex items-center justify-between border-b border-gray-700 px-3 py-1">
+                  <span className="text-[11px] font-medium text-gray-400">Step {i + 1}</span>
+                  <div className="flex items-center gap-1.5">
+                    {step.is_error && (
+                      <span className="rounded bg-red-900 px-1.5 py-0.5 text-[10px] font-semibold text-red-300">
+                        Error
+                      </span>
+                    )}
+                    <CopyButton text={step.action} />
+                  </div>
+                </div>
+                <pre className="overflow-x-auto px-3 py-2 font-mono text-[11px] leading-relaxed text-gray-100">
+                  <code>{step.action}</code>
+                </pre>
               </div>
-
-              {/* Action — dark code block */}
-              <pre className="overflow-x-auto bg-gray-900 px-3 py-2 font-mono text-[11px] leading-relaxed text-gray-100">
-                <code>{step.action}</code>
-              </pre>
 
               {/* Result / error text — guarded against large frame output */}
               {step.result && (

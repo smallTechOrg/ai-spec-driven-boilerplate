@@ -492,6 +492,7 @@ function TurnView({
               answer={turn.answer}
               collapsible={collapsible}
               onCollapse={collapsible ? onToggle : undefined}
+              question={turn.question}
             />
           )
         ) : null}
@@ -525,10 +526,12 @@ function AnswerView({
   answer,
   collapsible,
   onCollapse,
+  question,
 }: {
   answer: AskResponse
   collapsible: boolean
   onCollapse?: () => void
+  question: string
 }) {
   const markdown = answer.answer_markdown ?? ''
   const steps: AskStep[] = answer.steps ?? []
@@ -542,16 +545,25 @@ function AnswerView({
             </span>
           )}
         </div>
-        {collapsible && onCollapse && (
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={onCollapse}
-            aria-expanded="true"
+            onClick={() => exportMarkdown(markdown, question)}
             className="shrink-0 text-[11px] font-medium text-gray-400 hover:text-gray-700"
           >
-            collapse
+            Export MD
           </button>
-        )}
+          {collapsible && onCollapse && (
+            <button
+              type="button"
+              onClick={onCollapse}
+              aria-expanded="true"
+              className="shrink-0 text-[11px] font-medium text-gray-400 hover:text-gray-700"
+            >
+              collapse
+            </button>
+          )}
+        </div>
       </div>
 
       <Markdown>{markdown}</Markdown>
@@ -589,6 +601,18 @@ function AnswerView({
       <StepsInspector steps={steps} />
     </div>
   )
+}
+
+/** Download the answer as a Markdown file. */
+function exportMarkdown(markdown: string, question: string) {
+  const slug = question.slice(0, 40).replace(/[^a-z0-9]+/gi, '-').toLowerCase()
+  const blob = new Blob([markdown], { type: 'text/markdown' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `answer-${slug || 'export'}.md`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 /** First line / sentence of the answer, trimmed for a collapsed preview. */

@@ -65,7 +65,7 @@ This design **extends the existing skeleton in place** — the flat `src/` packa
 
 - **Language:** Python 3.12+ (backend) · TypeScript / React 19 (frontend).
 - **Agent framework:** LangGraph `StateGraph` (ReAct loop). No LangChain.
-- **LLM provider + model:** Google Gemini via `google-genai`; default model `gemini-3.1-flash-lite` (verify at the P2/P3 real-key gate; fall back to `gemini-2.5-flash` on 404 and record the choice here + in README). Alternate provider: OpenRouter. Offline fallback: stub.
+- **LLM provider + model:** Google Gemini via `google-genai`; default model `gemini-3.1-flash-lite` (**verified at Phase 2/3 gate**; recorded in README). Alternate provider: OpenRouter. Offline fallback: stub.
 - **Backend:** FastAPI + uvicorn, single-origin serving the built Next.js app on port 8001.
 - **Database + ORM:** SQLite + SQLAlchemy 2.0 (declarative `Mapped`), Alembic migrations. SQLite is the **production** DB for this single-user local app.
 - **Frontend:** Next.js 15 + React 19 (existing `frontend/`), static-exported to `frontend/out/` and mounted at `/app`.
@@ -115,7 +115,7 @@ This design **extends the existing skeleton in place** — the flat `src/` packa
 - `provider = settings.llm_provider`; if blank, auto-detect: `anthropic_api_key` → `anthropic`; else `gemini_api_key` → `gemini`; else `openrouter_api_key` → `openrouter`; else `stub`. Explicit `stub` always selects the stub. Anthropic is checked first when its key is set (it predates Gemini in the codebase and is retained as a first-class provider).
 - Each provider implements `call_model(prompt, *, system=None) -> str`. A `base.py` Protocol documents the contract. `LLMClient` also exposes the resolved `provider` name (so `/health` and the UI can show the stub banner) and token counts where the SDK reports them.
 - **Stub provider** branches **only on injected node tags** in the prompt (never on prose): `<node:finalize>` → canned best-effort summary; `<node:select>` → first dataset id in the schema block as a 1-element JSON array; `<node:plan>` → 1st call returns `df.describe().to_string()`, later calls return a `FINAL ANSWER:` Markdown summary (iteration inferred from `Result:`/`Error:` markers so repeated calls differ); a `<node:plan>` tag missing → `FINAL ANSWER: [stub] Unable to process`. See `spec/agent.md` for the exact tags and node behavior.
-- **Model verification:** at the P2/P3 real-key gate, confirm `gemini-3.1-flash-lite` resolves against the real API. On a 404 model-not-found, fall back to `gemini-2.5-flash` (the skeleton default) and record the chosen model here and in README. This is documented, not silent.
+- **Model verification:** `gemini-3.1-flash-lite` was verified at the Phase 2/3 real-key gate — it resolves against the Gemini API and is the confirmed model in use. It is recorded in `README.md`. No fallback was needed.
 
 ## Single-Origin Serving
 

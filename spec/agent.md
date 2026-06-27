@@ -22,7 +22,7 @@
 
 | Agent / Node | Provider | Model ID | Rationale |
 |-------------|----------|----------|-----------|
-| `plan_action` (per-iteration reasoning) | Gemini | `gemini-3.1-flash-lite` (→ `gemini-2.5-flash` on 404) | Cheapest fast model that follows the ReAct format; called every iteration, so latency/cost dominate. |
+| `plan_action` (per-iteration reasoning) | Gemini | `gemini-3.1-flash-lite` (**verified at Phase 2/3 gate**) | Cheapest fast model that follows the ReAct format; called every iteration, so latency/cost dominate. |
 | `force_finalize` (synthesis) | Gemini | same | One synthesis call; quality-over-cost but the same model is sufficient. |
 | `check_clarification` (C26), `select_datasets` (C19), `generate_suggestions`, `generate_dataset_notes` (C30), `extract_facts` (C31) | Gemini | same | Single-shot helpers outside the graph; same model via `LLMClient`. |
 
@@ -80,6 +80,8 @@ class AgentState(TypedDict, total=False):
     # Control
     error: str | None                    # set by any node on fatal failure → handle_error
     status: str                          # running | completed | failed
+    error_message: str | None            # informational: "max_iterations" | "consecutive_errors" (set by force_finalize) or the fatal error string (set by handle_error); persisted to query_runs
+    max_iterations: int                  # iteration cap for this run (from settings.max_iterations or the /ask override)
 ```
 
 This replaces the skeleton's 4-field `AgentState`. `TypedDict, total=False` per skeleton convention (not dataclass/Pydantic).

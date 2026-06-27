@@ -85,7 +85,7 @@ Session + `turns[]` (each turn carries `prompt_breakdown`). **404** missing.
 Rename. **404** missing.
 
 ### `DELETE /sessions/{id}` and `DELETE /sessions`
-Delete one / all sessions.
+Delete one / all sessions. **Does NOT cascade to `query_runs`** — run history is owned by the dataset, not the session; runs remain queryable after their session is deleted. Only the `conversation_sessions` row(s) are removed.
 
 ### `GET /runs/current`
 Most recent run `{run_id, status, iteration_count, max_iterations}` (status `idle` when none). Used for live progress polling (~1/s). Always 200.

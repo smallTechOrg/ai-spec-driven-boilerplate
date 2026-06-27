@@ -374,19 +374,26 @@ def _delete_one(session: Session, dataset_id: str) -> int:
     Returns the number of query_run rows removed. C15 requires the cascade to also
     remove every `conversation_sessions` row that references this dataset (via its
     `dataset_id` column or its `dataset_ids_json` list) so no session is orphaned.
+
+    Fix B (D2): match BOTH the primary dataset_id column AND the dataset_ids_json
+    list so multi-dataset runs that reference this dataset as a secondary participant
+    are also cleaned up.
     """
     row = session.get(DatasetRow, dataset_id)
     if row is None:
         return 0
     _delete_files(row)
-    runs = session.execute(
-        select(QueryRunRow).where(QueryRunRow.dataset_id == dataset_id)
-    ).scalars().all()
-    for r in runs:
+    all_runs = session.execute(select(QueryRunRow)).scalars().all()
+    runs_to_delete = [
+        r for r in all_runs
+        if r.dataset_id == dataset_id
+        or dataset_id in (r.dataset_ids_json or [])
+    ]
+    for r in runs_to_delete:
         session.delete(r)
     _delete_sessions_referencing(session, dataset_id)
     session.delete(row)
-    return len(runs)
+    return len(runs_to_delete)
 
 
 @router.delete("/datasets/{dataset_id}")
@@ -394,6 +401,19 @@ def delete_dataset(dataset_id: str, session: Session = Depends(get_session)) -> 
     row = session.get(DatasetRow, dataset_id)
     if row is None:
         raise api_error("not_found", f"Dataset {dataset_id} not found", 404)
+
+    # Fix A (D1): reject the delete while any run referencing this dataset is
+    # still running. A run "references" the dataset via its primary dataset_id
+    # column OR via the dataset_ids_json multi-dataset list.
+    all_runs = session.execute(select(QueryRunRow)).scalars().all()
+    for r in all_runs:
+        if r.dataset_id == dataset_id or dataset_id in (r.dataset_ids_json or []):
+            if r.status == "running":
+                raise api_error(
+                    "dataset_in_use",
+                    "Dataset is currently being analyzed — retry after the run completes.",
+                    409,
+                )
 
     # C15 recursive cascade: delete every transitive derived child first, then
     # the target — each one's files + its query_runs.

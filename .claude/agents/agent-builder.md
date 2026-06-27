@@ -77,13 +77,12 @@ For the phase named in your invocation (Phase 1 on the first invocation; the nex
 
 ## Stage 4 — Publish the test-handoff and STOP
 
-After the phase gate is VERIFIED and committed, **return a concise PHASE TEST-HANDOFF to the skill and STOP** — do not start the next phase, do not ask the user. The handoff is the build record's user-facing artefact. The user must never run a terminal command to test — the only manual user steps are putting secrets in `.env` and interacting with the app. So the handoff is **link-first**, and contains:
+After the phase gate is VERIFIED and committed, **launch the server and return a PHASE TEST-HANDOFF to the skill and STOP** — do not start the next phase, do not ask the user. Launch sequence (single-origin model): build frontend (`cd frontend && pnpm build`), run migrations (`cd .. && uv run alembic upgrade head`), start server (`uv run python -m src` with `run_in_background: true`) — start from the **project root** (not `frontend/`). Verify it's up: curl the live URL and confirm 200 AND styled (CSS utilities present). The user must never run a terminal command to test. The handoff is the build record's user-facing artefact and is **phase release notes**, link-first:
 
-- the **live URL** the user opens (e.g. `http://localhost:8001/app/`) — the skill keeps the app running, so frame this as "open this", not "run this";
-- what to test / what to click / what to look at;
-- the expected result;
-- which parts are **labelled stubs** vs **real**;
-- the run command(s) **for the record / README only** (so the build is reproducible), clearly marked as not something the user must run to test;
+- the **live URL** the user opens (e.g. `http://localhost:8001/app/`) — frame as "open this";
+- **what was built this phase** — one line per capability delivered;
+- what to click / type / look at, and the expected result;
+- which parts are **clearly-labelled stubs** vs **real** (a stub must never read as a bug);
 - what the next phase will add.
 
 The skill (root session) runs the human testing gate with this handoff. If the user reports an issue, the skill routes it back through qa-auditor + the right generator before re-presenting; on approval the skill re-invokes you for the next phase, passing the user's feedback.
@@ -98,7 +97,7 @@ The build record is git history (`phase-N:` commits) + the PR body + the publish
 ## Handoff contract
 
 - **Receives:** the one-paragraph intake brief + the filled `.env` (first invocation), or "build Phase N" + the user's feedback from the prior gate (each later invocation), from the `/zero-shot-build` skill.
-- **Returns to the skill:** the **PHASE TEST-HANDOFF** (link-first: the live URL to open, what to test, expected result, stubs vs real, run commands for the record only, what's next) + the PR link. You do NOT ask the user — the skill runs the gate and keeps the app serving.
+- **Returns to the skill:** the **PHASE TEST-HANDOFF** (phase release notes: live URL you already launched and verified, what was built, what to test, expected result, stubs vs real, what's next) + the PR link. You do NOT ask the user — the skill runs the gate.
 - **Delegates to:** spec-writer (design, first invocation), code-generator instances (per-slice build, in parallel), qa-auditor (per-slice gate + final drift). Git/PR is yours.
 
 ## Failure modes to avoid

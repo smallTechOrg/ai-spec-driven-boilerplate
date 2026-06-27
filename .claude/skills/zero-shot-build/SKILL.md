@@ -20,11 +20,11 @@ Intake runs in **two rounds**. Round 1 clarifies what the user wants. Round 2 co
 
 1. Acknowledge the idea in one sentence.
 2. Load the question tool: `ToolSearch` with query `select:AskUserQuestion`.
-3. Ask **exactly 4 questions** via `AskUserQuestion`, all multi-choice (users can always type "Other" for free text). These are product questions — no stack, no provider, no implementation detail:
-   - **Core capability** *(single-select, 4 options)* — what does the agent primarily do? Tailor options to the idea, covering the most likely interpretations. Examples: "Answer questions about data I upload", "Generate or transform content", "Automate a multi-step workflow", "Search and retrieve information".
-   - **Primary output** *(single-select, 4 options)* — what does it hand back to the user? Examples: "Text answers or summaries", "Charts or structured reports", "Files or documents", "Actions taken / notifications sent".
-   - **Who uses it and how** *(single-select, 4 options)* — usage pattern. Examples: "Just me, from a browser", "A small team, on demand", "End-users / customers", "An automated pipeline, no human in the loop".
-   - **Hard constraints** *(multiSelect: true, 4 options)* — non-negotiable limits. Always offer: "Data must stay local / no cloud uploads", "Must integrate with a specific external system", "Minimise paid API calls / cost-sensitive", "No hard constraints".
+3. Ask **exactly 4 questions** via `AskUserQuestion`, all `multiSelect: true` (users can always type "Other" for free text). These are product questions — no stack, no provider, no implementation detail:
+   - **Core capability** *(multiSelect, 4 options)* — what does the agent primarily do? Tailor options to the idea, covering the most likely interpretations. Examples: "Answer questions about data I upload", "Generate or transform content", "Automate a multi-step workflow", "Search and retrieve information".
+   - **Primary output** *(multiSelect, 4 options)* — what does it hand back to the user? Examples: "Text answers or summaries", "Charts or structured reports", "Files or documents", "Actions taken / notifications sent".
+   - **Who uses it and how** *(multiSelect, 4 options)* — usage pattern. Examples: "Just me, from a browser", "A small team, on demand", "End-users / customers", "An automated pipeline, no human in the loop".
+   - **Hard constraints** *(multiSelect, 4 options)* — non-negotiable limits. Always offer: "Data must stay local / no cloud uploads", "Must integrate with a specific external system", "Minimise paid API calls / cost-sensitive", "No hard constraints".
 
 ### Round 2 — What do we need to build it?
 

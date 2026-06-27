@@ -19,7 +19,7 @@ Reason: port 8000 is commonly occupied by other local services (FastAPI apps, Dj
 When the frontend is a **Next.js static export served by the backend** (the skeleton's model: `output: 'export'`, `basePath: '/app'`, mounted by FastAPI at `/app`), three things are mandatory — each was a real first-build failure:
 
 - **Single-origin is the canonical run + test path.** The user (and the gate) runs **one** server: `cd frontend && pnpm build` → `uv run python -m src`, then opens **`http://localhost:8001/app/`** (note the port `8001`, the `/app/`, and the trailing slash). Do **not** hand the user the two-server `pnpm dev` (`:3000`) flow as the test path — with `basePath: '/app'`, `localhost:3000/` 404s and the API origin differs, which reads as "nothing loads". `pnpm dev` is for inner-loop dev only.
-- **Tailwind v4 needs a PostCSS config.** Ship `frontend/postcss.config.mjs` with `{ plugins: { '@tailwindcss/postcss': {} } }`. Without it Next inlines `@import "tailwindcss"` but never runs Tailwind's generate step: the built CSS passes through a literal `@tailwind utilities` and ships **zero utility classes**, so the UI renders as unstyled "barebones HTML" while the build still succeeds. A clean build is **not** proof of styling.
+- **Tailwind v4 requires `postcss.config.mjs` (plugin: `@tailwindcss/postcss`) and `@source "../";` in the global CSS file.** Without both, the built CSS has no utility classes — the UI renders unstyled even though the build exits 0. **Code-generators must never replace or omit these two files** — extend `globals.css` below the `@source` line, never overwrite the first two lines. The gate must verify the built CSS contains real utility selectors, not just check HTTP 200.
 - **Node-version safety.** Node ≥25 exposes a broken global `localStorage` unless `--localstorage-file` is set, which crashes Next SSR (`localStorage.getItem is not a function` → every page 500s). The frontend `dev`/`build`/`start` scripts must carry `NODE_OPTIONS=--no-experimental-webstorage` (or the project must pin a supported Node LTS via `.nvmrc`/`engines`).
 
 ## LLM Model Name Rule
@@ -36,7 +36,7 @@ Current safe defaults (as of 2026):
 |----------|---------------|-------|
 | Anthropic | `claude-sonnet-4-6` | matches `.env.example`; verify against current docs before pinning |
 | OpenRouter | `anthropic/claude-sonnet-4-6` | provider-prefixed; routes to the underlying model |
-| Google Gemini | `gemini-2.5-flash` | `gemini-2.0-flash` and `gemini-1.5-flash` are unavailable for new users |
+| Google Gemini | `gemini-2.5-flash` | fast default tier; `gemini-2.5-pro` adds ~20s latency per call (reverted in a real build) — pick `flash` unless a node needs deep reasoning. `gemini-2.0-flash`/`gemini-1.5-flash` are unavailable for new users |
 | OpenAI | `gpt-4o-mini` | |
 
 ## DB Driver Rule

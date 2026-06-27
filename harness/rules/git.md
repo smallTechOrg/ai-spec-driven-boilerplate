@@ -6,11 +6,11 @@ All git rules that apply to every Claude Code session in this repo.
 
 ## Branch Model
 
-- **`main` is boilerplate-only.** Never commit application code to `main`. All application code lives on a named feature branch and reaches `main` only via a reviewed pull request.
-- Before writing any application code, create a feature branch: `git checkout -b feature/<slug>-v0.1`
+- **`main` is boilerplate-only.** Never commit application code to `main`. Only spec/harness/boilerplate improvements (no app code) reach `main`, via a reviewed PR.
+- **Branch the build from the CURRENT HEAD, not from `main`.** Confirm where you are first (`git rev-parse --abbrev-ref HEAD`) — call it `<base>` — then `git checkout -b feature/<slug>-v0.1` from there; never `git checkout main` first. A build dogfoods the harness version on the branch you are on (e.g. `v1`, `v0.3.x`); the feature branch must sit on top of THAT harness, because `main` may carry an older one. Branching from `main` would silently test the wrong (stale) harness.
+- **The build's PR targets `<base>` (the branch it was cut from), NOT `main`.** Open it with `--base <base>` so the PR shows only the generated app — isolated from the harness deltas already on `<base>` — and the dogfood output never lands on `main`. (`main` only ever receives harness/boilerplate PRs, e.g. a `vN → main` PR; a build's app code is never merged to `main`.)
 - All phase commits go to the feature branch, never to `main`
-- Spec, harness, and boilerplate improvements (no app code) are the only commits that may go directly to `main`
-- When the build is complete, open a PR from the feature branch into `main` — do not merge locally
+- When the build is complete, open the PR from the feature branch into `<base>` — do not merge locally
 - If you find yourself on `main` while writing application code, stop immediately, create the feature branch, and continue there
 
 ---
@@ -29,10 +29,13 @@ A commit that is not pushed does not exist as far as the project is concerned. T
 
 ## PR Must Exist Before the First Feature-Branch Commit
 
-After creating the feature branch and pushing the first commit, immediately open a PR:
+After creating the feature branch and pushing the first commit, immediately open a PR — based on `<base>` (the branch you cut from, captured at branch time), not `main`:
 
 ```bash
-gh pr create --base main --head feature/<slug>-v0.1
+base=$(git rev-parse --abbrev-ref HEAD)   # BEFORE checkout -b — this is <base>
+git checkout -b feature/<slug>-v0.1
+# ... first commit + push ...
+gh pr create --base "$base" --head feature/<slug>-v0.1
 ```
 
 Every subsequent `git push` automatically updates the same PR. Pushing commits without an open PR is equivalent to committing without pushing: the work is invisible and unreviewable.

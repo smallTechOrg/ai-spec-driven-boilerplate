@@ -66,10 +66,10 @@ These are the entry points. All are manual (`disable-model-invocation: true`). E
 
 ## The skeleton in `src/`
 
-`src/agent/` is the **opinionated baseline** — a working FastAPI + LangGraph + SQLite + Anthropic agent whose capability slot is `transform_text`. Tests pass out of the box. Generators extend this in place — they never copy or rename. The capability slot is:
+`src/` is the **opinionated baseline** — a working FastAPI + LangGraph + SQLite + Anthropic agent whose capability slot is `transform_text`. Tests pass out of the box. Generators extend this in place — they never copy or rename. The capability slot is:
 
-- `src/agent/graph/nodes.py` — `transform_text` node → replace with your capability logic
-- `src/agent/prompts/transform.md` → replace with your system prompt
+- `src/graph/nodes.py` — `transform_text` node → replace with your capability logic
+- `src/prompts/transform.md` → replace with your system prompt
 - `frontend/src/app/page.tsx` → replace the transform form with your UI
 
 Everything else (graph structure, runner, API, DB session, settings, test fixtures) is already wired and tested — do not change it unless the spec requires it.

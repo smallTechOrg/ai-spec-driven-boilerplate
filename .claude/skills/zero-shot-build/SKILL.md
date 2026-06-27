@@ -12,32 +12,44 @@ You run the human channel — intake, then the testing gate at every phase bound
 
 ## Stage 1 — Intake (the only interactive setup step)
 
-Intake runs in **two rounds**. Round 1 clarifies what the user wants. Round 2 collects the technical choices needed to build without interruption. Both rounds use `AskUserQuestion`; the API key prompt is the only additional manual step. Aim for a **tight scope** — Phase 1 should be the smallest user-testable **quick win**, not "complete".
+Intake runs in **three rounds**. Rounds 1 and 2 are about the idea — what to build and how it should behave. Round 3 collects the technical choices needed to build without interruption. The more specific the user is, the better — it lets you pick the *right* one core path for Phase 1. All rounds use `AskUserQuestion`; the API key prompt is the only additional manual step. **Aim for a tight scope: Phase 1 is the smallest user-testable quick win that works first time, not "complete"** — the richer intake sharpens *which* slice to build first, it does not license a bigger Phase 1.
 
 **Precondition: you already have the user's idea as their own free text** (from `$ARGUMENTS` or the plain-text prompt above). Never use `AskUserQuestion` to generate or propose the idea itself.
 
-### Round 1 — What do they want?
+### Round 1 — What is the idea?
 
 1. Acknowledge the idea in one sentence.
 2. Load the question tool: `ToolSearch` with query `select:AskUserQuestion`.
-3. Ask **Round 1** via `AskUserQuestion` — product-focused, 3–4 questions:
-   - **MVP scope** — what's the minimum that makes this useful? Push for the smallest first win.
-   - **Core behaviour** — what does a successful interaction look like? What does the user do and what does the agent return?
-   - **Key constraints** *(multiSelect: true)* — hard no's, compliance, systems to integrate, non-negotiable behaviours.
+3. Ask **4 questions** via `AskUserQuestion`, all `multiSelect: true`. Plain, friendly language — no technical jargon. Pure product questions.
 
-### Round 2 — What do we need to build it?
+   **Every question and every option must be specific to this idea** — not generic category labels. Read what the user wrote, then write questions and options they will instantly recognise as being about *their* thing. If the idea is "email triage agent", don't ask "what kind of input?" with generic buckets — ask "what makes an email urgent?" with options like "It's from my boss", "It has a deadline", "It mentions a specific project". Think like a product designer, not a requirements collector.
 
-4. Read the Round 1 answers. Identify any ambiguities that would block or derail Phase 1 if left unresolved. Load `AskUserQuestion` again if needed.
-5. Ask **Round 2** via `AskUserQuestion` — 3–4 questions total:
-   - **1 follow-up** derived from Round 1 answers only — things that were ambiguous or implied but unconfirmed (e.g. if they said "chat" → does it need to remember prior messages?; if they said "process files" → what formats?). Skip if Round 1 was unambiguous.
-   - **LLM provider** — offer: **Anthropic (API key)**, **Gemini (API key)**, **OpenRouter**, **Other**. (Drives which key the user sets and the default model.)
-   - **Stack** — language, database, hosting? ("no preference" → sensible defaults documented as assumptions.)
-   - **Output/trigger** — how is it invoked and what does it produce? (web UI, CLI, API, webhook, scheduled — and what format: text, JSON, file, notification.)
+   Four themes to cover (adapt wording and options to the idea):
+   - **What it works on** *(4 idea-specific options)* — the data, content, or domain. Be concrete: not "documents" but "emails from my inbox", "CSV exports from our CRM", "Slack threads".
+   - **What it produces** *(4 idea-specific options)* — the output or action. Be concrete: not "a summary" but "a one-line verdict I can forward", "a ranked list with reasons", "a draft reply ready to send".
+   - **The usage pattern** *(4 options)* — who uses it, how often, in what context. E.g. "Just me, a few times a day", "My whole team, whenever something comes in", "Runs automatically in the background", "Our customers use it directly".
+   - **Non-negotiables** *(4 options)* — always offer: "My data can't leave my machine", "It must connect to [something they mentioned]", "Keep costs very low", "None — just build it well".
 
-   Every Round 2 question must be a **build blocker** — something that, unanswered, would force a mid-phase pause or produce a wrong assumption. Do not ask nice-to-have clarifications here.
+### Round 2 — Deeper on the idea
 
-6. **API key** (the only manual user step). Read `.env` and check whether the key for the chosen provider is already set (non-empty): `AGENT_ANTHROPIC_API_KEY`, `AGENT_GEMINI_API_KEY`, or `AGENT_OPENROUTER_API_KEY` (for **Other**, ask which env var + base URL). If present and non-empty, skip silently. Only if missing or empty, tell the user to set it in `.env` (from `.env.example`) and wait for confirmation. Never echo, print, paste, or commit a secret value.
-7. Synthesize both rounds into a one-paragraph brief. ("Just build it" → narrow MVP, Python + SQLite defaults, documented as assumptions.)
+4. Read Round 1 answers carefully. Identify the 3–4 most important gaps or interesting tensions in what they selected — things that, unresolved, would force a wrong product decision in Phase 1.
+5. Load `AskUserQuestion` again. Ask **3–4 follow-up questions** that dig into the specifics of *what they want*, still no technical questions yet:
+   - Each question should surface a concrete product choice that affects the Phase 1 design. E.g. if they said "draft reply ready to send" → "How much should it change the tone? Keep it exactly as I'd write it / Make it more professional / I'll tell you per-reply". If they said "runs automatically" → "What should trigger it? New email arrives / I hit a button / On a schedule / Something else".
+   - If Round 1 answers were very sparse (mostly "None" or single selections with no strong signal), ask broader questions to uncover the actual use case before going technical.
+   - If Round 1 was detailed and specific, ask tighter follow-ups that resolve the most interesting edge cases.
+
+   **Skip a question if Round 1 already answered it.** Do not ask for information you already have.
+
+### Round 3 — What do we need to build it?
+
+6. Read both idea rounds. Now ask the **technical build questions** — 3–4 total, only genuine blockers:
+   - **LLM provider** *(single-select)* — offer: **Anthropic (API key)**, **Gemini (API key)**, **OpenRouter**, **Other**. This drives which key the user sets.
+   - **Stack preference** — language, database? ("No preference" → Python + SQLite defaults, documented as assumptions.)
+   - **How will they access it?** — web UI, CLI, API, scheduled job. Drives whether to build a frontend.
+   - **1 follow-up** from the idea rounds only if something would force a mid-build pause — skip if everything is clear.
+
+7. **API key** (the only manual user step). Read `.env` and check whether the key for the chosen provider is already set (non-empty): `AGENT_ANTHROPIC_API_KEY`, `AGENT_GEMINI_API_KEY`, or `AGENT_OPENROUTER_API_KEY` (for **Other**, ask which env var + base URL). If present and non-empty, skip silently. Only if missing or empty, tell the user to set it in `.env` (from `.env.example`) and wait for confirmation. Never echo, print, paste, or commit a secret value.
+8. Synthesize all three rounds into a one-paragraph brief. ("Just build it" → narrow MVP, Python + SQLite defaults, documented as assumptions.)
 
 ## Stage 2 — Design + scaffold + build Phase 1 (delegate)
 
@@ -51,13 +63,13 @@ Relay only the hard blockers it escalates (e.g. a required key still missing fro
 
 ## Stage 3 — Human testing gate (you own the human channel)
 
-Phase 1 is the smallest working win: real on the one core path, with clearly-labelled non-functional stubs for everything coming later. **Spoon-feed the user: the ONLY things they should ever do by hand are (a) put secrets in `.env` and (b) interact with the running app (click / chat). They must never run a terminal command to test.** So *you* bring the app up and keep it up:
+Phase 1 is the smallest working win: real on the one core path, with clearly-labelled non-functional stubs for everything coming later. **Spoon-feed the user: the ONLY things they should ever do by hand are (a) put secrets in `.env` and (b) interact with the running app (click / chat). They must never run a terminal command to test.** agent-builder launches and verifies the server before returning the handoff; you own the gate and re-invocation:
 
-1. **Launch and keep the app serving — don't hand over commands.** Build and start the app yourself in the background (for the skeleton's single-origin model: `cd frontend && pnpm build`, then `uv run alembic upgrade head`, then start the server with `run_in_background: true`), and **leave it running** across the whole gate so the user just opens a link. Start the server from the **project root**, not `frontend/` — the `pnpm build` step above leaves CWD in `frontend/`, and the server's relative SQLite path then fails with "unable to open database file" even though the DB exists. Verify it's actually up before handing off: `curl` the real page and confirm 200 **and** that it renders STYLED (utilities present in the built CSS / non-barebones), per `harness/patterns/tech-stack.md` and the qa-auditor UI rule. Keep the server process alive until the user has finished testing this phase (restart it silently if it dies); only the user's `.env` secrets and their in-app answers are manual.
+1. **The server is already running** — agent-builder launched and verified it (200 + styled) before returning the handoff. Nothing to start.
 2. Load the question tool: `ToolSearch` with query `select:AskUserQuestion` (before asking).
-3. Hand the user **only a live link and what to look for** — the ready URL (e.g. `http://localhost:8001/app/`), **what to click / type / look at**, the **expected result**, and which parts are **labelled stubs vs real** (so a stub is never mistaken for a bug). No build/run/migrate commands in the handoff — those are already done and running.
+3. Present the handoff as **phase release notes**: the live URL, what was built this phase, what to click / type / look at, the expected result, which parts are clearly-labelled stubs vs real (a stub must never read as a bug), and what the next phase adds. No run commands in the handoff — the app is already serving.
 4. Ask via `AskUserQuestion`: **"Does Phase 1 work as you expected?"** → options **"Yes — continue to Phase 2"** / **"I hit an issue"**.
-5. **On "I hit an issue":** capture what the user saw, then invoke **qa-auditor** to diagnose and CLASSIFY the root cause (SPEC vs CODE, and which surface). Route the fix: SPEC → spec-writer rewrites the spec, then the responsible generator(s) redo the code; CODE → the responsible **code-generator** and/or **code-generator** fixes the surface. Re-gate with qa-auditor, commit + push the fix yourself, then rebuild + restart the running app yourself and **re-present** the gate (still just a live link, no commands). Loop until the user is satisfied.
+5. **On "I hit an issue":** capture what the user saw, then invoke **qa-auditor** to diagnose and CLASSIFY the root cause (SPEC vs CODE, and which surface). Route the fix: SPEC → spec-writer rewrites the spec, then the responsible generator(s) redo the code; CODE → the responsible **code-generator** fixes the surface. Re-gate with qa-auditor, commit + push the fix yourself, then re-invoke **agent-builder** which relaunches the server and returns a fresh handoff. Re-present the gate (release notes, live link). Loop until the user is satisfied.
 6. **On "Yes":** proceed to Stage 4.
 
 ## Stage 4 — Per remaining phase (build → gate, repeat)

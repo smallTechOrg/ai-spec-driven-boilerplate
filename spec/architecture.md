@@ -15,7 +15,7 @@ The only outbound network call is to the **Gemini API**, and it carries only the
 | Dataset ingest | `src/datasets/` | Local file storage (`storage.py`), parse + schema/profile extraction (`profile.py`) |
 | Analysis graph | `src/graph/` | LangGraph code-interpreter loop (state, nodes, edges, agent, runner) — see `spec/agent.md` |
 | Code execution | `src/execution/sandbox.py` | Runs LLM-generated pandas code locally with restricted builtins, no network, no FS writes, timeout |
-| LLM client | `src/llm/` | Provider abstraction; Gemini provider (`gemini-2.5-pro`) |
+| LLM client | `src/llm/` | Provider abstraction; Gemini provider (`gemini-2.5-flash`) |
 | Persistence | `src/db/` | SQLAlchemy models + session; local SQLite |
 | Config | `src/config/settings.py` | `AGENT_`-prefixed settings (DB URL, LLM provider/model/key) |
 | Observability | `src/observability/events.py` | Structured logging — carried by every phase |
@@ -40,7 +40,7 @@ The only outbound network call is to the **Gemini API**, and it carries only the
 │  graph.generate_code:                                                         │
 │      ┌─────────────────── sent to Gemini ──────────────────┐                  │
 │      │ schema + dtypes + SMALL sample/profile + question     │ ── network ──▶ Gemini API
-│      └───────────────────────────────────────────────────────┘              │ (gemini-2.5-pro)
+│      └───────────────────────────────────────────────────────┘              │ (gemini-2.5-flash)
 │      ◀── generated pandas code ───────────────────────────────────────────────┘
 │  graph.execute_code:  run code LOCALLY over the FULL df in sandbox            │
 │      → result + captured stdout (intermediate steps)                          │
@@ -72,7 +72,7 @@ The sandbox (`src/execution/sandbox.py`) runs LLM-generated code with:
 | Language | Python 3.11+ | per baseline `pyproject.toml` `requires-python = ">=3.11"` |
 | Agent framework | LangGraph (`langgraph>=0.1`) | code-interpreter loop — see `spec/agent.md` |
 | LLM provider | Google Gemini (`google-genai`) | `GeminiProvider`, auto-detected from `AGENT_GEMINI_API_KEY` |
-| LLM model | **`gemini-2.5-pro`** (default) | env-overridable via `AGENT_LLM_MODEL`; baseline `GeminiProvider.DEFAULT_MODEL` is already `gemini-2.5-pro`. (Note: `harness/patterns/tech-stack.md` lists `gemini-2.5-flash` as the generic safe default; this build's intake explicitly pins `gemini-2.5-pro`.) |
+| LLM model | **`gemini-2.5-flash`** (default) | env-overridable via `AGENT_LLM_MODEL`; baseline `GeminiProvider.DEFAULT_MODEL` is `gemini-2.5-flash`. Chosen for low latency / responsive UX: the code-interpreter path makes two sequential Gemini calls per question (code-gen + summarize), so a fast model keeps round-trip time low while still being well-suited to pandas code generation and a 1–3 sentence summary. `gemini-2.5-pro` remains available via `AGENT_LLM_MODEL` for users who want deeper reasoning at the cost of latency. (Aligns with the generic safe default in `harness/patterns/tech-stack.md`.) |
 | Backend | FastAPI + Uvicorn | single-origin; serves API + static frontend at `/app` on port 8001 |
 | Database | **Local SQLite** | `sqlite:///./data/agent.db` via SQLAlchemy 2.0; chosen to honor the data-locality hard constraint (nothing leaves the machine) |
 | ORM / migrations | SQLAlchemy 2.0 + Alembic | tables created/migrated via `alembic upgrade head` |

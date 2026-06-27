@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Analysis } from './api'
 
 export function ResultView({
@@ -33,15 +33,7 @@ export function ResultView({
       </div>
 
       {/* Loading */}
-      {loading && (
-        <div className="mt-6 flex items-center gap-3 text-slate-600">
-          <svg className="h-5 w-5 animate-spin text-indigo-600" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-          </svg>
-          <span className="text-sm">Analyzing your data — writing and running pandas code…</span>
-        </div>
-      )}
+      {loading && <LoadingState />}
 
       {/* Error (transport / HTTP error, not a graceful failed-analysis body) */}
       {!loading && error && (
@@ -102,6 +94,53 @@ export function ResultView({
         </div>
       )}
     </section>
+  )
+}
+
+// Client-side perceived-progress for the single blocking POST /analyses call.
+// The backend runs a two-step flow (write pandas code, then run it); we surface
+// that honestly by cycling copy on a timer. This is NOT real step-streaming —
+// it adds visible motion so the wait doesn't read as a hang. Real per-step
+// progress is deferred to Phase 3.
+const LOADING_STEPS = [
+  'Writing pandas code…',
+  'Running it over your data…',
+  'Summarizing the result…',
+] as const
+
+function LoadingState() {
+  const [step, setStep] = useState(0)
+
+  useEffect(() => {
+    // Advance through the steps, then hold on the last one until the result
+    // arrives (component unmounts when loading flips to false).
+    const id = setInterval(() => {
+      setStep((s) => (s < LOADING_STEPS.length - 1 ? s + 1 : s))
+    }, 2500)
+    return () => clearInterval(id)
+  }, [])
+
+  return (
+    <div className="mt-6 space-y-3 text-slate-600">
+      <div className="flex items-center gap-3">
+        <svg className="h-5 w-5 animate-spin text-indigo-600" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+        </svg>
+        <span aria-live="polite" className="text-sm">
+          {LOADING_STEPS[step]}
+        </span>
+      </div>
+
+      {/* Indeterminate progress bar — animated, conveys motion without implying a real percentage. */}
+      <div
+        className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200"
+        role="progressbar"
+        aria-label="Analysis in progress"
+      >
+        <div className="h-full w-2/5 animate-indeterminate rounded-full bg-indigo-600" />
+      </div>
+    </div>
   )
 }
 

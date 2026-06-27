@@ -20,7 +20,7 @@ Turns a natural-language question about an uploaded dataset into pandas code, ex
 ## External Calls
 | System | Operation | On Failure |
 |--------|-----------|------------|
-| Gemini API (`gemini-2.5-pro`) | generate pandas code from schema_summary + question; later summarize result into plain language | surface as terminal error; never a raw traceback as the answer |
+| Gemini API (`gemini-2.5-flash`) | generate pandas code from schema_summary + question; later summarize result into plain language | surface as terminal error; never a raw traceback as the answer |
 | Local sandbox (`src/execution/sandbox.py`) | execute generated code over the full dataframe | feed the error back to the LLM and retry (bounded); after `max_attempts` → `status=failed` |
 
 ## Business Rules

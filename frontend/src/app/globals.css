@@ -8,6 +8,21 @@ body {
   font-feature-settings: "cv11", "ss01";
 }
 
+/* Indeterminate progress bar: a bar slides across the track to convey motion
+   during the single blocking analysis request (client-side perceived progress). */
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+
+.animate-indeterminate {
+  animation: indeterminate 1.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

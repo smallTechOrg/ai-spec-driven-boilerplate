@@ -20,10 +20,15 @@ Intake runs in **two rounds**. Round 1 clarifies what the user wants. Round 2 co
 
 1. Acknowledge the idea in one sentence.
 2. Load the question tool: `ToolSearch` with query `select:AskUserQuestion`.
-3. Ask **Round 1** via `AskUserQuestion` — product-focused, 3–4 questions:
-   - **MVP scope** — what's the minimum that makes this useful? Push for the smallest first win.
-   - **Core behaviour** — what does a successful interaction look like? What does the user do and what does the agent return?
-   - **Key constraints** *(multiSelect: true)* — hard no's, compliance, systems to integrate, non-negotiable behaviours.
+3. Ask **exactly 4 questions** via `AskUserQuestion`, all `multiSelect: true`. Write questions and option labels in plain, friendly language — no technical jargon. These are product questions; no stack, provider, or implementation detail yet.
+
+   **Critical:** options must be derived from the user's stated idea — specific sub-variations of *their* goal, not abstract category labels. If the idea is "data analysis agent", don't ask "what should it do?" with generic buckets — ask "what kind of data?" and "what kind of analysis?". Read the idea, then write options the user will immediately recognise as being about their thing.
+
+   The four question *themes* (adapt the wording to the idea):
+   - **The input or subject matter** *(multiSelect, 4 options)* — what kind of data/content/domain will it work with? Make options concrete to the idea (e.g. for data analysis: "CSV or spreadsheet files", "A database I connect to", "Documents and PDFs", "Live data from an API").
+   - **The kind of output or insight** *(multiSelect, 4 options)* — what useful thing does it produce? Again, specific to the idea (e.g. "Plain-English answers to my questions", "Charts and visual summaries", "Downloadable reports", "Spotting patterns or anomalies automatically").
+   - **Who uses it and when** *(multiSelect, 4 options)* — usage pattern. Examples: "Just me, when I need it", "My team, on demand", "Our customers", "Runs automatically, no one drives it".
+   - **Any dealbreakers?** *(multiSelect, 4 options)* — non-negotiable limits. Always offer: "My data can't leave my machine", "It needs to connect to something I already use", "Keep costs low", "None — just build it well".
 
 ### Round 2 — What do we need to build it?
 

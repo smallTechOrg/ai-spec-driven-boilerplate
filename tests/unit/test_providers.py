@@ -246,3 +246,49 @@ def test_stub_branches_only_on_tag_not_prose(stub):
     assert stub.call_model(prose_prompt) == finalize_only
     assert finalize_only != "proceed"
     assert finalize_only != "df.describe().to_string()"
+
+
+# ---------------------------------------------------------------------------
+# Real token metering — complete() / LLMResponse
+# ---------------------------------------------------------------------------
+
+def test_stub_complete_returns_text_and_positive_usage(stub):
+    # The stub has no real provider, so it reports a chars/4 estimate (>0), and
+    # its text equals call_model's output for the same prompt.
+    prompt = "<node:plan>\nQuestion: what is the average price?\n"
+    system = "You are a data analyst."
+    resp = stub.complete(prompt, system=system)
+    assert resp.text == stub.call_model(prompt, system=system)
+    assert resp.tokens_input > 0
+    assert resp.tokens_output > 0
+    # Input estimate accounts for both the prompt and the system instruction.
+    assert resp.tokens_input >= max(1, len(prompt) // 4)
+
+
+def test_client_complete_returns_llmresponse_in_stub_mode(monkeypatch, tmp_path):
+    _reset_settings_env(monkeypatch, tmp_path)  # no key -> stub
+    from llm.client import LLMClient
+    from llm.providers.base import LLMResponse
+    resp = LLMClient().complete("<node:clarify> clear?")
+    assert isinstance(resp, LLMResponse)
+    assert resp.text == "proceed"
+    assert resp.tokens_input > 0 and resp.tokens_output > 0
+
+
+def test_client_complete_passes_provider_usage_through_unchanged(monkeypatch, tmp_path):
+    """A provider's REAL token counts must propagate verbatim — not be re-estimated."""
+    _reset_settings_env(monkeypatch, tmp_path)
+    from llm.client import LLMClient
+    from llm.providers.base import LLMResponse
+
+    class _FakeProvider:
+        def complete(self, prompt, *, system=None):
+            return LLMResponse("real answer", 1234, 56)
+
+        def call_model(self, prompt, *, system=None):
+            return self.complete(prompt, system=system).text
+
+    client = LLMClient()
+    client._provider = _FakeProvider()  # swap in a provider with known real usage
+    resp = client.complete("anything")
+    assert (resp.text, resp.tokens_input, resp.tokens_output) == ("real answer", 1234, 56)

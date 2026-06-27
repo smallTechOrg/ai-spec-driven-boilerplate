@@ -1,4 +1,5 @@
 from config.settings import get_settings
+from llm.providers.base import LLMResponse
 
 
 def _resolve_provider_name() -> str:
@@ -57,6 +58,10 @@ class LLMClient:
         Read by `/health` and the UI to drive the offline stub-mode banner.
         """
         return self._provider_name
+
+    def complete(self, prompt: str, *, system: str | None = None) -> LLMResponse:
+        """Return the model's reply + REAL token usage (provider-reported)."""
+        return self._provider.complete(prompt, system=system)
 
     def call_model(self, prompt: str, *, system: str | None = None) -> str:
         return self._provider.call_model(prompt, system=system)

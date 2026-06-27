@@ -267,14 +267,18 @@ def plan_action(state: AgentState) -> AgentState:
     try:
         system = _load_prompt(_PLAN_PROMPT_PATH)
         prompt = _assemble_plan_prompt(state, wrap_up)
-        reply = LLMClient().call_model(prompt, system=system)
+        resp = LLMClient().complete(prompt, system=system)
     except Exception as exc:  # noqa: BLE001 — fatal LLM error
         logger.warning("plan_action_failed", run_id=state.get("run_id"), error=str(exc))
         return {**state, "error": f"LLM call failed: {exc}"}
 
-    reply = reply or ""
-    tokens_input = state.get("tokens_input", 0) + _estimate_tokens(prompt) + _estimate_tokens(system)
-    tokens_output = state.get("tokens_output", 0) + _estimate_tokens(reply)
+    reply = resp.text or ""
+    # Prefer the provider's REAL token usage; fall back to the chars/4 estimate
+    # only when a provider reports none (e.g. usage metadata missing).
+    in_toks = resp.tokens_input or (_estimate_tokens(prompt) + _estimate_tokens(system))
+    out_toks = resp.tokens_output or _estimate_tokens(reply)
+    tokens_input = state.get("tokens_input", 0) + in_toks
+    tokens_output = state.get("tokens_output", 0) + out_toks
 
     logger.info(
         "plan_action",
@@ -421,10 +425,12 @@ def force_finalize(state: AgentState) -> AgentState:
             f"## Transcript\n{_build_transcript(action_history)}\n\n"
             "Write the best-effort final answer in Markdown (no FINAL ANSWER: prefix)."
         )
-        answer = LLMClient().call_model(prompt, system=system)
-        answer = (answer or "").strip() or _static_best_effort(state)
-        tokens_input = state.get("tokens_input", 0) + _estimate_tokens(prompt) + _estimate_tokens(system)
-        tokens_output = state.get("tokens_output", 0) + _estimate_tokens(answer)
+        resp = LLMClient().complete(prompt, system=system)
+        answer = (resp.text or "").strip() or _static_best_effort(state)
+        in_toks = resp.tokens_input or (_estimate_tokens(prompt) + _estimate_tokens(system))
+        out_toks = resp.tokens_output or _estimate_tokens(answer)
+        tokens_input = state.get("tokens_input", 0) + in_toks
+        tokens_output = state.get("tokens_output", 0) + out_toks
     except Exception as exc:  # noqa: BLE001 — fall back to a static message
         logger.warning("force_finalize_llm_failed", run_id=run_id, error=str(exc))
         answer = _static_best_effort(state)

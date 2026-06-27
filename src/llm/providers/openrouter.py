@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import httpx
 
+from llm.providers.base import LLMResponse
+
 _ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
 _TIMEOUT = 60.0
 
@@ -22,7 +24,7 @@ class OpenRouterProvider:
         self._api_key = api_key
         self._model = model or self.DEFAULT_MODEL
 
-    def call_model(self, prompt: str, *, system: str | None = None) -> str:
+    def complete(self, prompt: str, *, system: str | None = None) -> LLMResponse:
         messages: list[dict[str, str]] = []
         if system:
             messages.append({"role": "system", "content": system})
@@ -39,4 +41,12 @@ class OpenRouterProvider:
         )
         response.raise_for_status()
         data = response.json()
-        return data["choices"][0]["message"]["content"]
+        text = data["choices"][0]["message"]["content"]
+        # OpenAI-compatible usage block (prompt_tokens / completion_tokens).
+        usage = data.get("usage") or {}
+        tokens_input = int(usage.get("prompt_tokens", 0) or 0)
+        tokens_output = int(usage.get("completion_tokens", 0) or 0)
+        return LLMResponse(text, tokens_input, tokens_output)
+
+    def call_model(self, prompt: str, *, system: str | None = None) -> str:
+        return self.complete(prompt, system=system).text

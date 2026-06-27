@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 import re
 
+from llm.providers.base import LLMResponse
+
 # Canned synthesis returned for <node:finalize> and as the wrap-up FINAL ANSWER
 # for later <node:plan> calls. Kept plain so the app renders something sensible.
 _FINALIZE_SUMMARY = (
@@ -41,6 +43,15 @@ class StubProvider:
     def __init__(self, **kwargs) -> None:  # tolerant: factory may pass model/api_key
         # Intentionally ignores api_key/model — the stub needs neither.
         pass
+
+    def complete(self, prompt: str, *, system: str | None = None) -> LLMResponse:
+        """Offline reply + a chars/4 token estimate (no real provider to meter)."""
+        text = self.call_model(prompt, system=system)
+        tokens_input = max(1, len(prompt or "") // 4)
+        if system:
+            tokens_input += max(1, len(system) // 4)
+        tokens_output = max(1, len(text or "") // 4)
+        return LLMResponse(text, tokens_input, tokens_output)
 
     def call_model(self, prompt: str, *, system: str | None = None) -> str:
         text = prompt or ""

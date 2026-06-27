@@ -91,9 +91,10 @@ def generate_suggestions(question: str, answer: str) -> tuple[list[str], int, in
             f"## Answer\n{answer}\n\n"
             "Reply with ONLY a JSON array of up to 3 short follow-up questions."
         )
-        tokens_input = _estimate_tokens(prompt) + _estimate_tokens(system)
-        raw = LLMClient().call_model(prompt, system=system) or ""
-        tokens_output = _estimate_tokens(raw)
+        resp = LLMClient().complete(prompt, system=system)
+        raw = resp.text or ""
+        tokens_input = resp.tokens_input or (_estimate_tokens(prompt) + _estimate_tokens(system))
+        tokens_output = resp.tokens_output or _estimate_tokens(raw)
     except Exception as exc:  # noqa: BLE001 — never raise; suggestions are optional
         logger.warning("suggestions_failed", error=str(exc))
         return [], 0, 0

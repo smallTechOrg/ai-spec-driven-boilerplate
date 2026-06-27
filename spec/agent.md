@@ -1,218 +1,322 @@
 # Agent
 
-> Required when the project uses an agent framework. Delete this file if your project has no agent framework.
->
-> If your project has no agent framework (e.g., a simple script or single-LLM API call), delete this file.
->
-
----
-
 ## Agent Architecture Pattern
 
-<!-- FILL IN: Which pattern does this agent follow? Choose one and describe why. -->
+**Chosen: Graph (LangGraph) — Prompt Chaining + Tool Use + Parallelization**
 
-| Pattern | Use when |
-|---------|----------|
-| **Single-agent loop** | One LLM drives a deterministic tool-call loop. No branches, no handoffs. |
-| **Graph (LangGraph)** | Multi-step pipeline with conditional edges, checkpointing, or parallel nodes. |
-| **Multi-agent** | Specialised sub-agents with distinct roles; orchestrator routes between them. |
-| **Supervisor** | One supervisor LLM dispatches to worker agents based on task type. |
-| **Human-in-the-loop** | Execution pauses at defined checkpoints for user review or approval. |
+The analysis pipeline is a fixed sequence of dependent steps (generate SQL → execute → compute stats + build charts) making Prompt Chaining the correct structural pattern. The two terminal steps (generate_insights and generate_charts) are independent of each other and run sequentially (LangGraph sequential nodes — LangGraph's `Send` API for true parallel node execution adds complexity not warranted in Phase 1; both nodes are fast and sequential is fine). Tool Use (Pattern 5) drives the SQL execution and pandas operations. Exception Handling and Recovery (Pattern 12) wraps every node. Resource-Aware Optimization (Pattern 16) is applied through caching and token budgets.
 
-**Chosen:** <!-- state pattern + one-sentence rationale -->
+The `ingest_file` operation (file upload) is NOT part of the analysis graph. It runs synchronously in the FastAPI file upload endpoint, outside LangGraph. This keeps the graph focused on the question-answer loop.
 
 ---
 
 ## LLM Provider & Model
 
-<!-- FILL IN: Which model drives each agent/node? State provider, model ID, and why. -->
+| Node | Provider | Model ID | Rationale |
+|------|----------|----------|-----------|
+| `generate_sql` | Google Gemini | `gemini-2.5-pro` | SQL generation requires strong reasoning over schema context |
+| `generate_insights` | Google Gemini | `gemini-2.5-pro` | Prose narrative requires coherent language generation |
 
-| Agent / Node | Provider | Model ID | Rationale |
-|-------------|----------|----------|-----------|
-| <!-- node --> | Anthropic | <!-- e.g. claude-sonnet-4-6 --> | <!-- latency vs. quality trade-off --> |
+Model is env-configurable via `AGENT_LLM_MODEL`. The same LLMClient instance (from `src/llm/client.py`) is reused across nodes.
 
-**Fallback behaviour:** <!-- Production resilience only: retry/backoff, degraded mode, or a surfaced error if the LLM API is unavailable or rate-limited. NOT a test/offline stub path — tests call the real API with keys from `.env`. -->
+**Fallback behaviour:** If the Gemini API call fails (network error, 4xx, 5xx), the node catches the exception, sets `state["error"]` to the stringified exception, and returns the mutated state. The conditional edge routes to `handle_error` → END. The run is marked `failed`. No retry in Phase 1 (retries are Phase 3).
 
-**Prompt strategy:** <!-- System/user split, few-shot examples, structured output (tool_use / JSON mode)? -->
+**Prompt strategy:** Each node uses a `Path`-loaded markdown prompt template from `src/prompts/`. System prompt sets the role and constraints. User message contains the structured context (schema + sample for SQL; metrics JSON for insights). Both nodes request structured plain-text output; a post-processing step strips accidental markdown fences.
 
 ---
 
-## Tools & Tool Calling
+## Tools (built-in node operations, not LLM function-calling tools)
 
-<!-- FILL IN: Every tool the agent can call. -->
+The agent does not use LLM function-calling / tool_use mode. Instead, each node performs its operation deterministically and stores results in state. The LLM is called only in `generate_sql` and `generate_insights`.
 
-| Tool name | Description | Inputs | Output | Side-effects |
-|-----------|-------------|--------|--------|--------------|
-| <!-- name --> | <!-- what it does --> | <!-- params --> | <!-- return type --> | <!-- DB write, API call, file write, etc. --> |
-
-**Tool selection strategy:** <!-- How does the agent decide which tool to call? (LLM choice, rule-based routing, forced single tool) -->
-
-**Tool failure handling:** <!-- retry, fallback, abort — per tool or global policy? -->
+| Operation | Node | Description | Side-effects |
+|-----------|------|-------------|--------------|
+| `PRAGMA table_info` | `generate_sql` | Introspect schema for each session table | Read-only SQLite |
+| `SELECT` sample rows | `generate_sql` | Fetch 20 sample rows per table for schema context | Read-only SQLite |
+| `EXPLAIN QUERY PLAN` | `generate_sql` | Validate generated SQL before execution | Read-only SQLite |
+| `SELECT` (full query) | `execute_sql` | Run the validated SQL against SQLite | Read-only SQLite |
+| pandas stats | `generate_insights` | Compute min/max/mean/median/anomalies/trends | In-memory; no I/O |
+| Chart spec builder | `generate_charts` | Build ChartSpec list from query_rows shape | In-memory; no I/O |
+| Cache write | `finalize` | Write result to `analysis_cache` | SQLite write |
+| RunRow update | `finalize` | Write result fields to `runs` | SQLite write |
 
 ---
 
 ## Agent State
 
-<!-- FILL IN: The full state type. Every field must be named, typed, and annotated with what populates it. -->
+The `AnalysisState` TypedDict extends the base `AgentState` from `src/graph/state.py`.
 
 ```python
-class AgentState(TypedDict):
-    # Identity
-    run_id: int                          # set at initialisation
+from typing import TypedDict, Any
 
-    # Input
-    # ...                                # fields populated from the trigger
+class AnalysisState(TypedDict, total=False):
+    # --- Identity (set at invocation) ---
+    run_id: str                    # UUID of the RunRow in SQLite
+    session_id: str                # UUID of the SessionRow; used to look up uploaded tables
+    question: str                  # verbatim natural-language question from the user
 
-    # Pipeline data (populated progressively by nodes)
-    # ...
+    # --- Skeleton compat (always present) ---
+    input_text: str                # alias for question (backward compat with RunRow)
+    output_text: str               # alias for insight_text (written by generate_insights, read by finalize)
+    error: str | None              # set by any node on fatal failure; None on success
+    messages: list                 # unused in this agent; kept for skeleton compat
 
-    # Output
-    # ...                                # final result fields
+    # --- Intermediate: generate_sql ---
+    uploaded_tables: list[str]     # table names available in this session (set from uploaded_files query)
+    schema_context: str            # serialized schema + sample rows sent to Gemini
+    sql_query: str                 # SQL SELECT generated by Gemini and validated
 
-    # Control
-    error: str | None                    # set by any node on fatal failure
-    checkpoint: str | None              # last completed node (for resume)
+    # --- Intermediate: execute_sql ---
+    query_rows: list[dict[str, Any]]  # rows returned by SQL execution; max 10 000
+    rows_truncated: bool           # True if result was capped at 10 000
+
+    # --- Output: generate_insights ---
+    insight_json: dict[str, Any]   # structured statistics from Python computation
+    insight_text: str              # prose narrative from Gemini
+
+    # --- Output: generate_charts ---
+    chart_specs: list[dict[str, Any]]  # ChartSpec list; up to 4 entries
 ```
 
 ---
 
-## Nodes / Steps
+## Nodes
 
-<!-- FILL IN: One section per node. For single-agent loops, describe each "step" or "tool call phase." -->
+### `generate_sql`
 
-### `node_[name]`
+**Reads from state:** `session_id`, `question`, `run_id`
 
-**Reads from state:** <!-- field names -->
+**Writes to state:** `uploaded_tables`, `schema_context`, `sql_query` — or `error` on failure
 
-**Writes to state:** <!-- field names -->
-
-**LLM call:** <!-- yes/no; if yes: prompt template summary, model used, output format -->
+**LLM call:** Yes. Gemini `gemini-2.5-pro`. System prompt: `src/prompts/generate_sql.md`. User message: the serialized schema context + the question. Expected output: a single SQL SELECT statement (no prose, no markdown fences).
 
 **External calls:**
 
 | System | Operation | On Failure |
 |--------|-----------|------------|
-| <!-- system --> | <!-- what it calls --> | <!-- fatal (set error) / partial (log + continue) / retry --> |
+| SQLite | `SELECT * FROM uploaded_files WHERE session_id = ?` | set `error`; route to handle_error |
+| SQLite | `PRAGMA table_info(<table>)` per table | set `error`; route to handle_error |
+| SQLite | `SELECT ... LIMIT 20` per table (sample rows) | set `error`; route to handle_error |
+| Gemini API | `generate_content` (SQL generation) | set `error`; route to handle_error |
+| SQLite | `EXPLAIN QUERY PLAN <generated_sql>` (validation) | set `error = "invalid_sql: <reason>"`; route to handle_error |
 
-**Behaviour:** <!-- One paragraph. What decision or transformation does this node perform? -->
+**Behaviour:** Queries `uploaded_files` to build the table list for this session. For each table, runs `PRAGMA table_info` to get column names and types, then fetches 20 random rows as sample data. Serializes all of this into `schema_context` (JSON). Enforces the SQL restriction rules (SELECT only) via post-processing: if the generated SQL contains any write/DDL keyword, sets `error = "forbidden_sql_operation"`. Strips markdown fences from the LLM output before storing in `sql_query`.
 
 ---
 
-## Graph / Flow Topology
+### `execute_sql`
 
-<!-- FILL IN: ASCII diagram of node flow. Show ALL conditional edges explicitly. -->
+**Reads from state:** `sql_query`, `run_id`
+
+**Writes to state:** `query_rows`, `rows_truncated` — or `error` on failure
+
+**LLM call:** No.
+
+**External calls:**
+
+| System | Operation | On Failure |
+|--------|-----------|------------|
+| SQLite | `SELECT ...` (or auto-wrapped with `LIMIT 10000`) | set `error = "execution_error: <reason>"`; route to handle_error |
+
+**Behaviour:** Wraps `sql_query` in `SELECT * FROM (<sql>) LIMIT 10000` if result might exceed the cap (checked heuristically by examining the query for GROUP BY or LIMIT — if no limit is present, wrap it). Executes via SQLAlchemy `text()`. Converts the `CursorResult` to `list[dict]`. Sets `rows_truncated = True` if the cap was applied.
+
+---
+
+### `generate_insights`
+
+**Reads from state:** `query_rows`, `question`, `sql_query`, `rows_truncated`
+
+**Writes to state:** `insight_json`, `insight_text`, `output_text` — or `error` on failure
+
+**LLM call:** Yes, unless `query_rows` is empty. Gemini `gemini-2.5-pro`. System prompt: `src/prompts/generate_insights.md`. User message: `insight_json` (the computed statistics JSON) + the original `question`. Expected output: 150-300 word prose narrative.
+
+**External calls:**
+
+| System | Operation | On Failure |
+|--------|-----------|------------|
+| Gemini API | `generate_content` (prose narrative) | set `error`; route to handle_error |
+
+**Behaviour:** Computes statistics from `query_rows` using pandas (build a DataFrame from the rows, call `describe()`, identify numeric columns, compute top3/bottom3, run anomaly detection at 3 std-dev threshold, detect trends if a date column exists). Populates `insight_json` from these computations — no LLM involved in this step. If `query_rows` is empty, sets `insight_text = "The query returned no results."` and skips the LLM call. Otherwise calls Gemini with the statistics JSON; stores the response as `insight_text` and also as `output_text` (skeleton compat alias).
+
+---
+
+### `generate_charts`
+
+**Reads from state:** `query_rows`, `question`
+
+**Writes to state:** `chart_specs` always (empty list on any failure; charts are non-critical)
+
+**LLM call:** No. Purely deterministic Python.
+
+**External calls:** None.
+
+**Behaviour:** Inspects column dtypes of `query_rows` (via pandas). Applies the auto-selection priority order defined in `spec/capabilities/charts.md`: (1) line if date + numeric, (2) bar if categorical (2-30 distinct values) + numeric, (3) histogram if single numeric only, (4) scatter if two+ numerics. Builds up to 4 `ChartSpec` dicts. Samples each spec's `data` list to max 500 points. Sets `sampled = True` on any spec that was sampled. Returns `chart_specs = []` for an empty `query_rows`. On any exception, sets `chart_specs = []` and ensures `state["error"]` is None (charts are non-critical — the run continues to `finalize` rather than aborting). This is the one node that degrades gracefully rather than routing to handle_error.
+
+---
+
+### `handle_error`
+
+**Reads from state:** `error`, `run_id`
+
+**Writes to state:** nothing (state is terminal)
+
+**LLM call:** No.
+
+**Behaviour:** Logs the error with `run_id` context using structlog. Updates `RunRow.status = "failed"` and `RunRow.error_message = state["error"]` in SQLite. Sets no further state fields. Graph terminates at END after this node.
+
+---
+
+### `finalize`
+
+**Reads from state:** `run_id`, `session_id`, `question`, `sql_query`, `insight_json`, `insight_text`, `output_text`, `chart_specs`, `query_rows`, `question_hash` (computed internally), `table_hash` (computed internally)
+
+**Writes to state:** nothing (state is terminal)
+
+**LLM call:** No.
+
+**Behaviour:** Updates `RunRow` in SQLite with all result fields (`status = "completed"`, `question`, `sql_query`, `insight_json` serialized to JSON string, `chart_specs` serialized to JSON string, `output_text`). Computes `question_hash` and `table_hash` and writes a new `analysis_cache` row (or skips if an identical key already exists — `INSERT OR IGNORE` semantics). Logs completion with `run_id` and timing.
+
+---
+
+## Graph Topology
 
 ```
 START
   │
   ▼
-node_a ──(error)──► node_handle_error ──► END
+generate_sql ──(error)──► handle_error ──► END
   │
   ▼
-node_b ──(condition)──► node_c
-  │                         │
-  │                         ▼
-  └──────────────────► node_finalize
-                             │
-                             ▼
-                            END
+execute_sql ──(error)──► handle_error ──► END
+  │
+  ▼
+generate_insights ──(error)──► handle_error ──► END
+  │
+  ▼
+generate_charts ──(always)──► finalize ──► END
+                                  (charts degrade to [] on error; run never aborts here)
 ```
+
+`generate_insights` and `generate_charts` are sequential in Phase 1. Phase 3 may introduce true parallel execution via LangGraph's `Send` API if latency measurement warrants it.
 
 **Conditional edges:**
 
-| Source node | Condition | Target |
-|-------------|-----------|--------|
-| <!-- node --> | <!-- e.g. state["error"] is not None --> | <!-- target node --> |
+| Source node | Edge function signature | Condition | Target |
+|-------------|------------------------|-----------|--------|
+| `generate_sql` | `after_generate_sql(s)` | `s.get("error")` is not None | `handle_error` |
+| `generate_sql` | `after_generate_sql(s)` | `s.get("error")` is None | `execute_sql` |
+| `execute_sql` | `after_execute_sql(s)` | `s.get("error")` is not None | `handle_error` |
+| `execute_sql` | `after_execute_sql(s)` | `s.get("error")` is None | `generate_insights` |
+| `generate_insights` | `after_generate_insights(s)` | `s.get("error")` is not None | `handle_error` |
+| `generate_insights` | `after_generate_insights(s)` | `s.get("error")` is None | `generate_charts` |
+| `generate_charts` | `after_generate_charts(s)` | always (charts never abort the run) | `finalize` |
 
 ---
 
-## Memory & Context
-
-<!-- FILL IN: How does the agent remember things across turns, steps, or runs? -->
+## Memory and Context
 
 | Scope | Mechanism | What is stored |
 |-------|-----------|----------------|
-| **Within a run** | LangGraph state | All in-progress data |
-| **Across runs** | <!-- DB / vector store / none --> | <!-- e.g. past results, user prefs --> |
-| **Conversation** | <!-- message history / summary / none --> | <!-- if chat-style --> |
+| Within a run | LangGraph `AnalysisState` TypedDict | All in-progress data; cleared after graph returns |
+| Across runs (per session) | `uploaded_files` SQLite table | Which tables are available in the session |
+| Across runs (result cache) | `analysis_cache` SQLite table | Full result payload keyed by question+table hash |
+| Conversation history | React state in browser (Phase 1) | Message thread; not persisted across page reloads |
 
-**Context window management:** <!-- How is the prompt kept within limits? (summary, sliding window, RAG retrieval) -->
+**Context window management:** The schema context sent to Gemini is limited to 20 sample rows per table. The statistics JSON sent to Gemini is truncated to 4 000 tokens / top 5 columns if needed.
 
 ---
 
 ## Human-in-the-Loop Checkpoints
 
-<!-- FILL IN: Where does execution pause for human input? Delete section if not applicable. -->
-
-| Checkpoint | What is shown to the user | Expected user action | Timeout / default |
-|------------|--------------------------|----------------------|-------------------|
-| <!-- name --> | <!-- what the agent surfaces --> | <!-- approve / edit / abort --> | <!-- timeout action --> |
+None in Phase 1-3. The agent runs fully autonomously per invocation. All decisions are made by the LLM or deterministic Python.
 
 ---
 
-## Error Handling & Recovery
+## Error Handling and Recovery
 
-<!-- FILL IN: How the agent handles failures at each level. -->
+**Node-level:** Each node wraps its body in a `try/except Exception`. On any exception, the node sets `state["error"] = str(exc)` and returns. The conditional edge after every node routes to `handle_error` when `state["error"]` is not None.
 
-**Node-level:** <!-- Each node catches its own exceptions; fatal errors set state["error"] and route to handle_error node. -->
+**Graph-level (`handle_error`):** Updates `RunRow.status = "failed"` and `error_message`. Logs with structlog at ERROR level including `run_id` and `error`. Terminates the graph.
 
-**Graph-level (handle_error node):**
-- Reads: `state.error`, `state.run_id`
-- Updates DB: run status → "failed", `error_message`, `completed_at`
-- Logs error with `run_id` context
-- Terminates graph
+**Resume / retry:** No run resume in Phase 1-3. Failed runs require re-submitting the question. Phase 3 adds retry with exponential backoff for Gemini API calls.
 
-**Resume / retry strategy:** <!-- Can a failed run be resumed from its last checkpoint? How? -->
-
-**Partial failure:** <!-- If a non-critical step fails, does the agent degrade gracefully or abort? -->
+**Partial failure:** All nodes are on the critical path — a failure in any node terminates the analysis. `generate_charts` failure is the one exception: if chart generation fails, it sets `chart_specs = []` and clears `error` so the graph continues to `finalize` (charts are non-critical; prose + insight_json are still returned).
 
 ---
 
 ## Observability
 
-<!-- FILL IN: What is logged, traced, and measured? -->
-
 | Signal | What | Where |
 |--------|------|-------|
-| **Trace** | One trace per run, one span per node | <!-- OpenTelemetry / LangSmith / stdout --> |
-| **LLM calls** | Prompt tokens, completion tokens, latency, model | <!-- LangSmith / structured log --> |
-| **Tool calls** | Tool name, inputs, success/error, latency | Structured log |
-| **Run outcome** | Status, total duration, error if any | DB + structured log |
+| Node entry/exit | Node name, run_id, timing | structlog to stdout |
+| LLM calls | Model, prompt token estimate, latency | structlog at INFO |
+| SQL execution | sql_query text, row_count, truncated flag | structlog at INFO |
+| Cache hit/miss | question_hash, table_hash, hit bool | structlog at INFO |
+| Run outcome | run_id, status, total duration | structlog at INFO + RunRow in SQLite |
+| Errors | run_id, node name, error message, traceback | structlog at ERROR |
 
 ---
 
 ## Concurrency Model
 
-<!-- FILL IN: How concurrent agent runs are handled. -->
-
-- **Run isolation:** <!-- one-at-a-time (API returns 409) / queue / parallel with run_id scoping -->
-- **Parallel nodes within a run:** <!-- which nodes run in parallel and why -->
-- **Checkpointing:** <!-- none / SqliteSaver / PostgresSaver — required if human-in-the-loop or long-running -->
+- **Run isolation:** The analysis endpoint is synchronous. FastAPI runs uvicorn with multiple workers (default: 1 in dev). Concurrent requests from the same browser session are possible but rare; SQLite WAL mode handles concurrent reads.
+- **Parallel nodes:** Sequential in Phase 1. `generate_insights` then `generate_charts` in order.
+- **Checkpointing:** None. LangGraph runs in memory without a checkpointer. Runs are not resumable.
 
 ---
 
-## Graph Assembly (`agent/graph.py`)
-
-<!-- FILL IN: Pseudocode showing how nodes and edges are wired. Must be ≤ 60 lines in the real file. -->
+## Graph Assembly (pseudocode for `src/graph/agent.py`)
 
 ```python
-graph = StateGraph(AgentState)
-
-graph.add_node("node_a", node_a)
-graph.add_node("node_b", node_b)
-graph.add_node("finalize", node_finalize)
-graph.add_node("handle_error", node_handle_error)
-
-graph.set_entry_point("node_a")
-
-graph.add_conditional_edges(
-    "node_a",
-    lambda s: "handle_error" if s.get("error") else "node_b",
+from langgraph.graph import StateGraph, END
+from graph.state import AnalysisState
+from graph.nodes import (
+    generate_sql, execute_sql,
+    generate_insights, generate_charts,
+    handle_error, finalize,
+)
+from graph.edges import (
+    after_generate_sql, after_execute_sql, after_generate_insights,
 )
 
-graph.add_edge("node_b", "finalize")
-graph.add_edge("finalize", END)
-graph.add_edge("handle_error", END)
 
-compiled_graph = graph.compile()
+def _build_graph() -> StateGraph:
+    g = StateGraph(AnalysisState)
+
+    g.add_node("generate_sql", generate_sql)
+    g.add_node("execute_sql", execute_sql)
+    g.add_node("generate_insights", generate_insights)
+    g.add_node("generate_charts", generate_charts)
+    g.add_node("handle_error", handle_error)
+    g.add_node("finalize", finalize)
+
+    g.set_entry_point("generate_sql")
+
+    g.add_conditional_edges(
+        "generate_sql",
+        after_generate_sql,
+        {"execute_sql": "execute_sql", "handle_error": "handle_error"},
+    )
+    g.add_conditional_edges(
+        "execute_sql",
+        after_execute_sql,
+        {"generate_insights": "generate_insights", "handle_error": "handle_error"},
+    )
+    g.add_conditional_edges(
+        "generate_insights",
+        after_generate_insights,
+        {"generate_charts": "generate_charts", "handle_error": "handle_error"},
+    )
+    # generate_charts always continues — it degrades gracefully (chart_specs=[]) rather than aborting
+    g.add_edge("generate_charts", "finalize")
+
+    g.add_edge("finalize", END)
+    g.add_edge("handle_error", END)
+
+    return g.compile()
+
+
+agentic_ai = _build_graph()
 ```
+
+The existing `src/graph/agent.py` is replaced in place (no copy/rename). The compiled graph object retains the name `agentic_ai` for compatibility with `src/graph/runner.py`.

@@ -1,218 +1,199 @@
-# Agent
+# Agent Design
 
-> Required when the project uses an agent framework. Delete this file if your project has no agent framework.
->
-> If your project has no agent framework (e.g., a simple script or single-LLM API call), delete this file.
->
+## Framework
 
----
+LangGraph (StateGraph). Chosen because the analysis flow has a conditional error branch and needs checkpointable state to track run status in SQLite. The pattern is a lightweight **Tool Use + Exception Handling** graph (patterns #5 and #12 from the catalogue): one substantive node that calls Gemini and executes pandas code, with a conditional edge to either finalize or handle the error.
 
-## Agent Architecture Pattern
-
-<!-- FILL IN: Which pattern does this agent follow? Choose one and describe why. -->
-
-| Pattern | Use when |
-|---------|----------|
-| **Single-agent loop** | One LLM drives a deterministic tool-call loop. No branches, no handoffs. |
-| **Graph (LangGraph)** | Multi-step pipeline with conditional edges, checkpointing, or parallel nodes. |
-| **Multi-agent** | Specialised sub-agents with distinct roles; orchestrator routes between them. |
-| **Supervisor** | One supervisor LLM dispatches to worker agents based on task type. |
-| **Human-in-the-loop** | Execution pauses at defined checkpoints for user review or approval. |
-
-**Chosen:** <!-- state pattern + one-sentence rationale -->
-
----
-
-## LLM Provider & Model
-
-<!-- FILL IN: Which model drives each agent/node? State provider, model ID, and why. -->
+## LLM Provider and Model
 
 | Agent / Node | Provider | Model ID | Rationale |
 |-------------|----------|----------|-----------|
-| <!-- node --> | Anthropic | <!-- e.g. claude-sonnet-4-6 --> | <!-- latency vs. quality trade-off --> |
+| analyze_data | Google Gemini | gemini-2.5-pro | High capability for code generation and structured JSON output; configurable via AGENT_LLM_MODEL env var |
 
-**Fallback behaviour:** <!-- Production resilience only: retry/backoff, degraded mode, or a surfaced error if the LLM API is unavailable or rate-limited. NOT a test/offline stub path — tests call the real API with keys from `.env`. -->
+**Fallback behaviour:** On Gemini API error (network timeout, rate limit, 5xx), the node sets `state["error"]` with the error message, the graph routes to `handle_error`, the Run record is marked "failed", and the API returns HTTP 500 with a clear message. No retry in Phase 1 (added in Phase 3).
 
-**Prompt strategy:** <!-- System/user split, few-shot examples, structured output (tool_use / JSON mode)? -->
-
----
-
-## Tools & Tool Calling
-
-<!-- FILL IN: Every tool the agent can call. -->
-
-| Tool name | Description | Inputs | Output | Side-effects |
-|-----------|-------------|--------|--------|--------------|
-| <!-- name --> | <!-- what it does --> | <!-- params --> | <!-- return type --> | <!-- DB write, API call, file write, etc. --> |
-
-**Tool selection strategy:** <!-- How does the agent decide which tool to call? (LLM choice, rule-based routing, forced single tool) -->
-
-**Tool failure handling:** <!-- retry, fallback, abort — per tool or global policy? -->
-
----
+**Prompt strategy:** Single system+user prompt. System sets the JSON output contract. User block contains: column schema as a table, the first 20 sample rows as CSV text, and the user's question. Gemini is instructed to return a single JSON object with exactly these keys: `pandas_code`, `chart_type`, `labels`, `values`, `summary`. No tool_use / function-calling — plain JSON mode via response instruction in the prompt.
 
 ## Agent State
-
-<!-- FILL IN: The full state type. Every field must be named, typed, and annotated with what populates it. -->
 
 ```python
 class AgentState(TypedDict):
     # Identity
-    run_id: int                          # set at initialisation
+    run_id: str                  # UUID string, set at graph invocation
 
-    # Input
-    # ...                                # fields populated from the trigger
+    # Input (set before graph is invoked)
+    dataset_id: str | None       # UUID of the dataset row in SQLite
+    question: str | None         # The user's plain-English question
 
-    # Pipeline data (populated progressively by nodes)
-    # ...
-
-    # Output
-    # ...                                # final result fields
+    # Pipeline data (set by analyze_data node)
+    chart_type: str | None       # "bar" | "line" | "scatter"
+    labels: list | None          # Real labels from pandas execution (not Gemini's illustrative values)
+    values: list | None          # Real values from pandas execution (not Gemini's illustrative values)
+    summary: str | None          # Written summary from Gemini
 
     # Control
-    error: str | None                    # set by any node on fatal failure
-    checkpoint: str | None              # last completed node (for resume)
+    error: str | None            # Set by any node on failure; routes graph to handle_error
 ```
 
----
+## Nodes
 
-## Nodes / Steps
+### `analyze_data(state: AgentState) -> AgentState`
 
-<!-- FILL IN: One section per node. For single-agent loops, describe each "step" or "tool call phase." -->
+**Reads from state:** `run_id`, `dataset_id`, `question`
 
-### `node_[name]`
+**Writes to state:** `chart_type`, `labels`, `values`, `summary`, `error` (on failure)
 
-**Reads from state:** <!-- field names -->
-
-**Writes to state:** <!-- field names -->
-
-**LLM call:** <!-- yes/no; if yes: prompt template summary, model used, output format -->
+**LLM call:** Yes — Gemini 2.5 Pro. Prompt contains: column schema (name + dtype per column) + first 20 sample rows as CSV text + user question. Expected output: JSON with `pandas_code`, `chart_type`, `labels`, `values`, `summary`.
 
 **External calls:**
 
 | System | Operation | On Failure |
 |--------|-----------|------------|
-| <!-- system --> | <!-- what it calls --> | <!-- fatal (set error) / partial (log + continue) / retry --> |
+| SQLite (datasets table) | SELECT by dataset_id | Set state["error"]; route to handle_error |
+| Local filesystem | pandas.read_csv / read_excel from file_path | Set state["error"]; route to handle_error |
+| Gemini 2.5 Pro API | Generate pandas code + chart config + summary | Set state["error"]; route to handle_error |
 
-**Behaviour:** <!-- One paragraph. What decision or transformation does this node perform? -->
+**Behaviour:** Loads the Dataset record from SQLite using `dataset_id`. Reads the full DataFrame from `file_path` using pandas. Builds the Gemini prompt from `columns_json` (column schema) and `sample_rows_json` (up to 20 rows as CSV text) — the full DataFrame is NEVER included in the prompt. Calls Gemini and parses the JSON response. Executes `pandas_code` in a restricted namespace to get real labels and values. Returns state with `chart_type`, `labels`, `values`, `summary` set.
+
+**Privacy rule (enforced in this node):** The Gemini prompt contains ONLY the column schema and up to 20 sample rows. The `file_path` DataFrame is loaded locally for pandas execution only — it is never serialized into the prompt.
+
+**Safe pandas execution:**
+```python
+namespace = {"df": df, "pd": pd}
+exec(pandas_code, namespace)
+result = namespace.get("result")
+# result must be: {"labels": [...], "values": [...]}
+```
+If `result` is missing, not a dict, or missing required keys, treat as execution error and set state["error"].
 
 ---
 
-## Graph / Flow Topology
+### `handle_error(state: AgentState) -> AgentState`
 
-<!-- FILL IN: ASCII diagram of node flow. Show ALL conditional edges explicitly. -->
+**Reads from state:** `run_id`, `error`
+
+**Writes to state:** no new state fields (side effect only: updates Run record in DB)
+
+**LLM call:** No
+
+**Behaviour:** Updates the Run record in SQLite: sets status="failed", error_message=state["error"], completed_at=now(). Logs the error with run_id context.
+
+---
+
+### `finalize(state: AgentState) -> AgentState`
+
+**Reads from state:** `run_id`, `chart_type`, `labels`, `values`, `summary`
+
+**Writes to state:** no new state fields (side effect only: updates Run record in DB)
+
+**LLM call:** No
+
+**Behaviour:** Updates the Run record in SQLite: sets status="completed", completed_at=now(). Returns state unchanged.
+
+## Graph Topology
 
 ```
 START
   │
   ▼
-node_a ──(error)──► node_handle_error ──► END
+analyze_data
   │
-  ▼
-node_b ──(condition)──► node_c
-  │                         │
-  │                         ▼
-  └──────────────────► node_finalize
-                             │
-                             ▼
-                            END
+  ├── (error is set) ──► handle_error ──► END
+  │
+  └── (no error) ──────► finalize ──────► END
 ```
 
 **Conditional edges:**
 
 | Source node | Condition | Target |
 |-------------|-----------|--------|
-| <!-- node --> | <!-- e.g. state["error"] is not None --> | <!-- target node --> |
+| analyze_data | `state.get("error") is not None` | handle_error |
+| analyze_data | `state.get("error") is None` | finalize |
+| handle_error | always | END |
+| finalize | always | END |
 
----
+## Graph Assembly (`src/graph/graph.py`)
 
-## Memory & Context
+```python
+from langgraph.graph import StateGraph, END
+from .nodes import analyze_data, handle_error, finalize
+from .state import AgentState
 
-<!-- FILL IN: How does the agent remember things across turns, steps, or runs? -->
+def build_graph():
+    graph = StateGraph(AgentState)
+
+    graph.add_node("analyze_data", analyze_data)
+    graph.add_node("handle_error", handle_error)
+    graph.add_node("finalize", finalize)
+
+    graph.set_entry_point("analyze_data")
+
+    graph.add_conditional_edges(
+        "analyze_data",
+        lambda s: "handle_error" if s.get("error") else "finalize",
+    )
+
+    graph.add_edge("handle_error", END)
+    graph.add_edge("finalize", END)
+
+    return graph.compile()
+
+compiled_graph = build_graph()
+```
+
+## Prompt (`src/prompts/analyze.md`)
+
+Replaces `src/prompts/transform.md`. The prompt instructs Gemini to:
+1. Analyze the provided column schema and sample data
+2. Return ONLY a single JSON object (no markdown fences, no explanation text)
+3. The JSON object must have exactly these keys:
+   - `pandas_code` (string): executable Python code using `df` and `pd` that assigns `result = {"labels": [...], "values": [...]}` — labels are category/x-axis values, values are numeric y-axis values
+   - `chart_type` (string): one of "bar", "line", "scatter" — chosen to best fit the question
+   - `labels` (array): illustrative labels matching the code's intent (replaced by real execution)
+   - `values` (array): illustrative values matching the code's intent (replaced by real execution)
+   - `summary` (string): 2-3 sentence plain-English summary of key findings
+
+The prompt template receives two variables: `{schema_text}` (column schema as a markdown table) and `{sample_csv}` (first 20 rows as CSV text) and `{question}` (the user's question).
+
+## Memory and Context
 
 | Scope | Mechanism | What is stored |
 |-------|-----------|----------------|
-| **Within a run** | LangGraph state | All in-progress data |
-| **Across runs** | <!-- DB / vector store / none --> | <!-- e.g. past results, user prefs --> |
-| **Conversation** | <!-- message history / summary / none --> | <!-- if chat-style --> |
+| Within a run | LangGraph AgentState (in-memory) | All pipeline data for one analysis request |
+| Across runs | SQLite Run table | Run status, error messages, timestamps |
+| Dataset persistence | SQLite Dataset table + local filesystem | Uploaded file + schema + sample rows |
+| Conversation | None in Phase 1 | Single-turn: one question → one chart+summary |
 
-**Context window management:** <!-- How is the prompt kept within limits? (summary, sliding window, RAG retrieval) -->
+> **Assumed:** Conversation history (multi-turn chat memory linking prior questions and results) is deferred to Phase 3. Phase 1 is single-turn: each question is independent. This is appropriate because each analysis stands on its own chart and the user can scroll to see prior results.
 
----
+**Context window management:** The prompt is bounded by schema size + 20 sample rows, which is small for any reasonable CSV. No truncation needed in Phase 1.
 
 ## Human-in-the-Loop Checkpoints
 
-<!-- FILL IN: Where does execution pause for human input? Delete section if not applicable. -->
+None in Phase 1. The analysis is fully automatic. Human testing gates exist between phases (see roadmap), not within the graph.
 
-| Checkpoint | What is shown to the user | Expected user action | Timeout / default |
-|------------|--------------------------|----------------------|-------------------|
-| <!-- name --> | <!-- what the agent surfaces --> | <!-- approve / edit / abort --> | <!-- timeout action --> |
+## Error Handling and Recovery
 
----
+**Node-level:** Each node is wrapped in try/except. Any exception sets `state["error"]` to the exception message string and returns. The conditional edge routes to `handle_error`.
 
-## Error Handling & Recovery
+**Graph-level:** `handle_error` writes the failure to SQLite and terminates. The FastAPI route reads the final state; if `state["error"]` is set, it returns HTTP 500.
 
-<!-- FILL IN: How the agent handles failures at each level. -->
+**Resume/retry:** No resume in Phase 1 — failed runs are terminal. Retries added in Phase 3.
 
-**Node-level:** <!-- Each node catches its own exceptions; fatal errors set state["error"] and route to handle_error node. -->
-
-**Graph-level (handle_error node):**
-- Reads: `state.error`, `state.run_id`
-- Updates DB: run status → "failed", `error_message`, `completed_at`
-- Logs error with `run_id` context
-- Terminates graph
-
-**Resume / retry strategy:** <!-- Can a failed run be resumed from its last checkpoint? How? -->
-
-**Partial failure:** <!-- If a non-critical step fails, does the agent degrade gracefully or abort? -->
-
----
+**Partial failure:** There is one substantive node; failure is always fatal (routes to handle_error, returns 500).
 
 ## Observability
 
-<!-- FILL IN: What is logged, traced, and measured? -->
-
 | Signal | What | Where |
 |--------|------|-------|
-| **Trace** | One trace per run, one span per node | <!-- OpenTelemetry / LangSmith / stdout --> |
-| **LLM calls** | Prompt tokens, completion tokens, latency, model | <!-- LangSmith / structured log --> |
-| **Tool calls** | Tool name, inputs, success/error, latency | Structured log |
-| **Run outcome** | Status, total duration, error if any | DB + structured log |
+| Run lifecycle | Status transitions (running → completed/failed) | SQLite runs table |
+| Errors | Exception message + run_id | SQLite runs table + stderr log |
+| LLM calls | Prompt size (tokens estimated), model name | stdout structured log |
 
----
+Distributed tracing and LangSmith integration are deferred to Phase 3 (Agentic Stack Upgrade).
 
 ## Concurrency Model
 
-<!-- FILL IN: How concurrent agent runs are handled. -->
-
-- **Run isolation:** <!-- one-at-a-time (API returns 409) / queue / parallel with run_id scoping -->
-- **Parallel nodes within a run:** <!-- which nodes run in parallel and why -->
-- **Checkpointing:** <!-- none / SqliteSaver / PostgresSaver — required if human-in-the-loop or long-running -->
-
----
-
-## Graph Assembly (`agent/graph.py`)
-
-<!-- FILL IN: Pseudocode showing how nodes and edges are wired. Must be ≤ 60 lines in the real file. -->
-
-```python
-graph = StateGraph(AgentState)
-
-graph.add_node("node_a", node_a)
-graph.add_node("node_b", node_b)
-graph.add_node("finalize", node_finalize)
-graph.add_node("handle_error", node_handle_error)
-
-graph.set_entry_point("node_a")
-
-graph.add_conditional_edges(
-    "node_a",
-    lambda s: "handle_error" if s.get("error") else "node_b",
-)
-
-graph.add_edge("node_b", "finalize")
-graph.add_edge("finalize", END)
-graph.add_edge("handle_error", END)
-
-compiled_graph = graph.compile()
-```
+- **Run isolation:** One analysis request per HTTP call; FastAPI handles concurrent requests via its async event loop, but each LangGraph invocation is synchronous and independent (scoped by run_id)
+- **Parallel nodes within a run:** None — single linear path (analyze_data → finalize/handle_error)
+- **Checkpointing:** None in Phase 1 (no human-in-the-loop, no long-running sessions); MemorySaver can be added in Phase 3 if needed

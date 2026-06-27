@@ -1,15 +1,10 @@
 # Agent
 
-> Required when the project uses an agent framework. Delete this file if your project has no agent framework.
->
-> If your project has no agent framework (e.g., a simple script or single-LLM API call), delete this file.
->
+The DataChat agent graph (LangGraph). It turns a plain-English question over a local dataset into a plain-English answer + chart, while enforcing — in code — that only schema + aggregates ever reach the LLM.
 
 ---
 
 ## Agent Architecture Pattern
-
-<!-- FILL IN: Which pattern does this agent follow? Choose one and describe why. -->
 
 | Pattern | Use when |
 |---------|----------|
@@ -19,200 +14,249 @@
 | **Supervisor** | One supervisor LLM dispatches to worker agents based on task type. |
 | **Human-in-the-loop** | Execution pauses at defined checkpoints for user review or approval. |
 
-**Chosen:** <!-- state pattern + one-sentence rationale -->
+**Chosen:** **Graph (LangGraph)** running a constrained **ReAct-style reason→act→observe** loop with a hard separation between **LLM reasoning** (over schema/aggregates) and **local tool execution** (over rows). Base composition: **Tool Use (#5)** + **Reasoning/ReAct (#17)** + **Guardrails (#18)** + **Observability (#19)**. The graph is the right floor because the flow has a real branch (compute succeeds vs. fails) and a privacy chokepoint that must sit between reasoning and execution. Phase 4 reaches up to **Memory (#8)**, **Reflection (#4)**, and **Exception Handling (#12)**; Phase 5 adds an **anomaly branch (Routing #2)**. We deliberately stay frugal — at most two LLM calls per question (plan + phrase), targeting one where the question is trivially mappable.
 
 ---
 
 ## LLM Provider & Model
 
-<!-- FILL IN: Which model drives each agent/node? State provider, model ID, and why. -->
-
 | Agent / Node | Provider | Model ID | Rationale |
 |-------------|----------|----------|-----------|
-| <!-- node --> | Anthropic | <!-- e.g. claude-sonnet-4-6 --> | <!-- latency vs. quality trade-off --> |
+| `plan_compute` | Gemini | `gemini-2.5-flash` | Cheap, fast structured-plan generation over a tiny schema prompt |
+| `phrase_answer` | Gemini | `gemini-2.5-flash` | Cheap phrasing + chart-type choice over a tiny aggregate result |
 
-**Fallback behaviour:** <!-- Production resilience only: retry/backoff, degraded mode, or a surfaced error if the LLM API is unavailable or rate-limited. NOT a test/offline stub path — tests call the real API with keys from `.env`. -->
+Single model everywhere to keep cost low (the brief's dealbreaker). `GeminiProvider.DEFAULT_MODEL` is set to `gemini-2.5-flash`; provider auto-detected from `AGENT_GEMINI_API_KEY`.
 
-**Prompt strategy:** <!-- System/user split, few-shot examples, structured output (tool_use / JSON mode)? -->
+**Fallback behaviour:** Phase 1 surfaces an LLM error as `api_error("LLM_UNAVAILABLE", ...)`. Phase 4 adds retry/backoff + timeout in `LLMClient`/nodes and a degraded message (the local aggregate result is still returned even if phrasing fails). Not a test stub — tests call real Gemini via `.env`.
+
+**Prompt strategy:** System/user split. `plan_compute` uses a system prompt (`src/prompts/plan.md`) instructing structured JSON output: `{group_by, metric_column, aggregation, filter?}`. `phrase_answer` (`src/prompts/answer.md`) takes the question + aggregate JSON and returns `{answer, chart: {type, x, series}}`. Outputs are parsed and validated (guardrail) before use.
 
 ---
 
 ## Tools & Tool Calling
 
-<!-- FILL IN: Every tool the agent can call. -->
-
 | Tool name | Description | Inputs | Output | Side-effects |
 |-----------|-------------|--------|--------|--------------|
-| <!-- name --> | <!-- what it does --> | <!-- params --> | <!-- return type --> | <!-- DB write, API call, file write, etc. --> |
+| `load_dataset` | Ingest a CSV into the local DuckDB working store | file path, dataset_id | local table handle | writes DuckDB local store |
+| `build_schema_summary` | Profile schema + column-level scalar aggregates (NO rows) | dataset_id | schema summary (cols, types, row count, min/max/distinct/null) | none |
+| `run_aggregation` | Execute the compute plan locally over the FULL dataset | plan, dataset_id | bounded aggregate result table | reads DuckDB local store |
+| `assert_no_raw_rows` | Guard: reject any LLM-bound payload that isn't schema/aggregate-shaped | payload | payload or raises | none (raises on violation) |
 
-**Tool selection strategy:** <!-- How does the agent decide which tool to call? (LLM choice, rule-based routing, forced single tool) -->
+**Tool selection strategy:** Deterministic graph order, not free LLM choice — `build_schema_summary` → (LLM plans) → `run_aggregation` → (LLM phrases). The LLM chooses *what to aggregate*, never *whether to touch rows*; row access is restricted to local tools.
 
-**Tool failure handling:** <!-- retry, fallback, abort — per tool or global policy? -->
+**Tool failure handling:** Each tool raises on failure; the node catches, sets `state["error"]`, and routes to `handle_error`. Phase 4 adds a single re-plan retry when `run_aggregation` rejects an invalid plan.
+
+---
+
+## Privacy Boundary Enforcement
+
+This is the heart of the product, enforced in the graph:
+
+- **Only two nodes call the LLM:** `plan_compute` and `phrase_answer`. No other node may import or call `LLMClient`.
+- `plan_compute`'s outgoing payload = `build_schema_summary(...)` output only (schema + scalar aggregates). It calls `assert_no_raw_rows(payload)` immediately before `LLMClient().call_model(...)`.
+- `phrase_answer`'s outgoing payload = `run_aggregation(...)` output only (a small grouped result). It calls `assert_no_raw_rows(payload)` immediately before the LLM call.
+- `assert_no_raw_rows` (in `src/tools/compute.py`) enforces the contract: the payload must be a schema summary or an aggregate result under a bounded row count (e.g. ≤ N grouped rows) and must not contain a raw-row marker. It raises if violated.
+- **Row access is confined to `src/tools/` (DuckDB/pandas).** Nodes never hold raw rows in state that crosses to the LLM; `execute_local` keeps the full data inside DuckDB and emits only the aggregate.
+
+Proven by `tests/phase1/test_privacy_boundary.py` (spies on the LLM payload with a sentinel-row fixture and asserts no raw cell value appears).
 
 ---
 
 ## Agent State
 
-<!-- FILL IN: The full state type. Every field must be named, typed, and annotated with what populates it. -->
-
 ```python
-class AgentState(TypedDict):
+class AgentState(TypedDict, total=False):
     # Identity
-    run_id: int                          # set at initialisation
+    run_id: str                          # set by runner at init
 
     # Input
-    # ...                                # fields populated from the trigger
+    dataset_id: str                      # which local dataset/connection to query
+    question: str                        # the user's plain-English question
+    messages: list                       # chat-turn history (Phase 4 memory)
 
-    # Pipeline data (populated progressively by nodes)
-    # ...
+    # Pipeline data (populated progressively; NONE of the LLM-bound fields hold raw rows)
+    schema_summary: dict                 # set by profile_data (cols/types/scalar aggregates)
+    compute_plan: dict                   # set by plan_compute (group_by/metric/aggregation)
+    aggregate_result: dict               # set by execute_local (bounded grouped result)
 
     # Output
-    # ...                                # final result fields
+    answer_text: str                     # set by phrase_answer
+    chart_spec: dict                     # set by phrase_answer ({type, x, series})
+    status: str                          # "completed" | "failed"
 
     # Control
     error: str | None                    # set by any node on fatal failure
-    checkpoint: str | None              # last completed node (for resume)
 ```
 
 ---
 
 ## Nodes / Steps
 
-<!-- FILL IN: One section per node. For single-agent loops, describe each "step" or "tool call phase." -->
+### `profile_data`
+**Reads from state:** `dataset_id`
+**Writes to state:** `schema_summary`
+**LLM call:** no.
+**External calls:** DuckDB read (local) — on failure: fatal (set `error`).
+**Behaviour:** Calls `build_schema_summary(dataset_id)` to produce schema + scalar aggregates. No rows. Pure local profiling.
 
-### `node_[name]`
+### `plan_compute`
+**Reads from state:** `schema_summary`, `question`, `messages`
+**Writes to state:** `compute_plan`
+**LLM call:** yes — Gemini `gemini-2.5-flash`, system `prompts/plan.md`, structured JSON plan. Payload = schema summary + question only; `assert_no_raw_rows` called before the call.
+**External calls:** Gemini — on failure: fatal (`LLM_UNAVAILABLE`).
+**Behaviour:** Asks the model which columns to group by / aggregate. Parses + validates the JSON plan (guardrail). Invalid → `error` (Phase 4: re-plan once).
 
-**Reads from state:** <!-- field names -->
+### `execute_local`
+**Reads from state:** `compute_plan`, `dataset_id`
+**Writes to state:** `aggregate_result`
+**LLM call:** no.
+**External calls:** DuckDB (local) over the FULL dataset — on failure: fatal (`COMPUTE_FAILED`).
+**Behaviour:** Validates the plan's columns against the schema, runs `run_aggregation(...)` locally over all rows, returns a bounded aggregate result. The privacy boundary's local side.
 
-**Writes to state:** <!-- field names -->
+### `phrase_answer`
+**Reads from state:** `question`, `aggregate_result`
+**Writes to state:** `answer_text`, `chart_spec`
+**LLM call:** yes — Gemini `gemini-2.5-flash`, system `prompts/answer.md`. Payload = question + aggregate result only; `assert_no_raw_rows` called before the call.
+**External calls:** Gemini — on failure: fatal (Phase 4: degraded — return the raw aggregate without prose).
+**Behaviour:** Turns the aggregate into a plain-English answer and a chart spec (type chosen from the data shape).
 
-**LLM call:** <!-- yes/no; if yes: prompt template summary, model used, output format -->
+### `finalize`
+**Reads from state:** `answer_text`, `chart_spec`, `run_id`
+**Writes to state:** `status="completed"`
+**Behaviour:** Persists the `Question` row (answer + chart spec) to SQLite.
 
-**External calls:**
-
-| System | Operation | On Failure |
-|--------|-----------|------------|
-| <!-- system --> | <!-- what it calls --> | <!-- fatal (set error) / partial (log + continue) / retry --> |
-
-**Behaviour:** <!-- One paragraph. What decision or transformation does this node perform? -->
+### `handle_error`
+**Reads from state:** `error`, `run_id`
+**Writes to state:** `status="failed"`
+**Behaviour:** Persists failure (status + error_message) and terminates.
 
 ---
 
 ## Graph / Flow Topology
 
-<!-- FILL IN: ASCII diagram of node flow. Show ALL conditional edges explicitly. -->
-
 ```
 START
   │
   ▼
-node_a ──(error)──► node_handle_error ──► END
+profile_data ──(error)──► handle_error ──► END
   │
   ▼
-node_b ──(condition)──► node_c
-  │                         │
-  │                         ▼
-  └──────────────────► node_finalize
-                             │
-                             ▼
-                            END
+plan_compute ──(error)──► handle_error
+  │
+  ▼
+execute_local ──(error)──► handle_error
+  │
+  ▼
+phrase_answer ──(error)──► handle_error
+  │
+  ▼
+finalize ──► END
 ```
 
 **Conditional edges:**
 
 | Source node | Condition | Target |
 |-------------|-----------|--------|
-| <!-- node --> | <!-- e.g. state["error"] is not None --> | <!-- target node --> |
+| `profile_data` | `state["error"]` set | `handle_error` |
+| `profile_data` | else | `plan_compute` |
+| `plan_compute` | `state["error"]` set | `handle_error` |
+| `plan_compute` | else | `execute_local` |
+| `execute_local` | `state["error"]` set | `handle_error` |
+| `execute_local` | else | `phrase_answer` |
+| `phrase_answer` | `state["error"]` set | `handle_error` |
+| `phrase_answer` | else | `finalize` |
+
+*(Phase 5 adds an `anomaly` branch off the entry router when the request is an anomaly request.)*
 
 ---
 
 ## Memory & Context
 
-<!-- FILL IN: How does the agent remember things across turns, steps, or runs? -->
-
 | Scope | Mechanism | What is stored |
 |-------|-----------|----------------|
-| **Within a run** | LangGraph state | All in-progress data |
-| **Across runs** | <!-- DB / vector store / none --> | <!-- e.g. past results, user prefs --> |
-| **Conversation** | <!-- message history / summary / none --> | <!-- if chat-style --> |
+| **Within a run** | LangGraph state | schema summary, plan, aggregate, answer, chart |
+| **Across runs** | SQLite app store | dataset metadata, past questions/answers |
+| **Conversation** | `AgentState.messages` + SQLite (Phase 4) | prior turns so follow-ups ("now by month") resolve in context |
 
-**Context window management:** <!-- How is the prompt kept within limits? (summary, sliding window, RAG retrieval) -->
+**Context window management:** Prompts are tiny by design (schema + small aggregates), so no truncation needed. Conversation memory (Phase 4) keeps a bounded window of recent turns; raw rows are never part of context.
 
 ---
 
 ## Human-in-the-Loop Checkpoints
 
-<!-- FILL IN: Where does execution pause for human input? Delete section if not applicable. -->
-
-| Checkpoint | What is shown to the user | Expected user action | Timeout / default |
-|------------|--------------------------|----------------------|-------------------|
-| <!-- name --> | <!-- what the agent surfaces --> | <!-- approve / edit / abort --> | <!-- timeout action --> |
+None. Read-only personal analysis; no irreversible actions. (Section retained intentionally empty.)
 
 ---
 
 ## Error Handling & Recovery
 
-<!-- FILL IN: How the agent handles failures at each level. -->
+**Node-level:** Each node wraps its work in try/except; on failure sets `state["error"]` and routing sends it to `handle_error`.
 
-**Node-level:** <!-- Each node catches its own exceptions; fatal errors set state["error"] and route to handle_error node. -->
+**Graph-level (`handle_error`):**
+- Reads `state.error`, `state.run_id`
+- Updates the `Question`/run row: status → "failed", `error_message`, timestamp
+- Logs with `run_id` context; terminates the graph
 
-**Graph-level (handle_error node):**
-- Reads: `state.error`, `state.run_id`
-- Updates DB: run status → "failed", `error_message`, `completed_at`
-- Logs error with `run_id` context
-- Terminates graph
+**Resume / retry strategy:** Phase 1 — none (each question is a fresh run). Phase 4 — `plan_compute` re-plans once on a guardrail rejection; `LLMClient` retries with backoff on transient Gemini errors.
 
-**Resume / retry strategy:** <!-- Can a failed run be resumed from its last checkpoint? How? -->
-
-**Partial failure:** <!-- If a non-critical step fails, does the agent degrade gracefully or abort? -->
+**Partial failure:** Phase 4 — if `phrase_answer` fails, return the aggregate result with a generic phrasing (degraded, not crashed). Local compute failures remain fatal (no meaningful answer possible).
 
 ---
 
 ## Observability
 
-<!-- FILL IN: What is logged, traced, and measured? -->
-
 | Signal | What | Where |
 |--------|------|-------|
-| **Trace** | One trace per run, one span per node | <!-- OpenTelemetry / LangSmith / stdout --> |
-| **LLM calls** | Prompt tokens, completion tokens, latency, model | <!-- LangSmith / structured log --> |
-| **Tool calls** | Tool name, inputs, success/error, latency | Structured log |
-| **Run outcome** | Status, total duration, error if any | DB + structured log |
+| **Trace** | One trace per run, one span per node | structured stdout log (structlog) |
+| **LLM calls** | model, prompt/response sizes, latency, call count per question | structured log |
+| **Tool calls** | tool name, success/error, latency, rows-scanned (local) | structured log |
+| **Run outcome** | status, duration, error if any | SQLite + structured log |
+| **Privacy assertion** | each `assert_no_raw_rows` pass logged (boundary upheld) | structured log |
 
 ---
 
 ## Concurrency Model
 
-<!-- FILL IN: How concurrent agent runs are handled. -->
-
-- **Run isolation:** <!-- one-at-a-time (API returns 409) / queue / parallel with run_id scoping -->
-- **Parallel nodes within a run:** <!-- which nodes run in parallel and why -->
-- **Checkpointing:** <!-- none / SqliteSaver / PostgresSaver — required if human-in-the-loop or long-running -->
+- **Run isolation:** one question = one run scoped by `run_id`; the personal single-user tool serves requests sequentially per process. No cross-run shared mutable state.
+- **Parallel nodes within a run:** none — the pipeline is strictly ordered (profile → plan → execute → phrase).
+- **Checkpointing:** none in Phase 1 (runs are short). Phase 4 conversation memory persists turns to SQLite, not a LangGraph checkpointer.
 
 ---
 
-## Graph Assembly (`agent/graph.py`)
-
-<!-- FILL IN: Pseudocode showing how nodes and edges are wired. Must be ≤ 60 lines in the real file. -->
+## Graph Assembly (`src/graph/agent.py`)
 
 ```python
-graph = StateGraph(AgentState)
-
-graph.add_node("node_a", node_a)
-graph.add_node("node_b", node_b)
-graph.add_node("finalize", node_finalize)
-graph.add_node("handle_error", node_handle_error)
-
-graph.set_entry_point("node_a")
-
-graph.add_conditional_edges(
-    "node_a",
-    lambda s: "handle_error" if s.get("error") else "node_b",
+from langgraph.graph import StateGraph, END
+from graph.state import AgentState
+from graph.nodes import (
+    profile_data, plan_compute, execute_local,
+    phrase_answer, finalize, handle_error,
+)
+from graph.edges import (
+    after_profile, after_plan, after_execute, after_phrase,
 )
 
-graph.add_edge("node_b", "finalize")
-graph.add_edge("finalize", END)
-graph.add_edge("handle_error", END)
+def _build_graph() -> StateGraph:
+    g = StateGraph(AgentState)
+    g.add_node("profile_data", profile_data)
+    g.add_node("plan_compute", plan_compute)
+    g.add_node("execute_local", execute_local)
+    g.add_node("phrase_answer", phrase_answer)
+    g.add_node("finalize", finalize)
+    g.add_node("handle_error", handle_error)
 
-compiled_graph = graph.compile()
+    g.set_entry_point("profile_data")
+    g.add_conditional_edges("profile_data", after_profile,
+        {"plan_compute": "plan_compute", "handle_error": "handle_error"})
+    g.add_conditional_edges("plan_compute", after_plan,
+        {"execute_local": "execute_local", "handle_error": "handle_error"})
+    g.add_conditional_edges("execute_local", after_execute,
+        {"phrase_answer": "phrase_answer", "handle_error": "handle_error"})
+    g.add_conditional_edges("phrase_answer", after_phrase,
+        {"finalize": "finalize", "handle_error": "handle_error"})
+    g.add_edge("finalize", END)
+    g.add_edge("handle_error", END)
+    return g.compile()
+
+agentic_ai = _build_graph()
 ```

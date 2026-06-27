@@ -60,10 +60,10 @@ SHIP (after the final phase passes its gate)
 
 ## Stage 2 — Scaffold (first invocation only — you own git)
 
-1. `git rev-parse --abbrev-ref HEAD` to confirm current branch (this is the base — do NOT switch to main first). `git checkout -b feature/<slug>-v0.1`. Never build on `main`.
+1. `git rev-parse --abbrev-ref HEAD` to confirm current branch (this is the base — do NOT switch to main first). Generate a unique branch name: `BRANCH="feature/<slug>-$(date +%m%d-%H%M)-v0.1"` then `git checkout -b "$BRANCH"`. Never build on `main`.
 2. Create the project directories per `harness/patterns/project-layout.md`. Never write app code at the repo root.
 3. Create `.env.example` documenting every env var; the real values live in the user's `.env` (filled at intake) and tests/evals read from there. Never stage `.env`.
-4. First commit (scaffold) + push, then open the PR immediately — a PR must exist before the first feature commit (`harness/rules/git.md`): `gh pr create --base main --head feature/<slug>-v0.1`.
+4. First commit (scaffold) + push, then open the PR immediately — a PR must exist before the first feature commit (`harness/rules/git.md`): `gh pr create --base main --head "$BRANCH"`.
 
 ## Stage 3 — Build one phase (max parallelism)
 
@@ -73,7 +73,7 @@ For the phase named in your invocation (Phase 1 on the first invocation; the nex
 2. **Fan out a code-generator per slice — ALL IN ONE MESSAGE so they run concurrently.** Invoke multiple `code-generator` instances in a single Agent message — one per independent slice — and tell each exactly which surfaces it owns (backend `src/`, frontend `frontend/`, or both). Slices own disjoint file paths so parallel instances never conflict. Serialize a generator only across a true **declared dependency** in the roadmap.
    - **Phase 1 scope**: the smallest user-testable WIN — first-time-right on the one core path (backend minimal but REAL, no fake data on the tested path), with the frontend visually complete: real UI for the working path PLUS clearly-labelled NON-FUNCTIONAL stubs for everything coming later. A stub must never look like a bug. Do not over-build Phase 1.
 3. **Gate each slice the moment its generator returns — pipeline, do NOT wait for the whole phase.** Because slices are independent, spawn that slice's qa-auditor as soon as its code-generator comes back, rather than barrier-waiting for every generator to finish before any review starts. This cuts phase wall-clock from `max(all generators) + max(all auditors)` to `max(generator + auditor per slice)`. Each qa-auditor does independent code review (logic/security/spec-fidelity) **and** the phase gate + golden-path/live-server/UI smoke against the real LLM/API using keys from `.env`. Aggregate the verdicts as they arrive. On a **BLOCKED** slice, loop only that slice's generator (frontend and/or backend per the verdict's named surface) until VERIFIED; other slices are unaffected. (Only barrier-wait when a slice's true declared dependency in the roadmap requires an upstream slice's verified output first.)
-4. **Commit + push this phase** once all slices are VERIFIED — stage the phase's files explicitly (never `git add -A` / `git add .`), `git commit -m "phase-N: <desc>" && git push origin feature/<slug>-v0.1` as one atomic action. Keep the PR body current (what each phase added, how to run it, what's deferred).
+4. **Commit + push this phase** once all slices are VERIFIED — stage the phase's files explicitly (never `git add -A` / `git add .`), `git commit -m "phase-N: <desc>" && git push origin "$(git rev-parse --abbrev-ref HEAD)"` as one atomic action. Keep the PR body current (what each phase added, how to run it, what's deferred).
 
 ## Stage 4 — Publish the test-handoff and STOP
 

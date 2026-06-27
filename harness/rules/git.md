@@ -7,7 +7,7 @@ All git rules that apply to every Claude Code session in this repo.
 ## Branch Model
 
 - **`main` is boilerplate-only.** Never commit application code to `main`. All application code lives on a named feature branch and reaches `main` only via a reviewed pull request.
-- Before writing any application code, create a feature branch: `git checkout -b feature/<slug>-v0.1`
+- Before writing any application code, create a feature branch with a datestamp suffix to ensure uniqueness across repeated builds: `git checkout -b feature/<slug>-$(date +%m%d-%H%M)-v0.1`
 - All phase commits go to the feature branch, never to `main`
 - Spec, harness, and boilerplate improvements (no app code) are the only commits that may go directly to `main`
 - When the build is complete, open a PR from the feature branch into `main` — do not merge locally

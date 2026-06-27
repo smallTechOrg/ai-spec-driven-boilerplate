@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     max_cost_usd_per_run: float = Field(default=1.0)
     max_tokens_per_run: int = Field(default=200_000)
 
+    # Data-analysis capability caps (AGENT_-prefixed; overridable from .env)
+    sample_rows: int = Field(default=20)             # rows in the bounded sample
+    sandbox_timeout_s: float = Field(default=10.0)   # local code wall-clock cap
+    max_upload_mb: int = Field(default=50)           # reject larger uploads
+    max_rows: int = Field(default=1_000_000)         # reject larger datasets
+
     # MCP consumption (optional; tools register into the same registry)
     mcp_server_url: str = Field(default="")
     mcp_server_name: str = Field(default="")

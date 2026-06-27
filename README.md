@@ -4,6 +4,79 @@ Give it a one-line idea. Walk away with a working, tested, phased agent.
 
 A lean, Claude-Code-native harness for building agentic software **spec-first**. One person with an idea and one API key can drive a real, production-shaped agent into existence — and a senior engineer opening the result finds a conventional, reviewable stack, not generated mush.
 
+> This repo doubles as the harness *and* as a concrete build. The section directly below documents the agent currently built into `src/`; everything from **The Spirit** onward documents the reusable harness itself.
+
+---
+
+## This Build: Data Analysis Agent (Phase 1)
+
+Upload a CSV, ask a question in plain English, and get back **three things you can trust**: the real numeric answer (computed by running pandas over your actual data — never the LLM guessing), a short plain-English explanation, and the **exact pandas code the agent executed** so the result is auditable. Your data stays local: only the file's schema and a small sample of rows are sent to the LLM to plan the analysis — the full CSV never leaves the box.
+
+Stack: FastAPI + LangGraph + pandas + SQLite + Gemini (`gemini-2.5-flash`, auto-detected from `AGENT_GEMINI_API_KEY`), with a Next.js static-export UI served single-origin at `/app`. Tooling: `uv` (Python) and `pnpm` (frontend).
+
+### Run it
+
+All commands below are run **from the repo root** (`/Users/sai/Workspace/Code/exp1`) unless a `cd` is shown.
+
+1. Make sure `.env` has your Gemini key set — this is the only manual step (the file is gitignored):
+
+   ```
+   AGENT_GEMINI_API_KEY=<your key>
+   ```
+
+2. Build the static UI into `frontend/out`:
+
+   ```bash
+   cd frontend && pnpm install && pnpm build
+   ```
+
+3. Back at the repo root, create the `datasets` / `queries` tables:
+
+   ```bash
+   uv run alembic upgrade head
+   ```
+
+4. Start the API + UI (single-origin) on port 8001:
+
+   ```bash
+   uv run python -m src
+   ```
+
+5. Open **`http://localhost:8001/app/`**, upload `tests/fixtures/sales.csv`, and ask:
+
+   > What is the total amount, and which region has the highest average amount?
+
+   You'll see the numeric answer, a short explanation, and the exact pandas code the agent ran.
+
+### API
+
+Two routes, both returning the standard `{data, error}` envelope:
+
+| Method & path | Request | Response (`data`) |
+|---------------|---------|-------------------|
+| `POST /datasets` | multipart form field `file` (a `.csv`) | the stored dataset (id, schema, row count) |
+| `POST /datasets/{dataset_id}/ask` | JSON `{ "question": "...", "conversation_id": "..." }` | `answer`, `explanation`, `code`, `result` |
+
+### Test it
+
+The Phase 1 gate (run **from the repo root**; needs the real Gemini key in `.env`, since the integration tests call the live model):
+
+```bash
+uv run pytest tests/unit/test_dataset.py tests/unit/test_sandbox.py tests/unit/test_db_schema.py tests/integration/test_analysis_graph.py tests/integration/test_analysis_api.py -q
+```
+
+### What's real vs. labelled stubs (UI)
+
+| Real and working | Labelled "Coming soon" stubs |
+|------------------|------------------------------|
+| Single CSV upload | Multiple files at once |
+| One question → answer, explanation, and the executed code | Charts / visualisations |
+| | Excel / `.xlsx` upload |
+| | Multi-turn chat (follow-up questions) |
+| | Database connections |
+
+The stubs are non-functional and clearly marked in the UI so a stub is never mistaken for a bug.
+
 ---
 
 ## The Spirit

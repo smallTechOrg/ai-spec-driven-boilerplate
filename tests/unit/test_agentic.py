@@ -62,7 +62,11 @@ def test_mcp_off_by_default_on_by_setting(monkeypatch):
 
 
 def test_graph_has_composed_nodes():
+    # Phase 1 composes the Data-Analysis graph (spec/agent.md): the transform_text
+    # / react seam nodes are superseded on the composed path; load_memory /
+    # write_memory are dormant until Phase 2.
     from graph.agent import agentic_ai
     nodes = set(agentic_ai.get_graph().nodes)
-    for n in ("guard_input", "load_memory", "react", "guard_output", "write_memory", "transform_text"):
+    for n in ("guard_input", "load_dataset", "propose_code", "execute_code",
+              "explain_result", "finalize", "handle_error"):
         assert n in nodes

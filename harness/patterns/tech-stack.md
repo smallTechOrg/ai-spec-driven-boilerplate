@@ -36,7 +36,7 @@ Current safe defaults (as of 2026):
 |----------|---------------|-------|
 | Anthropic | `claude-sonnet-4-6` | matches `.env.example`; verify against current docs before pinning |
 | OpenRouter | `anthropic/claude-sonnet-4-6` | provider-prefixed; routes to the underlying model |
-| Google Gemini | `gemini-2.5-flash` | `gemini-2.0-flash` and `gemini-1.5-flash` are unavailable for new users |
+| Google Gemini | `gemini-2.5-pro` | `gemini-2.0-flash` and `gemini-1.5-flash` are unavailable for new users |
 | OpenAI | `gpt-4o-mini` | |
 
 ## DB Driver Rule

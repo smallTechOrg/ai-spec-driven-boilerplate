@@ -18,9 +18,9 @@ Four roles are always present; the middle phases are derived from requirements:
 
 ### Phase 1 — First Win
 
-Phase 1 is the **smallest user-testable win** — the one core path of the main user journey, real and working the first time, that the person who briefed the idea immediately appreciates. Not every primary requirement: the single most important path, done right, with the rest as labelled stubs.
+Phase 1 is the **smallest user-testable win** — the full primary user journey end-to-end, real and working the first time, that the person who briefed the idea immediately appreciates. Not every feature: the complete primary flow, done right, with supporting features as labelled stubs.
 
-- **Smallest real path, not "all the primary requirements."** Pick the one core path that proves the idea (e.g. upload → ask → answer-with-chart) and make it real first-time. Defer every other requirement to a later phase as a clearly-labelled stub. Over-scoping Phase 1 to cover everything is the failure mode, not the goal.
+- **Full primary journey, not "all the features."** Deliver the complete end-to-end flow that proves the idea (e.g. upload → profile → ask → answer-with-chart) — every step the user must take to get a real result. Defer secondary features (export, history, multi-file, settings) to later phases as clearly-labelled stubs. Over-scoping Phase 1 to cover every feature is the failure mode, not the goal.
 - **Agentic stack is wired from day one.** The graph framework (LangGraph or equivalent), state type, core nodes, and assembly are set up in Phase 1 even if some capability nodes are stubs. Never defer the agentic skeleton.
 - Frontend is visually complete: real UI for the one path Phase 1 delivers, PLUS clearly-labelled stubs for what's coming. Stubs are never mistaken for bugs.
 - All calls on the tested path hit the real LLM/API (keys from `.env`) — no fake data on what the user tests.

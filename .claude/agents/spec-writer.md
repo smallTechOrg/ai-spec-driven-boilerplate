@@ -53,7 +53,7 @@ Adding a single capability to an existing spec: create just the new `spec/capabi
 
 Goal: a working, thoroughly-tested agent built phase by phase, each phase a user-testable win. **Phase 1 is the SMALLEST user-testable win that works the FIRST time the user tests it** — zero rough edges on the tested path, no debugging or re-prompting required. It is fine for Phase 1 to be smaller than "complete"; later phases wire stubs into real features, one human-tested increment at a time.
 
-Anything not strictly required for the core loop goes into a later phase, not Phase 1. For each candidate: *if removed, would the agent still do its one core thing?* If yes — defer it. Almost always v1: one output format, one trigger, one data source, env/file config, CLI **or** REST, happy path only. **Target: 2–4 capabilities max.** More than 5 → cut harder.
+Anything not part of the primary user journey goes into a later phase, not Phase 1. For each candidate: *if removed, would the user be unable to complete their primary task end-to-end?* If yes — it belongs in Phase 1. If no — defer it. Almost always v1: the full primary flow (e.g. upload → profile → ask → answer), one output format, one trigger, one data source. Let the user's requirements drive the capability count — include what is genuinely needed for the primary journey, defer what is not.
 
 **Plan the UI stubs explicitly.** The frontend builds in parallel with the backend, so Phase 1's UI can be visually rich and indicative: real UI for the one working path PLUS clearly-labelled NON-FUNCTIONAL stubs/placeholders for everything coming later, so the user sees the vision. Note in the plan which UI surfaces are real-on-the-path vs labelled stubs, so a stub is never mistaken for a bug. Backend in Phase 1 is minimal but REAL on the one core path — no fake data on the path the user tests.
 
@@ -99,8 +99,8 @@ Be your own adversarial reviewer — there is no second pair of eyes, so catch t
 
 - **Completeness** — every `<!-- FILL IN -->` resolved or the file deleted; no placeholder text shipped.
 - **Coherence** — vision, capabilities, data-model, architecture, and agent graph agree; each capability's inputs/outputs trace to entities in `data.md`; no capability references data that doesn't exist.
-- **Scope** — 2–4 capabilities for v1; **every capability maps to a phase**; anything failing the core-loop test is in a later phase, not Phase 1.
-- **Phase 1** — the SMALLEST first-time-right win, with the UI stubs planned and labelled, and the backend minimal-but-real on the one tested path.
+- **Scope** — **every capability maps to a phase**; anything not required for the primary user journey end-to-end is in a later phase, not Phase 1.
+- **Phase 1** — the full primary journey first-time-right, with the UI stubs planned and labelled, and the backend real on every step of that journey.
 - **Slices** — genuinely independent, or every true dependency marked, so generators can fan out concurrently.
 - **Gates** — every gate is a concrete runnable command against **real keys + the production DB**, not "tests pass".
 - **Agent graph** — if a framework is used, `agent.md` is complete (state/nodes/edges/error-handler/finalize/concurrency/assembly); an incomplete graph is a CRITICAL BLOCKER.

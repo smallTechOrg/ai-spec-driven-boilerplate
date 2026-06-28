@@ -20,3 +20,6 @@ build/
 # Playwright output
 test-results/
 frontend/test-results/
+
+# runtime dataset uploads (not source)
+src/data/datasets/

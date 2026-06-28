@@ -1,11 +1,18 @@
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Anchor .env to the repo root so it loads regardless of CWD.
+# settings.py lives at src/config/settings.py:
+#   parents[0]=config, parents[1]=src, parents[2]=repo root.
+_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="AGENT_",
-        env_file=".env",
+        env_file=str(_ENV_FILE),
         case_sensitive=False,
         extra="ignore",
     )

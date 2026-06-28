@@ -391,7 +391,7 @@
           </form>
           {% if srv.is_parquet %}
           <input type="file" accept=".csv,.tsv,.json,.xlsx,.xls" style="display:none" id="addcsv-input"
-                 onchange="addTable({{ srv.name|tojson }})">
+                 onchange='addTable({{ srv.id|tojson }}, {{ srv.name|tojson }})'>
           <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('addcsv-input').click()">+ Add table</button>
           {% endif %}
         </div>
@@ -625,17 +625,20 @@
   }
 
   // Add a table to an existing parquet database: upload the file, then sync (re-inspects + regenerates).
-  async function addTable(databaseName) {
+  async function addTable(serverId, databaseName) {
     const input = document.getElementById('addcsv-input');
     const file = input.files[0];
     if (!file) return;
+    input.value = '';
+    showPageLoading('Uploading file…');
     try {
       const up = new FormData(); up.append('database_name', databaseName); up.append('file', file);
       const r1 = await fetch('/database/upload', { method: 'POST', body: up });
-      if (!r1.ok) { alert((await _errMsg(r1))); return; }
-      const r2 = await fetch('/database/' + window.MCP_SERVER_ID + '/sync', { method: 'POST' });
-      window.location = '/database/' + window.MCP_SERVER_ID;
-    } catch (e) { alert('Network error: ' + e); }
+      if (!r1.ok) { hidePageLoading(); alert(await _errMsg(r1)); return; }
+      showPageLoading('Syncing database…');
+      await fetch('/database/' + serverId + '/sync', { method: 'POST' });
+      window.location = '/database/' + serverId;
+    } catch (e) { hidePageLoading(); alert('Network error: ' + e); }
   }
 
   // ── Ask: overlay + poll ───────────────────────────────────────────────

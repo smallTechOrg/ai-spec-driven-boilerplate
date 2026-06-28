@@ -13,11 +13,12 @@ A capability is a single, discrete action or behavior the agent performs. Exampl
 
 ## Capabilities in This Project
 
-<!-- FILL IN: List capabilities here as they are defined. Each entry links to its spec file (no number prefix). -->
-
-| Capability | File |
-|-----------|------|
-| <!-- name --> | [name.md](name.md) |
+| Capability | File | Introduced |
+|-----------|------|-----------|
+| dataset_library | [dataset_library.md](dataset_library.md) | P1 → P2 → P4 |
+| analyze_dataset | [analyze_dataset.md](analyze_dataset.md) | P1 → P3 → P4 |
+| conversation | [conversation.md](conversation.md) | P2 |
+| run_observability | [run_observability.md](run_observability.md) | P1 → P3 → P4 |
 
 ## How to Add a New Capability
 

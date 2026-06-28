@@ -110,7 +110,7 @@ def test_resource_and_prompt_rows(db):
     db.add_all([r, p])
     db.commit()
     db.refresh(r)
-    assert r.content == {"tables": {}}
+    assert r.content == {"kind": "schema", "tables": {}}
     assert p.arguments == []
 
 

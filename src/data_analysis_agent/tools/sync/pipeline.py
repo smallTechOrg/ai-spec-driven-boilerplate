@@ -553,7 +553,7 @@ def _resource_fields(row: McpResourceRow, item: dict) -> None:
     row.description = item.get("description")
     row.mime_type = item.get("mime_type")
     row.kind = item.get("kind") or "primary_entity"
-    row.content_json = json.dumps(item["content"]) if item.get("content") is not None else None
+    row.content = item["content"] if item.get("content") is not None else None
     row.size = item.get("size")
 
 

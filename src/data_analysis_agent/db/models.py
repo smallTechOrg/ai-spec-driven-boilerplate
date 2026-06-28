@@ -2,7 +2,8 @@ import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Float, Index, Integer, Text, TIMESTAMP, text
+from sqlalchemy import Float, Index, Integer, JSON, Text, TIMESTAMP, func, text, type_coerce
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -101,14 +102,13 @@ class _CapabilityMixin:
 class McpToolRow(_CapabilityMixin, Base):
     """A canned "GET-API" MCP tool: a parameterized read-only SELECT over the server's tables.
 
-    The tool's execution spec is a single JSON object column, ``execution_json``::
+    All tool metadata is stored in a single ``meta_json`` column::
 
-        {"sql_template": "SELECT … WHERE x > $min",
-         "parameters": [{"name": "min", "type": "integer", "description": "…", "required": true}]}
-
-    ``sql_template`` carries the ``$param`` embeddings; ``parameters`` defines each embedding's name +
-    type. This object is the **source of truth for the executor**. The MCP-advertised ``inputSchema`` and
-    the bare ``sql_template`` are *derived* from it (read-only properties) — there is no separate column.
+        {"execution":     {"sql_template": "SELECT … WHERE x > $min",
+                           "parameters":   [{"name": "min", "type": "integer", ...}]},
+         "input_schema":  {"type": "object", "properties": {...}, "required": [...]},
+         "output_schema": {},
+         "annotations":   {}}
     """
 
     __tablename__ = "mcp_tools"
@@ -126,18 +126,24 @@ class McpToolRow(_CapabilityMixin, Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    execution_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
-    output_schema_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    annotations_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    meta_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+
+    def _meta(self) -> dict:
+        return _loads(self.meta_json, {})
+
+    def _set_meta_key(self, key: str, value) -> None:
+        m = self._meta()
+        m[key] = value
+        self.meta_json = json.dumps(m)
 
     @property
     def execution(self) -> dict:
         """The executor spec: ``{"sql_template": str, "parameters": [{"name","type",...}]}``."""
-        return _loads(self.execution_json, {})
+        return self._meta().get("execution") or {}
 
     @execution.setter
     def execution(self, value: dict) -> None:
-        self.execution_json = json.dumps(value or {})
+        self._set_meta_key("execution", value or {})
 
     @property
     def parameters(self) -> list[dict]:
@@ -151,25 +157,70 @@ class McpToolRow(_CapabilityMixin, Base):
 
     @property
     def input_schema(self) -> dict:
-        """MCP ``inputSchema`` derived from the execution parameter specs."""
+        """MCP ``inputSchema`` — stored in meta or derived from execution parameters."""
+        stored = self._meta().get("input_schema")
+        if stored:
+            return stored
         return input_schema_from_parameters(self.parameters)
+
+    @input_schema.setter
+    def input_schema(self, value: dict) -> None:
+        self._set_meta_key("input_schema", value or {})
 
     @property
     def output_schema(self) -> dict | None:
-        return _loads(self.output_schema_json, None)
+        return self._meta().get("output_schema") or None
+
+    @output_schema.setter
+    def output_schema(self, value: dict | None) -> None:
+        self._set_meta_key("output_schema", value or {})
 
     @property
     def annotations(self) -> dict | None:
-        return _loads(self.annotations_json, None)
+        return self._meta().get("annotations") or None
+
+    @annotations.setter
+    def annotations(self, value: dict | None) -> None:
+        self._set_meta_key("annotations", value or {})
+
+    # ── backward-compat aliases (old column names → meta_json) ──────────────
+    @property
+    def execution_json(self) -> str:
+        return json.dumps(self.execution)
+
+    @execution_json.setter
+    def execution_json(self, value: str | None) -> None:
+        self._set_meta_key("execution", json.loads(value) if value else {})
+
+    @property
+    def output_schema_json(self) -> str | None:
+        v = self._meta().get("output_schema")
+        return json.dumps(v) if v is not None else None
+
+    @output_schema_json.setter
+    def output_schema_json(self, value: str | None) -> None:
+        self._set_meta_key("output_schema", json.loads(value) if value else None)
+
+    @property
+    def annotations_json(self) -> str | None:
+        v = self._meta().get("annotations")
+        return json.dumps(v) if v is not None else None
+
+    @annotations_json.setter
+    def annotations_json(self, value: str | None) -> None:
+        self._set_meta_key("annotations", json.loads(value) if value else None)
 
 
 class McpResourceRow(_CapabilityMixin, Base):
-    """An MCP resource: the dataset schema, or a primary/secondary entity derived from it."""
+    """An MCP resource: the dataset schema, or a primary/secondary entity derived from it.
+
+    ``content_json`` stores all content including the resource kind::
+
+        {"kind": "primary_entity", ...entity-specific fields...}
+    """
 
     __tablename__ = "mcp_resources"
     __table_args__ = (
-        # A resource URI is unique at the DB level (among active rows — soft-deleted tombstones are
-        # excluded so a pruned entity can be re-added under the same URI).
         Index(
             "uq_mcp_resources_active_uri",
             "uri",
@@ -184,9 +235,25 @@ class McpResourceRow(_CapabilityMixin, Base):
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     mime_type: Mapped[str | None] = mapped_column(Text, nullable=True)
-    kind: Mapped[str] = mapped_column(Text, nullable=False, default="primary_entity")
     content_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     size: Mapped[int | None] = mapped_column(Integer, nullable=True)  # bytes: parquet file (table) or content_json (schema)
+
+    @hybrid_property
+    def kind(self) -> str:
+        return (self.content or {}).get("kind") or "primary_entity"
+
+    @kind.setter
+    def kind(self, value: str) -> None:
+        c = _loads(self.content_json, {}) or {}
+        c["kind"] = value
+        self.content_json = json.dumps(c)
+
+    @kind.expression
+    @classmethod
+    def kind(cls):
+        # type_coerce (no SQL CAST emitted) lets SQLAlchemy use JSON subscript semantics:
+        # json_extract(col, '$.kind') on SQLite, col->>'kind' on PostgreSQL.
+        return func.coalesce(type_coerce(cls.content_json, JSON)["kind"].as_string(), "primary_entity")
 
     @property
     def content(self):
@@ -194,11 +261,21 @@ class McpResourceRow(_CapabilityMixin, Base):
 
     @content.setter
     def content(self, value) -> None:
+        if value is not None:
+            existing = _loads(self.content_json, {}) or {}
+            if "kind" in existing and "kind" not in value:
+                value = {"kind": existing["kind"], **value}
         self.content_json = json.dumps(value)
 
 
 class McpPromptRow(_CapabilityMixin, Base):
-    """An MCP prompt template over the server's tools."""
+    """An MCP prompt template over the server's tools.
+
+    ``meta_json`` stores both the argument spec and the template::
+
+        {"arguments": [{"name": "...", "description": "...", "required": true}],
+         "template":   {...}}
+    """
 
     __tablename__ = "mcp_prompts"
     __table_args__ = (
@@ -215,16 +292,53 @@ class McpPromptRow(_CapabilityMixin, Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    arguments_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    template_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    meta_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    def _meta(self) -> dict:
+        return _loads(self.meta_json, {})
 
     @property
     def arguments(self) -> list[dict]:
-        return _loads(self.arguments_json, [])
+        return self._meta().get("arguments") or []
+
+    @arguments.setter
+    def arguments(self, value: list[dict]) -> None:
+        m = self._meta()
+        m["arguments"] = value or []
+        self.meta_json = json.dumps(m)
 
     @property
     def template(self):
-        return _loads(self.template_json, None)
+        return self._meta().get("template")
+
+    @template.setter
+    def template(self, value) -> None:
+        m = self._meta()
+        m["template"] = value
+        self.meta_json = json.dumps(m)
+
+    # ── backward-compat aliases (old column names → meta_json) ──────────────
+    @property
+    def arguments_json(self) -> str | None:
+        v = self._meta().get("arguments")
+        return json.dumps(v) if v is not None else None
+
+    @arguments_json.setter
+    def arguments_json(self, value: str | None) -> None:
+        m = self._meta()
+        m["arguments"] = json.loads(value) if value else []
+        self.meta_json = json.dumps(m)
+
+    @property
+    def template_json(self) -> str | None:
+        v = self._meta().get("template")
+        return json.dumps(v) if v is not None else None
+
+    @template_json.setter
+    def template_json(self, value: str | None) -> None:
+        m = self._meta()
+        m["template"] = json.loads(value) if value is not None else None
+        self.meta_json = json.dumps(m)
 
 
 class SessionRow(Base):

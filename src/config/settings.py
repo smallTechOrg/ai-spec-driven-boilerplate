@@ -21,6 +21,19 @@ class Settings(BaseSettings):
     anthropic_api_key: str = Field(default="")
     gemini_api_key: str = Field(default="")
 
+    # LLM model overrides (per node)
+    llm_model_plan: str = Field(default="gemini-2.5-flash")    # plan_analysis node
+    llm_model_reason: str = Field(default="gemini-2.5-pro")    # reason_answer node
+
+    # PostgreSQL external data source (Phase 2)
+    postgres_dsn: str = Field(default="")
+
+    # LangSmith — SDK reads LANGCHAIN_* from os.environ directly (no AGENT_ prefix).
+    # These fields allow loading them from .env via pydantic-settings for reference.
+    # The lifespan startup copies them into os.environ for the SDK to pick up.
+    langchain_api_key: str = Field(default="")
+    langchain_tracing_v2: str = Field(default="")
+
 
 _settings: Settings | None = None
 

@@ -20,7 +20,7 @@ def test_run_returns_200_with_output(api_client, _isolated_db):
         s.commit()
         run_id = row.id
 
-    with patch("api.runs.run_agent", return_value=run_id):
+    with patch("api.runs.run_agent_text", return_value=run_id):
         r = api_client.post("/runs", json={"input_text": "test"})
 
     assert r.status_code == 200

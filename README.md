@@ -23,7 +23,7 @@ Six convictions the whole repo is built around:
 
 A starting point for building AI agents spec-first. The repo ships with:
 
-- A working **baseline agent** in `src/` (FastAPI + LangGraph + SQLite, provider-agnostic LLM — Anthropic or Gemini, `transform_text` as the capability slot) — tests pass out of the box
+- A working **local-first data-analyst agent** in `src/` (FastAPI + LangGraph + SQLite, Gemini LLM) — upload a CSV, ask a natural-language question, get an answer with locally-run code and a chart. Privacy-preserving: only the schema and a small sample are sent to Gemini; the generated pandas/DuckDB code runs locally against your full data. Tests pass out of the box.
 - A **spec template** in `spec/` covering roadmap, architecture, capabilities, data model, API, UI, and agent graph
 - Three **zero-shot skills** (`/zero-shot-build`, `/zero-shot-fix`, `/zero-shot-sync`)
 - A four-agent **team** — agent-builder orchestrates (plans, fans out, owns git/PR); spec-writer is the single design authority; code-generator implements one slice per instance (parallelised); qa-auditor reviews and gates
@@ -114,32 +114,39 @@ agent.py            ← verify setup (default); --run to start the server
 .env.example
 ```
 
-**Capability slot** — the three files to replace for your agent:
-- `src/graph/nodes.py` — replace `transform_text` with your logic
-- `src/prompts/transform.md` — replace with your system prompt
-- `frontend/src/app/page.tsx` — replace the transform form with your UI
+**Capability files** — the implemented data-analyst slot:
+- `src/graph/nodes.py` — the analysis graph nodes (plan → generate code → run locally → visualize)
+- `src/prompts/plan.md`, `src/prompts/generate_code.md`, `src/prompts/visualize.md` — the system prompts for each step
+- `frontend/src/app/page.tsx` — the data-analyst workspace UI
 
 Everything else (graph wiring, API, DB, settings, tests) is already working.
 
 ---
 
-## Running the Baseline
+## Running the data-analyst agent
 
 ```bash
 cp .env.example .env
-# edit .env: set exactly ONE provider key —
-#   AGENT_ANTHROPIC_API_KEY=<your key>   or   AGENT_GEMINI_API_KEY=<your key>
-# the provider is auto-detected from whichever key is set
+# edit .env: set your Gemini key —
+#   AGENT_GEMINI_API_KEY=<your key>
 uv sync
-python agent.py                        # verify tools, .env, deps, tests (default)
-python agent.py --run                  # migrations + frontend build + start server
 ```
+
+Then, from the repo root:
+
+```bash
+uv run alembic upgrade head            # apply DB migrations
+cd frontend && pnpm build && cd ..     # build the static frontend
+uv run python -m src                   # serve API + UI at http://localhost:8001/app/
+```
+
+The bundled `python agent.py --run` helper performs the same migrations + frontend build + server start in one step if you prefer.
 
 Once running:
 
 | URL | What |
 |-----|------|
-| `http://localhost:8001/app/` | **UI** — transform form (the capability slot) |
+| `http://localhost:8001/app/` | **UI** — data-analyst workspace (upload CSV, ask questions, get answers with code + charts) |
 | `http://localhost:8001/health` | API health check |
 | `http://localhost:8001/docs` | Interactive API docs (Swagger) |
 

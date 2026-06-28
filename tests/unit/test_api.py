@@ -1,6 +1,4 @@
 """API contract tests — no LLM key required, graph is not invoked."""
-import pytest
-from unittest.mock import patch
 
 
 def test_health(api_client):
@@ -9,37 +7,31 @@ def test_health(api_client):
     assert r.json()["data"]["status"] == "ok"
 
 
-def test_run_returns_200_with_output(api_client, _isolated_db):
-    from sqlalchemy.orm import Session
-    from db.models import RunRow
-
-    # Pre-insert a completed run so run_agent just returns its id
-    with Session(_isolated_db) as s:
-        row = RunRow(input_text="test", status="completed", output_text="Hello from mock LLM")
-        s.add(row)
-        s.commit()
-        run_id = row.id
-
-    with patch("api.runs.run_agent", return_value=run_id):
-        r = api_client.post("/runs", json={"input_text": "test"})
-
-    assert r.status_code == 200
-    data = r.json()
-    assert data["data"]["output_text"] == "Hello from mock LLM"
+def test_ask_unknown_dataset_404(api_client):
+    r = api_client.post("/datasets/nonexistent/ask", json={"question": "hi"})
+    assert r.status_code == 404
+    assert r.json()["detail"]["code"] == "DATASET_NOT_FOUND"
 
 
-def test_run_missing_body(api_client):
-    r = api_client.post("/runs", json={})
+def test_ask_missing_question_422(api_client):
+    # Body present but no question field → pydantic 422.
+    r = api_client.post("/datasets/whatever/ask", json={"conversation_id": None})
     assert r.status_code == 422
 
 
-def test_get_run_not_found(api_client):
-    r = api_client.get("/runs/nonexistent-id")
-    assert r.status_code == 404
+def test_ask_blank_question_422(api_client):
+    r = api_client.post("/datasets/whatever/ask", json={"question": "   "})
+    assert r.status_code == 422
+    assert r.json()["detail"]["code"] == "MISSING_QUESTION"
 
 
-def test_run_empty_input_rejected(api_client):
-    r = api_client.post("/runs", json={"input_text": ""})
-    # empty string is technically valid JSON — server accepts it; LLM handles it
-    # just confirm we get a structured response
-    assert r.status_code in (200, 422, 500)
+def test_upload_empty_file_400(api_client):
+    r = api_client.post("/datasets", files={"file": ("empty.csv", b"", "text/csv")})
+    assert r.status_code == 400
+    assert r.json()["detail"]["code"] == "EMPTY_FILE"
+
+
+def test_upload_unparseable_file_400(api_client):
+    # A single blank line yields a frame with no columns → unparseable.
+    r = api_client.post("/datasets", files={"file": ("bad.csv", b"\n", "text/csv")})
+    assert r.status_code == 400

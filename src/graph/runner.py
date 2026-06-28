@@ -98,6 +98,7 @@ def run_agent(
                 json.dumps(final["table"]) if final.get("table") else None
             )
             run.tokens = tokens
+            run.followups_json = json.dumps(final.get("followups") or [])
             run.error_message = final.get("error") if status == "failed" else None
 
     if status == "completed":
@@ -107,6 +108,7 @@ def run_agent(
             "chart_spec": final.get("chart_spec"),
             "table": final.get("table"),
             "code": final.get("code"),
+            "followups": final.get("followups") or [],
         })
     else:
         events_bus.publish(run_id, "error", {

@@ -16,12 +16,30 @@ export interface SchemaColumn {
   dtype: string
 }
 
+// Per-column auto-profile (Phase 2). Parallel to `schema`. The backend may
+// return `null`/absent if local profiling failed — callers must fall back to
+// the plain `schema` column list when `profile` is unavailable.
+export type TypeCategory = 'numeric' | 'datetime' | 'categorical' | 'text' | 'boolean'
+
+export interface ColumnProfile {
+  name: string
+  dtype: string
+  type_category: TypeCategory
+  missing: number
+  distinct: number
+  min: number | string | null
+  max: number | string | null
+  examples: unknown[]
+}
+
 export interface Dataset {
   dataset_id: string
   filename: string
   row_count: number
   schema: SchemaColumn[]
   sample: Record<string, unknown>[]
+  // Phase 2: per-column profile (may be null if profiling failed).
+  profile: ColumnProfile[] | null
 }
 
 export interface CreatedRun {
@@ -58,6 +76,8 @@ export interface FinalEvent {
   chart_spec: ChartSpec | null
   table: Record<string, unknown>[]
   code: string
+  // Phase 2: 2–3 plain-English follow-up questions (or [] if omitted).
+  followups: string[]
 }
 
 export interface ErrorEvent {
@@ -83,6 +103,8 @@ export interface Run {
   table: Record<string, unknown>[] | null
   steps: RunStep[]
   tokens: number | null
+  // Phase 2: 2–3 plain-English follow-up questions (or [] if omitted).
+  followups: string[]
 }
 
 /** Thrown for any non-2xx API response; `message` is the human-facing copy. */

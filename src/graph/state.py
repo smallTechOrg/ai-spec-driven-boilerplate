@@ -25,6 +25,7 @@ class AgentState(TypedDict, total=False):
     chart_spec: dict | None
     table: list[dict] | None
     result: object                      # raw computed result payload (for finalize)
+    followups: list[str]                # 2-3 suggested follow-up questions (Phase 2)
 
     # Telemetry
     tokens: int

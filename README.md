@@ -127,13 +127,25 @@ Everything else (DB session, settings, LLM client, observability) is reused.
 
 ---
 
-## Running the Local CSV Analyst (Phase 1)
+## Running the Local CSV Analyst (Phases 1–2)
 
 This repo currently builds the **Local CSV Analyst** — upload a CSV, ask a
 plain-English question, and the agent plans → writes pandas → runs it locally
 over the full file → streams its steps → returns an answer + chart + table +
 the code that ran. Only schema + a few sample rows + the question ever reach the
 LLM; the raw data never leaves the machine.
+
+**Phase 2 adds:**
+- **Auto-profiling on upload** — `POST /datasets` computes a full per-column
+  profile over the full file locally (type category, distinct count, missing
+  count, min/max range for numeric/datetime columns, and a few example values)
+  and returns it as `data.profile` plus persists it to `datasets.profile_json`.
+  Profiling is best-effort: if it fails the upload still succeeds with a null
+  profile. The profile is derived stats only and never reaches the LLM.
+- **Suggested follow-ups after each answer** — a cheap, schema-only LLM call
+  proposes 2–3 clickable follow-up questions, returned on the `final` SSE event
+  and on `GET /runs/{id}` as `followups`, and persisted to `runs.followups_json`.
+  A follow-up failure degrades to `[]` and never fails the run.
 
 ```bash
 cp .env.example .env
@@ -155,6 +167,9 @@ Then open `http://localhost:8001/app/` and:
    table**, and a collapsible **Show code** section with the pandas that ran.
    (If the first attempt errors, a retry step shows the error and a corrected
    second attempt.)
+4. The **auto-profile** panel shows real per-column types/ranges/missing counts
+   for the uploaded file, and **2–3 suggested follow-up questions** appear under
+   the answer — click one to run it as a new question.
 
 | URL | What |
 |-----|------|

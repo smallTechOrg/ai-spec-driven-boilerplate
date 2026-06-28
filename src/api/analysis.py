@@ -96,6 +96,7 @@ def _terminal_from_db(run_id: str) -> str:
                 "chart_spec": json.loads(run.chart_spec_json) if run.chart_spec_json else None,
                 "table": json.loads(run.table_json) if run.table_json else None,
                 "code": _last_code(run),
+                "followups": json.loads(run.followups_json) if run.followups_json else [],
             })
         return _sse("error", {"status": run.status,
                               "error": run.error_message or "Run failed."})
@@ -129,5 +130,6 @@ def get_run(run_id: str, session: Session = Depends(get_session)) -> dict:
         "table": json.loads(run.table_json) if run.table_json else None,
         "steps": json.loads(run.steps_json) if run.steps_json else [],
         "tokens": run.tokens or 0,
+        "followups": json.loads(run.followups_json) if run.followups_json else [],
         "error": run.error_message,
     })

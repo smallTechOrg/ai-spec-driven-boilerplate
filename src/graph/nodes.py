@@ -63,6 +63,63 @@ def build_code_prompt(state: AgentState) -> str:
     return "\n\n".join(parts)
 
 
+def build_followups_prompt(state: AgentState) -> str:
+    """Privacy-safe follow-ups prompt: schema (column,dtype) + question + a SHORT
+    answer summary ONLY. Deliberately omits sample_rows and any full data —
+    follow-ups are schema-only (see spec/agent.md#privacy-boundary)."""
+    schema = state.get("schema") or []
+    schema_block = "Schema (column, dtype):\n" + "\n".join(
+        f"- {c.get('name')}: {c.get('dtype')}" for c in schema
+    )
+    answer = (state.get("answer") or "").strip()
+    answer_summary = answer[:400]
+    parts = [
+        schema_block,
+        f"Question just answered: {state.get('question', '')}",
+    ]
+    if answer_summary:
+        parts.append(f"Answer summary: {answer_summary}")
+    parts.append("Propose 2-3 follow-up questions as a JSON array of strings.")
+    return "\n\n".join(parts)
+
+
+def _parse_followups(text: str) -> list[str]:
+    """Parse 2-3 follow-up strings from the model output.
+
+    Accepts a JSON array first; falls back to line-by-line parsing. Returns at
+    most 3 non-empty, de-duplicated questions; [] if nothing usable is found.
+    """
+    if not text:
+        return []
+    candidates: list[str] = []
+    cleaned = text.strip()
+    # Strip a markdown fence if the model wrapped the JSON.
+    fenced = _FENCE_RE.search(cleaned)
+    if fenced:
+        cleaned = fenced.group(1).strip()
+    # Try JSON array.
+    start, end = cleaned.find("["), cleaned.rfind("]")
+    if start != -1 and end != -1 and end > start:
+        try:
+            arr = json.loads(cleaned[start:end + 1])
+            if isinstance(arr, list):
+                candidates = [str(x).strip() for x in arr if str(x).strip()]
+        except (json.JSONDecodeError, ValueError):
+            candidates = []
+    # Fallback: one question per line.
+    if not candidates:
+        for line in cleaned.splitlines():
+            line = line.strip().lstrip("-*0123456789. ").strip().strip('"')
+            if line and len(line) > 3:
+                candidates.append(line)
+
+    out: list[str] = []
+    for q in candidates:
+        if q not in out:
+            out.append(q)
+    return out[:3]
+
+
 def _parse_code(text: str) -> str:
     """Extract the first fenced code block; fall back to the raw text."""
     if not text:
@@ -186,6 +243,29 @@ def finalize(state: AgentState) -> AgentState:
     answer = _compose_answer(state)
     _log.info("node", run_id=state.get("run_id"), node="finalize", status="completed")
     return {**state, "answer": answer, "status": "completed", "error": None}
+
+
+def suggest_followups(state: AgentState) -> AgentState:
+    """Cheap, schema-only LLM call proposing 2-3 follow-up questions after a
+    successful run. Best-effort: any failure degrades to [] and never fails the
+    run (per the capability's "follow-ups omitted; answer still returned")."""
+    started = time.monotonic()
+    run_id = state.get("run_id", "")
+    try:
+        text, tokens = LLMClient().call_model_with_usage(
+            build_followups_prompt(state), system=_load("followups.md")
+        )
+        followups = _parse_followups(text)
+        total_tokens = state.get("tokens", 0) + tokens
+        latency = int((time.monotonic() - started) * 1000)
+        _log.info("node", run_id=run_id, node="suggest_followups",
+                  latency_ms=latency, tokens=tokens, count=len(followups))
+        return {**state, "followups": followups, "tokens": total_tokens}
+    except Exception as exc:
+        latency = int((time.monotonic() - started) * 1000)
+        _log.error("node_error", run_id=run_id, node="suggest_followups",
+                   latency_ms=latency, error=str(exc))
+        return {**state, "followups": []}
 
 
 def handle_error(state: AgentState) -> AgentState:

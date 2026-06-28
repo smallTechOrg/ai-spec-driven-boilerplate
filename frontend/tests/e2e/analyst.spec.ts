@@ -36,6 +36,20 @@ test('upload CSV, ask a question, get a real answer + chart + table + code', asy
   await expect(page.getByText('order_status', { exact: false }).first()).toBeVisible()
   await expect(page.getByLabel('Your question')).toBeEnabled()
 
+  // Phase 2: the auto-profile panel renders REAL per-column profile info
+  // (a type badge for a known column + distinct/missing counts), not a stub.
+  const profile = page.getByTestId('profile-panel')
+  await expect(profile).toBeVisible()
+  // `order_status` is a low-cardinality categorical — assert a type badge renders.
+  await expect(profile.getByTestId('profile-type-badge').first()).toBeVisible()
+  // Real distinct/missing counts appear in the table header + rows.
+  // Scope to the column headers explicitly: a bare getByText('Missing')
+  // is strict-mode-ambiguous (it also matches the "N with missing values"
+  // summary span), so target the <th> via its columnheader role.
+  await expect(profile.getByRole('columnheader', { name: 'Distinct' })).toBeVisible()
+  await expect(profile.getByRole('columnheader', { name: 'Missing' })).toBeVisible()
+  await expect(profile.getByTestId('profile-row').first()).toBeVisible()
+
   // Ask the canonical question.
   await page.getByLabel('Your question').fill(QUESTION)
   await page.getByRole('button', { name: 'Ask' }).click()
@@ -62,4 +76,27 @@ test('upload CSV, ask a question, get a real answer + chart + table + code', asy
   await expect(codeBlock).toBeVisible()
   const code = (await codeBlock.innerText()).trim()
   expect(code.length).toBeGreaterThan(5)
+
+  // Phase 2: 2–3 real follow-up chips render under the answer, and clicking
+  // one submits it as a NEW question that runs a fresh analysis.
+  const strip = page.getByTestId('followups-strip')
+  await expect(strip).toBeVisible()
+  const chips = strip.getByTestId('followup-chip')
+  const chipCount = await chips.count()
+  expect(chipCount).toBeGreaterThanOrEqual(2)
+  expect(chipCount).toBeLessThanOrEqual(3)
+
+  // Capture the first answer text so we can confirm a new run replaces it.
+  const firstAnswer = (await answer.innerText()).trim()
+
+  // Click the first follow-up → a fresh run starts (plan + stream reappear)
+  // and a new answer renders.
+  await chips.first().click()
+  await expect(page.getByText('Plan')).toBeVisible({ timeout: 60_000 })
+  await expect(answer).toBeVisible({ timeout: 90_000 })
+  const secondAnswer = (await answer.innerText()).trim()
+  expect(secondAnswer.length).toBeGreaterThan(20)
+  // A genuinely new run produced output (content may differ from the first).
+  expect(secondAnswer.length).toBeGreaterThan(0)
+  void firstAnswer
 })

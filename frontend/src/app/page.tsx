@@ -9,6 +9,7 @@ import {
   type Dataset,
 } from '@/lib/api'
 import UploadPanel from '@/components/UploadPanel'
+import ProfilePanel from '@/components/ProfilePanel'
 import QuestionBox from '@/components/QuestionBox'
 import StepStream, { type FeedItem } from '@/components/StepStream'
 import AnswerCard, { FailureCard } from '@/components/AnswerCard'
@@ -17,7 +18,7 @@ import TableView from '@/components/TableView'
 import CodeAccordion from '@/components/CodeAccordion'
 import LibraryStub from '@/components/LibraryStub'
 import HistoryStub from '@/components/HistoryStub'
-import FollowUpsStub from '@/components/FollowUpsStub'
+import FollowUpsStrip from '@/components/FollowUpsStrip'
 import CostStub from '@/components/CostStub'
 
 interface FinalResult {
@@ -25,6 +26,7 @@ interface FinalResult {
   chartSpec: ChartSpec | null
   table: Record<string, unknown>[]
   code: string
+  followups: string[]
 }
 
 interface FailureResult {
@@ -102,6 +104,7 @@ export default function Home() {
             chartSpec: e.chart_spec ?? null,
             table: e.table ?? [],
             code: e.code,
+            followups: e.followups ?? [],
           })
           setStreaming(false)
         },
@@ -146,6 +149,8 @@ export default function Home() {
           <div className="space-y-6">
             <UploadPanel dataset={dataset} onUploaded={handleUploaded} disabled={streaming} />
 
+            {dataset && <ProfilePanel dataset={dataset} />}
+
             <QuestionBox enabled={!!dataset} streaming={streaming} onAsk={handleAsk} />
 
             {topError && (
@@ -164,6 +169,11 @@ export default function Home() {
                 <ChartView chartSpec={result.chartSpec} />
                 <TableView table={result.table} />
                 <CodeAccordion code={result.code} />
+                <FollowUpsStrip
+                  followups={result.followups}
+                  onPick={handleAsk}
+                  disabled={streaming}
+                />
               </>
             )}
 
@@ -177,8 +187,6 @@ export default function Home() {
                 </p>
               </div>
             )}
-
-            <FollowUpsStub />
           </div>
         </div>
       </main>

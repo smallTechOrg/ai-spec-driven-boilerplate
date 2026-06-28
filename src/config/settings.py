@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     anthropic_api_key: str = Field(default="")
     gemini_api_key: str = Field(default="")
 
+    # Data-analysis agent
+    data_dir: str = Field(default="./data")          # uploaded files + sqlite db
+    max_steps: int = Field(default=4)                # agentic loop step cap
+    sample_rows: int = Field(default=20)             # bounded sample sent to LLM
+
 
 _settings: Settings | None = None
 

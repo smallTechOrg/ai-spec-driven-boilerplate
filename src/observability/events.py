@@ -5,7 +5,6 @@ def configure_logging(log_level: str = "INFO") -> None:
     structlog.configure(
         processors=[
             structlog.stdlib.add_log_level,
-            structlog.stdlib.add_logger_name,
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.processors.JSONRenderer(),
         ],
@@ -18,4 +17,6 @@ def configure_logging(log_level: str = "INFO") -> None:
 
 
 def get_logger(name: str = "agent") -> structlog.BoundLogger:
-    return structlog.get_logger(name)
+    # Bind the logger name into the event dict (PrintLogger has no .name attribute,
+    # so we carry it as bound context instead of via add_logger_name).
+    return structlog.get_logger().bind(logger=name)

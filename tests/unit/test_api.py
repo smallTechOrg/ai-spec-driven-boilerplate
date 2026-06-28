@@ -1,6 +1,5 @@
-"""API contract tests — no LLM key required, graph is not invoked."""
-import pytest
-from unittest.mock import patch
+"""API contract tests that do not invoke the LLM."""
+import io
 
 
 def test_health(api_client):
@@ -9,37 +8,48 @@ def test_health(api_client):
     assert r.json()["data"]["status"] == "ok"
 
 
-def test_run_returns_200_with_output(api_client, _isolated_db):
-    from sqlalchemy.orm import Session
-    from db.models import RunRow
+def test_upload_rejects_non_csv(api_client):
+    r = api_client.post(
+        "/api/datasets", files={"file": ("notes.txt", io.BytesIO(b"hello"), "text/plain")}
+    )
+    assert r.status_code == 400
 
-    # Pre-insert a completed run so run_agent just returns its id
-    with Session(_isolated_db) as s:
-        row = RunRow(input_text="test", status="completed", output_text="Hello from mock LLM")
-        s.add(row)
-        s.commit()
-        run_id = row.id
 
-    with patch("api.runs.run_agent", return_value=run_id):
-        r = api_client.post("/runs", json={"input_text": "test"})
+def test_upload_rejects_empty_file(api_client):
+    r = api_client.post(
+        "/api/datasets", files={"file": ("empty.csv", io.BytesIO(b""), "text/csv")}
+    )
+    assert r.status_code == 400
 
+
+def test_upload_profiles_csv(api_client, tmp_path, monkeypatch):
+    import config.settings as m
+    m._settings = None
+    monkeypatch.setenv("AGENT_DATA_DIR", str(tmp_path))
+    csv = b"region,order_value\nWest,10\nEast,20\n"
+    r = api_client.post(
+        "/api/datasets", files={"file": ("o.csv", io.BytesIO(csv), "text/csv")}
+    )
     assert r.status_code == 200
-    data = r.json()
-    assert data["data"]["output_text"] == "Hello from mock LLM"
+    body = r.json()
+    assert body["row_count"] == 2
+    assert body["column_count"] == 2
 
 
-def test_run_missing_body(api_client):
-    r = api_client.post("/runs", json={})
-    assert r.status_code == 422
-
-
-def test_get_run_not_found(api_client):
-    r = api_client.get("/runs/nonexistent-id")
+def test_analyze_unknown_dataset_404(api_client):
+    r = api_client.post(
+        "/api/analyses", json={"dataset_id": "nope", "question": "x?"}
+    )
     assert r.status_code == 404
 
 
-def test_run_empty_input_rejected(api_client):
-    r = api_client.post("/runs", json={"input_text": ""})
-    # empty string is technically valid JSON — server accepts it; LLM handles it
-    # just confirm we get a structured response
-    assert r.status_code in (200, 422, 500)
+def test_analyze_empty_question_400(api_client):
+    r = api_client.post(
+        "/api/analyses", json={"dataset_id": "nope", "question": "   "}
+    )
+    assert r.status_code == 400
+
+
+def test_get_analysis_not_found_404(api_client):
+    r = api_client.get("/api/analyses/nonexistent")
+    assert r.status_code == 404

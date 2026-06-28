@@ -8,11 +8,24 @@ _engine: Engine | None = None
 _SessionLocal: sessionmaker | None = None
 
 
+def _ensure_sqlite_dir(database_url: str) -> None:
+    """Create the parent directory for an on-disk SQLite DB if needed."""
+    prefix = "sqlite:///"
+    if database_url.startswith(prefix):
+        from pathlib import Path
+
+        raw = database_url[len(prefix):]
+        if raw and raw != ":memory:":
+            Path(raw).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+
+
 def _get_engine() -> Engine:
     global _engine
     if _engine is None:
         from config.settings import get_settings
-        _engine = create_engine(get_settings().database_url, echo=False)
+        url = get_settings().database_url
+        _ensure_sqlite_dir(url)
+        _engine = create_engine(url, echo=False)
     return _engine
 
 

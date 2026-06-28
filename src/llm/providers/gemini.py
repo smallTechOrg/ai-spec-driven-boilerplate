@@ -3,7 +3,8 @@ from google.genai import types
 
 
 class GeminiProvider:
-    DEFAULT_MODEL = "gemini-2.5-pro"
+    # Cheap default per spec (architecture.md → Stack); escalate to pro in P4.
+    DEFAULT_MODEL = "gemini-2.5-flash"
 
     def __init__(self, api_key: str, model: str) -> None:
         self._client = genai.Client(api_key=api_key)

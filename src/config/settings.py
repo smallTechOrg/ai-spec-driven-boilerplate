@@ -13,9 +13,15 @@ class Settings(BaseSettings):
     database_url: str = Field(default="sqlite:///./data/agent.db")
     log_level: str = Field(default="INFO")
 
+    # Where uploaded source files / DuckDB caches are stored (local only).
+    data_dir: str = Field(default="./data/datasets")
+    # Max upload size in bytes (~100 MB default).
+    max_upload_bytes: int = Field(default=100 * 1024 * 1024)
+
     # LLM provider — auto-detected from whichever key is set if left blank
     llm_provider: str = Field(default="")   # "anthropic" | "gemini"
-    llm_model: str = Field(default="")      # uses provider default when blank
+    # Low cost tier flash model is the default for the Local Data Analyst.
+    llm_model: str = Field(default="gemini-2.5-flash")
 
     # Provider keys — set exactly one
     anthropic_api_key: str = Field(default="")

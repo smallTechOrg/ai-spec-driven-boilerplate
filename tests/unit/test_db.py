@@ -1,12 +1,14 @@
 """DB layer tests — no LLM key required."""
+import json
+
 from sqlalchemy.orm import Session
-from db.models import RunRow
-import db.session as session_module
+
+from db.models import Dataset, Message, RunRow, Session as SessionRow
 
 
 def test_run_row_roundtrip(_isolated_db):
     with Session(_isolated_db) as s:
-        run = RunRow(input_text="hello world")
+        run = RunRow(question="What were total sales?", dataset_id="ds1")
         s.add(run)
         s.commit()
         run_id = run.id
@@ -14,40 +16,68 @@ def test_run_row_roundtrip(_isolated_db):
     with Session(_isolated_db) as s:
         fetched = s.get(RunRow, run_id)
         assert fetched is not None
-        assert fetched.input_text == "hello world"
+        assert fetched.question == "What were total sales?"
+        assert fetched.dataset_id == "ds1"
         assert fetched.status == "pending"
-        assert fetched.output_text is None
+        assert fetched.result_summary_json is None
 
 
-def test_run_row_status_update(_isolated_db):
+def test_run_row_audit_fields_persist(_isolated_db):
     with Session(_isolated_db) as s:
-        run = RunRow(input_text="test")
+        run = RunRow(
+            question="q",
+            status="completed",
+            plan_json=json.dumps(["step 1"]),
+            generated_sql="SELECT 1",
+            result_summary_json=json.dumps({"answer": "ok"}),
+            prompt_tokens=812,
+            completion_tokens=240,
+            est_usd=0.00042,
+        )
         s.add(run)
         s.commit()
         run_id = run.id
 
     with Session(_isolated_db) as s:
         run = s.get(RunRow, run_id)
-        run.status = "completed"
-        run.output_text = "some output"
+        assert run.prompt_tokens == 812
+        assert run.completion_tokens == 240
+        assert run.est_usd == 0.00042
+        assert json.loads(run.plan_json) == ["step 1"]
+
+
+def test_dataset_roundtrip(_isolated_db):
+    with Session(_isolated_db) as s:
+        ds = Dataset(
+            name="sample.csv",
+            source_path="/tmp/sample.csv",
+            source_kind="csv",
+            duckdb_table="ds",
+            row_count=480,
+            profile_json=json.dumps({"row_count": 480, "columns": []}),
+        )
+        s.add(ds)
         s.commit()
+        ds_id = ds.id
 
     with Session(_isolated_db) as s:
-        run = s.get(RunRow, run_id)
-        assert run.status == "completed"
-        assert run.output_text == "some output"
+        ds = s.get(Dataset, ds_id)
+        assert ds.name == "sample.csv"
+        assert ds.row_count == 480
+        assert ds.sheet_name is None
 
 
-def test_multiple_runs_independent(_isolated_db):
-    ids = []
+def test_message_and_session_tables_exist(_isolated_db):
     with Session(_isolated_db) as s:
-        for i in range(3):
-            run = RunRow(input_text=f"input {i}")
-            s.add(run)
+        sess = SessionRow(active_dataset_id="ds1")
+        s.add(sess)
+        s.flush()
+        msg = Message(role="user", content="hi", dataset_id="ds1", session_id=sess.id)
+        s.add(msg)
         s.commit()
-        # fetch all
-        runs = s.query(RunRow).all()
-        ids = [r.id for r in runs]
+        msg_id = msg.id
 
-    assert len(ids) == 3
-    assert len(set(ids)) == 3  # all unique
+    with Session(_isolated_db) as s:
+        msg = s.get(Message, msg_id)
+        assert msg.role == "user"
+        assert msg.content == "hi"

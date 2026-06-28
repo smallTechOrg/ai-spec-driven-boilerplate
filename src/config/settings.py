@@ -1,6 +1,9 @@
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Gemini default for this build (see spec/architecture.md ## Stack).
+GEMINI_DEFAULT_MODEL = "gemini-2.5-flash"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -20,6 +23,10 @@ class Settings(BaseSettings):
     # Provider keys — set exactly one
     anthropic_api_key: str = Field(default="")
     gemini_api_key: str = Field(default="")
+
+    # DataChat — analysis engine
+    upload_dir: str = Field(default="./data/uploads")
+    max_steps: int = Field(default=4)
 
 
 _settings: Settings | None = None

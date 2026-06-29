@@ -68,12 +68,33 @@ def post_message(
     answer = result.get("answer") or ""
     chart_json = result.get("chart_json")
 
+    # Attempt to extract a CSV representation from execution_result for later export
+    last_result_csv = None
+    exec_res = result.get("execution_result") or ""
+    if exec_res and exec_res not in ("No result produced", ""):
+        import io
+        import pandas as pd
+        try:
+            # Try parsing as delimited text (handles space/tab-aligned pandas output)
+            df_check = pd.read_csv(io.StringIO(exec_res), sep=None, engine="python")
+            if not df_check.empty and len(df_check.columns) > 0:
+                last_result_csv = df_check.to_csv(index=False)
+        except Exception:
+            try:
+                # Fallback: store raw output as a single-column CSV
+                lines = [l.strip() for l in exec_res.strip().splitlines() if l.strip()]
+                if lines:
+                    last_result_csv = "result\n" + "\n".join(lines)
+            except Exception:
+                pass
+
     # Save assistant message
     assistant_msg = MessageRow(
         session_id=session_id,
         role="assistant",
         content=answer,
         chart_json=json.dumps(chart_json) if chart_json is not None else None,
+        last_result_csv=last_result_csv,
     )
     db.add(assistant_msg)
     db.flush()

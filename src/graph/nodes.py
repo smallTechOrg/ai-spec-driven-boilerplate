@@ -47,8 +47,12 @@ def profile_data(state: AgentState) -> AgentState:
 
         file_info = files[0]
         file_path = file_info["path"]
+        filename = file_info["filename"]
 
-        df = pd.read_csv(file_path)
+        if filename.lower().endswith(".xlsx"):
+            df = pd.read_excel(file_path, engine="openpyxl")
+        else:
+            df = pd.read_csv(file_path)
         row_count, col_count = df.shape
 
         columns = []
@@ -289,13 +293,16 @@ def execute_code(state: AgentState) -> AgentState:
         code = state.get("generated_code", "")
         uploaded_files = state.get("uploaded_files", [])
 
-        # Load all uploaded CSVs as DataFrames
+        # Load all uploaded files as DataFrames (CSV or Excel)
         dfs_dict: dict = {}
         for f in uploaded_files:
             stem = Path(f["filename"]).stem
             fpath = f.get("path") or f.get("temp_path")
             if fpath and Path(fpath).exists():
-                dfs_dict[stem] = pd.read_csv(fpath)
+                if f["filename"].lower().endswith(".xlsx"):
+                    dfs_dict[stem] = pd.read_excel(fpath, engine="openpyxl")
+                else:
+                    dfs_dict[stem] = pd.read_csv(fpath)
             else:
                 log.warning("file_not_found", filename=f["filename"])
 

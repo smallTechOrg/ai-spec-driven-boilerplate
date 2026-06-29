@@ -58,6 +58,7 @@ class MessageRow(Base):
     role: Mapped[str] = mapped_column(Text, nullable=False)  # "user" | "assistant"
     content: Mapped[str] = mapped_column(Text, nullable=False)
     chart_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_result_csv: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, default=_now
     )

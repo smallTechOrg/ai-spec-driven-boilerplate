@@ -1,14 +1,14 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import FileUpload from "@/components/FileUpload";
-import ProfileCard from "@/components/ProfileCard";
+import FileList from "@/components/FileList";
 import ChatMessage, { LoadingMessage } from "@/components/ChatMessage";
 import ChatInput from "@/components/ChatInput";
 import { createSession, sendMessage, Message, UploadedFile } from "@/lib/api";
 
 export default function Home() {
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
@@ -27,12 +27,20 @@ export default function Home() {
   }, [messages, loading]);
 
   const handleUploaded = (file: UploadedFile) => {
-    setUploadedFile(file);
-    setMessages([]);
+    setUploadedFiles((prev) => {
+      if (prev.length === 0) {
+        setMessages([]);
+      }
+      return [...prev, file];
+    });
+  };
+
+  const handleFileAdded = (file: UploadedFile) => {
+    setUploadedFiles((prev) => [...prev, file]);
   };
 
   const handleSend = async (content: string) => {
-    if (!sessionId || !uploadedFile) return;
+    if (!sessionId || uploadedFiles.length === 0) return;
 
     const userMsg: Message = {
       message_id: `tmp-${Date.now()}`,
@@ -59,6 +67,12 @@ export default function Home() {
     }
   };
 
+  const emptyChatHint = () => {
+    if (uploadedFiles.length === 0) return "Upload a CSV or Excel file to get started";
+    if (uploadedFiles.length === 1) return "Ask a question about your data";
+    return `Ask a question about your data — all ${uploadedFiles.length} files are available`;
+  };
+
   if (initError) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -72,24 +86,20 @@ export default function Home() {
 
   return (
     <div className="h-screen flex overflow-hidden">
-      {/* Left panel — file upload + profile */}
+      {/* Left panel — file upload + profile(s) */}
       <div className="w-[30%] min-w-[260px] border-r border-gray-200 bg-white flex flex-col overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100">
           <h1 className="font-semibold text-gray-900 text-sm">CSV Analysis Agent</h1>
         </div>
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-          {!uploadedFile && sessionId ? (
+          {uploadedFiles.length === 0 && sessionId ? (
             <FileUpload sessionId={sessionId} onUploaded={handleUploaded} />
-          ) : uploadedFile ? (
-            <>
-              <ProfileCard filename={uploadedFile.filename} profile={uploadedFile.profile} />
-              <button
-                disabled
-                className="w-full text-xs text-gray-400 border border-gray-200 rounded-lg py-2 cursor-not-allowed"
-              >
-                Upload another file [Coming in Phase 2]
-              </button>
-            </>
+          ) : uploadedFiles.length > 0 && sessionId ? (
+            <FileList
+              files={uploadedFiles}
+              sessionId={sessionId}
+              onFileAdded={handleFileAdded}
+            />
           ) : null}
         </div>
       </div>
@@ -101,10 +111,7 @@ export default function Home() {
           {messages.length === 0 && !loading && (
             <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 gap-2">
               <p className="text-4xl">📊</p>
-              <p className="font-medium">
-                {uploadedFile ? "Ask a question about your data" : "Upload a CSV file to get started"}
-              </p>
-              <p className="text-xs text-gray-300">Compare files across sessions — Phase 2</p>
+              <p className="font-medium">{emptyChatHint()}</p>
             </div>
           )}
           {messages.map((msg) => (
@@ -115,7 +122,7 @@ export default function Home() {
         </div>
 
         {/* Input */}
-        <ChatInput onSend={handleSend} disabled={loading} hasFile={!!uploadedFile} />
+        <ChatInput onSend={handleSend} disabled={loading} hasFile={uploadedFiles.length > 0} />
       </div>
     </div>
   );

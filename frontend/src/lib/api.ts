@@ -70,3 +70,12 @@ export async function getMessages(sessionId: string): Promise<Message[]> {
   if (!res.ok) throw new Error(body.error?.message ?? "Failed to get messages");
   return body.data.messages;
 }
+
+export async function exportResult(sessionId: string): Promise<Blob> {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/export`, { method: "POST" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error?.message ?? "Export failed — no exportable result from the last query");
+  }
+  return res.blob();
+}

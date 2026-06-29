@@ -33,11 +33,12 @@ def create_app() -> FastAPI:
     # Custom error handler — wraps HTTPException in our {data, error} envelope
     app.add_exception_handler(HTTPException, _http_exception_handler)
 
-    from api import health, sessions, files, messages
+    from api import health, sessions, files, messages, export
     app.include_router(health.router)
     app.include_router(sessions.router)
     app.include_router(files.router)
     app.include_router(messages.router)
+    app.include_router(export.router)
 
     # CORS for frontend dev server
     app.add_middleware(

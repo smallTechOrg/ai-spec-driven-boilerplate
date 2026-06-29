@@ -21,7 +21,7 @@ def upload_file(
     file: UploadFile = File(...),
     db: Session = Depends(get_session),
 ) -> dict:
-    """Upload a CSV file, profile it, and return the profile."""
+    """Upload a CSV or Excel (.xlsx) file, profile it, and return the profile."""
     # Validate session
     session = db.get(SessionRow, session_id)
     if session is None:
@@ -29,8 +29,8 @@ def upload_file(
 
     # Validate file extension
     filename = file.filename or ""
-    if not filename.lower().endswith(".csv"):
-        raise api_error("INVALID_FILE", "Only CSV files are supported in Phase 1")
+    if not filename.lower().endswith(".csv") and not filename.lower().endswith(".xlsx"):
+        raise api_error("INVALID_FILE", "Only CSV and Excel (.xlsx) files are supported")
 
     # Save to temp dir
     settings = get_settings()

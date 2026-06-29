@@ -1,4 +1,5 @@
 import { FileProfile, ColumnProfile, QualityFlag } from "@/lib/api";
+import ExportMenu from "@/components/ExportMenu";
 
 function dtypeColor(dtype: string): string {
   if (dtype.includes("float") || dtype.includes("int")) return "bg-blue-100 text-blue-800";
@@ -52,9 +53,10 @@ function FlagBadge({ flag }: { flag: QualityFlag }) {
 interface Props {
   filename: string;
   profile: FileProfile;
+  sessionId?: string;  // optional — when present, export is wired
 }
 
-export default function ProfileCard({ filename, profile }: Props) {
+export default function ProfileCard({ filename, profile, sessionId }: Props) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
       <div className="px-4 py-3 border-b border-gray-100">
@@ -72,13 +74,17 @@ export default function ProfileCard({ filename, profile }: Props) {
         </div>
       )}
       <div className="px-4 py-3 border-t border-gray-100">
-        <button
-          disabled
-          className="w-full text-sm text-gray-400 border border-gray-200 rounded-lg py-1.5 cursor-not-allowed"
-          title="Coming in Phase 2"
-        >
-          Export Data [Coming in Phase 2]
-        </button>
+        {sessionId ? (
+          <ExportMenu sessionId={sessionId} />
+        ) : (
+          <button
+            disabled
+            className="w-full text-sm text-gray-400 border border-gray-200 rounded-lg py-1.5 cursor-not-allowed"
+            title="No session available"
+          >
+            Export Data
+          </button>
+        )}
       </div>
     </div>
   );

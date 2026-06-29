@@ -22,15 +22,15 @@ West,14200,140
 test.describe("Phase 1 — CSV Analysis Agent", () => {
   test("page loads and shows upload dropzone", async ({ page }) => {
     await page.goto(BASE_URL);
-    await expect(page.locator("text=Drop a CSV file here")).toBeVisible({ timeout: 10000 });
-    await expect(page.locator("text=CSV only")).toBeVisible();
+    await expect(page.locator("text=Drop a file here")).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("text=CSV and Excel (.xlsx) supported")).toBeVisible();
   });
 
   test("upload CSV shows profile card", async ({ page }) => {
     const csvPath = createTestCsv();
     try {
       await page.goto(BASE_URL);
-      await page.waitForSelector("text=Drop a CSV file here");
+      await page.waitForSelector("text=Drop a file here");
 
       // Upload via file input
       const fileInput = page.locator('input[type="file"]');
@@ -50,7 +50,7 @@ test.describe("Phase 1 — CSV Analysis Agent", () => {
     const csvPath = createTestCsv();
     try {
       await page.goto(BASE_URL);
-      await page.waitForSelector("text=Drop a CSV file here");
+      await page.waitForSelector("text=Drop a file here");
 
       const fileInput = page.locator('input[type="file"]');
       await fileInput.setInputFiles(csvPath);
@@ -71,18 +71,21 @@ test.describe("Phase 1 — CSV Analysis Agent", () => {
     }
   });
 
-  test("shows Phase 2 stubs as disabled", async ({ page }) => {
+  test("shows export stub as disabled and multi-file add button as enabled", async ({ page }) => {
     const csvPath = createTestCsv();
     try {
       await page.goto(BASE_URL);
-      await page.waitForSelector("text=Drop a CSV file here");
+      await page.waitForSelector("text=Drop a file here");
       const fileInput = page.locator('input[type="file"]');
       await fileInput.setInputFiles(csvPath);
       await expect(page.locator("text=5 rows")).toBeVisible({ timeout: 15000 });
 
-      // Phase 2 stubs must be visible but disabled
+      // Export Data stub remains disabled (Phase 2 slice-d)
       await expect(page.locator("button:has-text('Export Data')")).toBeDisabled();
-      await expect(page.locator("button:has-text('Upload another file')")).toBeDisabled();
+
+      // Multi-file "Add another file" button is now live (not disabled)
+      await expect(page.locator("button:has-text('Add another file')")).toBeVisible();
+      await expect(page.locator("button:has-text('Add another file')")).toBeEnabled();
     } finally {
       fs.unlinkSync(csvPath);
     }

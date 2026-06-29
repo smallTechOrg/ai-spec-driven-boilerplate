@@ -14,8 +14,8 @@ export default function FileUpload({ sessionId, onUploaded }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (file: File) => {
-    if (!file.name.endsWith(".csv")) {
-      setError("Only CSV files are supported. Excel support coming in Phase 2.");
+    if (!file.name.endsWith(".csv") && !file.name.endsWith(".xlsx")) {
+      setError("Only CSV and Excel (.xlsx) files are supported.");
       return;
     }
     setError(null);
@@ -63,9 +63,9 @@ export default function FileUpload({ sessionId, onUploaded }: Props) {
         }`}
       >
         <div className="text-3xl mb-2">{dragging ? "📂" : "☁️"}</div>
-        <p className="font-medium text-gray-700">{dragging ? "Drop it!" : "Drop a CSV file here, or click to browse"}</p>
-        <p className="text-xs text-gray-400 mt-1">CSV only — Excel support coming in Phase 2</p>
-        <input ref={inputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onChange} />
+        <p className="font-medium text-gray-700">{dragging ? "Drop it!" : "Drop a file here, or click to browse"}</p>
+        <p className="text-xs text-gray-400 mt-1">CSV and Excel (.xlsx) supported</p>
+        <input ref={inputRef} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={onChange} />
       </div>
       {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
     </div>

@@ -1,77 +1,122 @@
-'use client'
-
-import { useState } from 'react'
+"use client";
+import { useState, useEffect, useRef } from "react";
+import FileUpload from "@/components/FileUpload";
+import ProfileCard from "@/components/ProfileCard";
+import ChatMessage, { LoadingMessage } from "@/components/ChatMessage";
+import ChatInput from "@/components/ChatInput";
+import { createSession, sendMessage, Message, UploadedFile } from "@/lib/api";
 
 export default function Home() {
-  const [input, setInput] = useState('')
-  const [result, setResult] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!input.trim()) return
-    setLoading(true)
-    setError(null)
-    setResult(null)
+  // Create session on mount
+  useEffect(() => {
+    createSession()
+      .then(setSessionId)
+      .catch(() => setInitError("Could not connect to the server. Is it running on port 8001?"));
+  }, []);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  const handleUploaded = (file: UploadedFile) => {
+    setUploadedFile(file);
+    setMessages([]);
+  };
+
+  const handleSend = async (content: string) => {
+    if (!sessionId || !uploadedFile) return;
+
+    const userMsg: Message = {
+      message_id: `tmp-${Date.now()}`,
+      role: "user",
+      content,
+      chart_json: null,
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setLoading(true);
+
     try {
-      const res = await fetch('/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input_text: input }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.detail?.message ?? `Request failed (${res.status})`)
-      } else if (data.data?.error) {
-        setError(data.data.error)
-      } else {
-        setResult(data.data.output_text)
-      }
-    } catch {
-      setError('Network error — is the server running?')
+      const response = await sendMessage(sessionId, content);
+      setMessages((prev) => [...prev, response]);
+    } catch (e: unknown) {
+      const errorMsg: Message = {
+        message_id: `err-${Date.now()}`,
+        role: "assistant",
+        content: e instanceof Error ? e.message : "An error occurred. Please try again.",
+        chart_json: null,
+      };
+      setMessages((prev) => [...prev, errorMsg]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
+  };
+
+  if (initError) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center text-red-600 max-w-md">
+          <p className="text-lg font-semibold mb-2">Connection Error</p>
+          <p className="text-sm">{initError}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-16">
-      <h1 className="mb-8 text-3xl font-bold tracking-tight">Agent</h1>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <textarea
-          className="w-full rounded-lg border border-gray-300 p-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          rows={4}
-          placeholder="Enter text to transform…"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          disabled={loading}
-        />
-        <button
-          type="submit"
-          disabled={loading || !input.trim()}
-          className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? 'Running…' : 'Run'}
-        </button>
-      </form>
-
-      {error && (
-        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
+    <div className="h-screen flex overflow-hidden">
+      {/* Left panel — file upload + profile */}
+      <div className="w-[30%] min-w-[260px] border-r border-gray-200 bg-white flex flex-col overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100">
+          <h1 className="font-semibold text-gray-900 text-sm">CSV Analysis Agent</h1>
         </div>
-      )}
-
-      {result && (
-        <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4 text-sm whitespace-pre-wrap shadow-sm">
-          {result}
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+          {!uploadedFile && sessionId ? (
+            <FileUpload sessionId={sessionId} onUploaded={handleUploaded} />
+          ) : uploadedFile ? (
+            <>
+              <ProfileCard filename={uploadedFile.filename} profile={uploadedFile.profile} />
+              <button
+                disabled
+                className="w-full text-xs text-gray-400 border border-gray-200 rounded-lg py-2 cursor-not-allowed"
+              >
+                Upload another file [Coming in Phase 2]
+              </button>
+            </>
+          ) : null}
         </div>
-      )}
+      </div>
 
-      {!result && !error && !loading && (
-        <p className="mt-10 text-center text-sm text-gray-400">Results will appear here.</p>
-      )}
-    </main>
-  )
+      {/* Right panel — chat */}
+      <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+        {/* Message list */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {messages.length === 0 && !loading && (
+            <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 gap-2">
+              <p className="text-4xl">📊</p>
+              <p className="font-medium">
+                {uploadedFile ? "Ask a question about your data" : "Upload a CSV file to get started"}
+              </p>
+              <p className="text-xs text-gray-300">Compare files across sessions — Phase 2</p>
+            </div>
+          )}
+          {messages.map((msg) => (
+            <ChatMessage key={msg.message_id} message={msg} />
+          ))}
+          {loading && <LoadingMessage />}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Input */}
+        <ChatInput onSend={handleSend} disabled={loading} hasFile={!!uploadedFile} />
+      </div>
+    </div>
+  );
 }

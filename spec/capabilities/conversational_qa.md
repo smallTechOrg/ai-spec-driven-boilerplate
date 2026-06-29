@@ -2,59 +2,49 @@
 
 ## What It Does
 
-The user types a natural-language question about their uploaded data; the agent generates Python/pandas code to answer it, executes the code server-side, and returns a prose answer with an optional Plotly chart. The full conversation history within the session is preserved and used as context for follow-up questions.
+User types a natural-language question about their uploaded CSV. The agent generates Python/pandas code, executes it server-side, and returns a prose answer with optional Plotly chart. Full conversation history is preserved and used for follow-up questions.
 
-## Inputs
+## Input
 
-| Input | Type | Source | Required |
-|-------|------|---------|----------|
-| Question text | string | POST /sessions/{session_id}/messages body `content` field | Yes |
-| session_id | UUID string | URL path parameter | Yes |
-| File profiles (schema + stats) | JSON objects | Loaded from `files` table in SQLite | Yes (at least one file must be uploaded) |
-| Conversation history | array of message objects | Last 10 turns loaded from `messages` table in SQLite | No (empty for first turn) |
+- Natural-language question string (POST /sessions/{session_id}/messages)
+- Session context: uploaded file profiles (schema + stats) and last 10 conversation turns from DB
 
-## Outputs
+## Output
 
-| Output | Type | Destination |
-|--------|------|-------------|
-| Prose answer | string (`content` field) | API response body + stored in `messages` table |
-| Plotly chart spec | JSON dict (`chart_json` field, nullable) | API response body (not stored in DB) |
-| User message record | message object | Stored in `messages` table |
-| Assistant message record | message object | Stored in `messages` table |
+- `content`: plain prose answer written for a non-technical reader
+- `chart_json`: optional Plotly figure JSON (null if no chart generated)
 
-## External Calls
+## LLM Prompt Strategy (privacy-preserving)
 
-| System | Operation | On Failure |
-|--------|-----------|------------|
-| LLM (Gemini) | Generate Python/pandas code from question + schema context | Return error message to user; do not crash |
-| SQLite (session DB) | SELECT last 10 messages for session; INSERT user + assistant messages | Return HTTP 500 |
-| Code execution sandbox | exec() the generated code against loaded DataFrames | Catch exception; route to error handling |
-
-## Business Rules
-
-- At least one file must be uploaded to the session before Q&A is available; otherwise return HTTP 400 with message "Please upload a CSV file first"
-- LLM prompt includes column names + dtypes + numeric stats + top-5 value_counts for all uploaded files — never raw rows
-- Conversation history is trimmed to the last 10 turns (5 user + 5 assistant alternating) to limit token usage
-- History is session-scoped only — no cross-session context
-- If the generated code raises an exception, a user-friendly error message is returned; the failed attempt is still stored in `messages`
-- Ambiguous column references: agent states its assumption inline in the prose answer
-- Clarification needed: answer begins with "To answer this precisely, could you clarify..."
-
-## LLM Prompt Strategy
-
-The prompt sent to the LLM for code generation contains these sections in order:
-
-1. System instruction: role, task, available variables (`dfs` dict, `pd`, `np`, `go`, `px`), output variables (`result`, `fig`)
-2. Schema context: column names + dtypes for each uploaded file, labelled by filename
-3. Stats context: numeric stats (min/max/mean/std/percentiles) and categorical top-5 value_counts — NO raw rows
-4. Conversation history: last 10 turns (role + content pairs)
+Gemini receives ONLY:
+1. System instruction for pandas code generation
+2. Schema: column names + dtypes (NO raw rows)
+3. Stats: numeric min/max/mean/std/percentiles, categorical top-5 value_counts, null counts
+4. Last 10 conversation turns (user questions + assistant answers)
 5. Current question
 
-## Success Criteria
+Raw row values are NEVER included in any LLM prompt.
 
-- [ ] Ask "show me revenue by month" against a sales CSV → response contains a Plotly bar chart with months on x-axis and revenue on y-axis
-- [ ] Ask a follow-up "now show only Q1" → agent uses prior conversation context to filter correctly without re-specifying the dataset
-- [ ] Ask about a column that does not exist → agent returns a helpful prose error message; server does not return HTTP 5xx
-- [ ] LLM prompt string logged to stdout never contains a raw row value from the CSV (verified by automated test that inspects the prompt)
-- [ ] Conversation history for the session contains both user and assistant turns after each exchange
-- [ ] First question in a new session (no prior history) answers correctly
+## Conversation History
+
+- All turns stored in SQLite `messages` table
+- Last 10 turns loaded on each Q&A call for context
+- Trimmed to 10 turns to control token costs
+- No cross-session memory
+
+## Uncertainty Handling
+
+- Ambiguous column: generate code for most likely match + state assumption inline
+- Ambiguous aggregation: state assumption inline ("I'm summing by month — let me know if you want a different grouping")
+- Phase 3: structured clarification flow
+
+## Phase
+
+Phase 1 (real). Multi-turn context real from Phase 1.
+
+## Acceptance Criteria
+
+- [ ] "Show me revenue by month" → bar chart with months on x-axis
+- [ ] Follow-up "now show only Q1" → filtered correctly using conversation context
+- [ ] Question about nonexistent column → helpful error message, no crash
+- [ ] LLM prompt never contains raw row values (verified by automated test)

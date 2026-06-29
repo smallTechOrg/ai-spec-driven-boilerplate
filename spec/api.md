@@ -2,21 +2,17 @@
 
 ## API Style
 
-REST. All endpoints return a JSON envelope:
-- Success: `{"data": <payload>, "error": null}`
-- Failure: `{"data": null, "error": {"code": "ERROR_CODE", "message": "Human-readable message"}}`
-
-All timestamps are ISO 8601 UTC strings.
+REST. JSON envelope: `{"data": <payload>, "error": null}` on success; `{"data": null, "error": {"code": "...", "message": "..."}}` on error. All routes return HTTP 200 even for application errors (except 404/422).
 
 ---
 
 ## Endpoints
 
-### `POST /sessions`
+### POST /sessions
 
-**Purpose:** Create a new analysis session. Must be called before uploading files or sending messages.
+Create a new analysis session.
 
-**Request:** No body required.
+**Request:** no body
 
 **Response 200:**
 ```json
@@ -29,25 +25,19 @@ All timestamps are ISO 8601 UTC strings.
 }
 ```
 
-**Error cases:**
-
-| Status | Code | Condition |
-|--------|------|-----------|
-| 500 | INTERNAL_ERROR | SQLite write failed |
-
 ---
 
-### `POST /sessions/{session_id}/files`
+### POST /sessions/{session_id}/files
 
-**Purpose:** Upload a CSV file into the session. Triggers automatic profiling (no LLM call). Returns a full profile card.
+Upload a CSV file. Saves to temp dir, runs profiling (no LLM), returns profile. Multipart form upload.
 
-**Request:** `multipart/form-data` with field `file` containing the CSV file binary.
+**Request:** `multipart/form-data` with field `file` (CSV file, content-type text/csv or application/octet-stream)
 
 **Response 200:**
 ```json
 {
   "data": {
-    "file_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "file_id": "uuid-string",
     "filename": "sales.csv",
     "profile": {
       "row_count": 1250,
@@ -58,15 +48,7 @@ All timestamps are ISO 8601 UTC strings.
           "dtype": "float64",
           "null_count": 3,
           "null_pct": 0.24,
-          "stats": {
-            "min": 0.0,
-            "max": 99999.9,
-            "mean": 5432.1,
-            "std": 3210.5,
-            "p25": 1200.0,
-            "p50": 4800.0,
-            "p75": 8900.0
-          },
+          "stats": {"min": 0.0, "max": 99999.9, "mean": 5432.1, "std": 3210.5, "p25": 1200.0, "p50": 4500.0, "p75": 8900.0},
           "sample_values": ["1200.0", "8450.5", "320.0"]
         },
         {
@@ -74,7 +56,7 @@ All timestamps are ISO 8601 UTC strings.
           "dtype": "object",
           "null_count": 0,
           "null_pct": 0.0,
-          "top_values": {"West": 340, "East": 310, "North": 300, "South": 300},
+          "value_counts": {"West": 420, "East": 380, "North": 250, "South": 200},
           "sample_values": ["West", "East", "North"]
         }
       ],
@@ -88,79 +70,46 @@ All timestamps are ISO 8601 UTC strings.
 }
 ```
 
-**Error cases:**
-
-| Status | Code | Condition |
-|--------|------|-----------|
-| 400 | INVALID_FILE | Uploaded file is not a CSV (wrong extension or unreadable by pandas) |
-| 404 | SESSION_NOT_FOUND | session_id does not exist in the sessions table |
-| 500 | PROFILING_FAILED | pandas profiling raised an unexpected exception |
+**Error 400:** `{"data": null, "error": {"code": "INVALID_FILE", "message": "Only CSV files are supported in Phase 1"}}`
+**Error 404:** `{"data": null, "error": {"code": "SESSION_NOT_FOUND", "message": "Session not found"}}`
 
 ---
 
-### `POST /sessions/{session_id}/messages`
+### POST /sessions/{session_id}/messages
 
-**Purpose:** Send a natural-language question. Runs the full Q&A pipeline (plan_and_code → execute_code → format_response). Returns the assistant's prose answer and an optional Plotly chart.
+Send a natural-language question. Runs Q&A pipeline (LangGraph). Returns assistant response.
 
 **Request:**
 ```json
-{
-  "content": "Show me a bar chart of revenue by region"
-}
+{"content": "Show me a bar chart of revenue by region"}
 ```
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| content | string | yes | The user's natural-language question (max 2000 characters) |
 
 **Response 200:**
 ```json
 {
   "data": {
-    "message_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "message_id": "uuid-string",
     "role": "assistant",
-    "content": "Revenue by region shows the West leading at $2.1M, followed by East at $1.8M, North at $1.5M, and South at $1.4M.",
+    "content": "Revenue by region shows the West leading at $2.1M, followed by East at $1.8M, North at $1.1M, and South at $0.9M.",
     "chart_json": {
-      "data": [
-        {
-          "type": "bar",
-          "x": ["West", "East", "North", "South"],
-          "y": [2100000, 1800000, 1500000, 1400000]
-        }
-      ],
-      "layout": {
-        "title": "Revenue by Region",
-        "xaxis": {"title": "Region"},
-        "yaxis": {"title": "Revenue ($)"}
-      }
-    },
-    "created_at": "2026-06-29T12:05:00Z"
+      "data": [{"type": "bar", "x": ["West", "East", "North", "South"], "y": [2100000, 1800000, 1100000, 900000]}],
+      "layout": {"title": "Revenue by Region"}
+    }
   },
   "error": null
 }
 ```
 
-`chart_json` is `null` when the generated code did not produce a Plotly figure.
+`chart_json` is `null` when no chart was generated.
 
-**Error cases:**
-
-| Status | Code | Condition |
-|--------|------|-----------|
-| 400 | NO_FILES | No files have been uploaded to this session yet |
-| 400 | EMPTY_CONTENT | content field is missing or blank |
-| 404 | SESSION_NOT_FOUND | session_id does not exist |
-| 422 | VALIDATION_ERROR | Request body fails schema validation |
-| 500 | AGENT_ERROR | LLM call or code execution failed (error surfaced in content field of response, not as HTTP 500) |
-
-> **Note:** Agent errors (Gemini failures, exec() exceptions) are returned as HTTP 200 with the error message in the `content` field of the assistant message, not as HTTP 5xx. Only unexpected server-level errors return 500.
+**Error 400:** `{"data": null, "error": {"code": "NO_FILES", "message": "Upload a CSV file before asking questions"}}`
+**Error 404:** Session not found.
 
 ---
 
-### `GET /sessions/{session_id}/messages`
+### GET /sessions/{session_id}/messages
 
-**Purpose:** Retrieve the full conversation history for a session in chronological order.
-
-**Request:** No body. No query parameters in Phase 1.
+Get full conversation history for the session.
 
 **Response 200:**
 ```json
@@ -168,18 +117,18 @@ All timestamps are ISO 8601 UTC strings.
   "data": {
     "messages": [
       {
-        "message_id": "aaa85f64-5717-4562-b3fc-2c963f66afa6",
+        "message_id": "uuid-1",
         "role": "user",
-        "content": "Show me a bar chart of revenue by region",
+        "content": "Show me revenue by region",
         "chart_json": null,
-        "created_at": "2026-06-29T12:04:55Z"
+        "created_at": "2026-06-29T12:01:00Z"
       },
       {
-        "message_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "message_id": "uuid-2",
         "role": "assistant",
-        "content": "Revenue by region shows the West leading at $2.1M...",
+        "content": "Revenue by region shows the West leading...",
         "chart_json": {"data": [...], "layout": {...}},
-        "created_at": "2026-06-29T12:05:00Z"
+        "created_at": "2026-06-29T12:01:05Z"
       }
     ]
   },
@@ -187,62 +136,36 @@ All timestamps are ISO 8601 UTC strings.
 }
 ```
 
-**Error cases:**
-
-| Status | Code | Condition |
-|--------|------|-----------|
-| 404 | SESSION_NOT_FOUND | session_id does not exist |
-
 ---
 
-### `DELETE /sessions/{session_id}`
+### DELETE /sessions/{session_id}
 
-**Purpose:** Delete a session and all associated data: messages, uploaded file records, and temp CSV files from disk.
-
-**Request:** No body.
+Delete session, all messages, and all uploaded temp files from disk.
 
 **Response 200:**
 ```json
-{
-  "data": {"deleted": true},
-  "error": null
-}
+{"data": {"deleted": true}, "error": null}
 ```
-
-**Error cases:**
-
-| Status | Code | Condition |
-|--------|------|-----------|
-| 404 | SESSION_NOT_FOUND | session_id does not exist |
 
 ---
 
-### `GET /app/*` (Static Frontend)
+### GET /health
 
-**Purpose:** Serve the built Next.js static export from `frontend/out/`. FastAPI mounts this via `StaticFiles`.
+Health check.
 
-**Response:** HTML/CSS/JS files. Returns 404 if the frontend has not been built yet.
+**Response 200:**
+```json
+{"data": {"status": "ok"}, "error": null}
+```
 
 ---
 
 ## Authentication
 
-No authentication in Phase 1. Session IDs are UUID v4 values (128-bit random) which act as opaque access tokens — sufficiently unguessable for a single-user personal tool. All session data is ephemeral and session-scoped.
+No authentication in Phase 1. Session IDs are UUID v4 (unguessable). All data is ephemeral.
 
 ---
 
-## Error Envelope
+## Static Frontend
 
-All errors use this shape:
-
-```json
-{
-  "data": null,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable description of the problem"
-  }
-}
-```
-
-Error codes are SCREAMING_SNAKE_CASE strings. The `message` field is safe to display to the user.
+`GET /app/*` serves the Next.js static export (frontend/out/) via FastAPI StaticFiles. Returns 404 if frontend not built. Frontend is built with `cd frontend && pnpm build` before starting the server.

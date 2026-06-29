@@ -10,8 +10,8 @@
 
 | Node | Provider | Model ID | Rationale |
 |------|----------|----------|-----------|
-| plan_and_code | Gemini | gemini-2.0-flash | Cost-efficient code generation from schema+stats |
-| format_response | Gemini | gemini-2.0-flash | Prose formatting of execution result |
+| plan_and_code | Gemini | gemini-3.1-pro | Cost-efficient code generation from schema+stats |
+| format_response | Gemini | gemini-3.1-pro | Prose formatting of execution result |
 | profile_data | none | — | Pure pandas computation, zero LLM calls |
 | execute_code | none | — | Sandboxed exec(), zero LLM calls |
 
@@ -57,9 +57,9 @@ class AgentState(TypedDict, total=False):
 - NO LLM call
 
 ### plan_and_code(state: AgentState) → AgentState
-- Loads conversation history from SQLite (last 10 turns for session_id)
+- Loads conversation history from SQLite (last 20 messages for session_id)
 - Builds prompt: system instruction + schema (col names + dtypes, NO raw rows) + stats + history + question
-- Calls Gemini gemini-2.0-flash to generate pandas code (stores answer in `result`, optional chart in `fig`)
+- Calls Gemini gemini-3.1-pro to generate pandas code (stores answer in `result`, optional chart in `fig`)
 - Sets `generated_code` in returned state
 - On Gemini error: sets `error`
 
@@ -71,7 +71,7 @@ class AgentState(TypedDict, total=False):
 - Timeout: 30 seconds
 
 ### format_response(state: AgentState) → AgentState
-- Calls Gemini gemini-2.0-flash with `execution_result` + `current_question`
+- Calls Gemini gemini-3.1-pro with `execution_result` + `current_question`
 - Returns plain prose answer for a non-technical reader
 - Sets `answer`
 
@@ -129,7 +129,7 @@ def run_question(session_id: str, question: str, uploaded_files: list[dict]) -> 
 ## Memory Strategy
 
 - Within a session: conversation history in SQLite `messages` table
-- Each Q&A turn loads last 10 messages from DB for LLM prompt context
+- Each Q&A turn loads last 20 messages from DB for LLM prompt context (10 user + 10 assistant)
 - No cross-session memory; all data deleted on session end
 - AgentState is ephemeral per invocation — no LangGraph checkpointing in Phase 1
 

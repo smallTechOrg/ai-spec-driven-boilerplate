@@ -1,9 +1,10 @@
-import type { NextConfig } from 'next'
+import type { NextConfig } from "next";
 
-const config: NextConfig = {
-  output: 'export',
-  basePath: '/app',
+const nextConfig: NextConfig = {
+  output: "export",
   trailingSlash: true,
-}
+  basePath: "/app",
+  images: { unoptimized: true },
+};
 
-export default config
+export default nextConfig;

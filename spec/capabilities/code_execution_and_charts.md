@@ -2,40 +2,14 @@
 
 ## What It Does
 
-The agent executes LLM-generated Python/pandas code in a restricted server-side sandbox and captures the result (a scalar value, a summary string, or a Plotly figure). The result is passed to the response-formatting step which writes the prose answer. If a Plotly figure was produced, its JSON spec is returned to the frontend and rendered as an interactive chart.
+Executes LLM-generated Python/pandas code in a sandboxed exec() on the server. Captures result value and optional Plotly figure. Returns Plotly JSON to frontend for interactive rendering.
 
-## Inputs
+## Execution Sandbox
 
-| Input | Type | Source | Required |
-|-------|------|---------|----------|
-| Generated Python code | string | Output of LLM code-generation step | Yes |
-| Loaded DataFrames | dict of `{filename_stem: pd.DataFrame}` | Files loaded from session temp directory | Yes |
-
-## Outputs
-
-| Output | Type | Destination |
-|--------|------|-------------|
-| Result value | string (str/repr of `result` variable) | Passed to response-formatting step as context |
-| Plotly chart spec | JSON dict (from `fig.to_json()`) or null | `chart_json` field in API response |
-| Execution error message | string or null | Passed to error-handling step if exec() raises |
-
-## External Calls
-
-| System | Operation | On Failure |
-|--------|-----------|------------|
-| Python exec() sandbox | Execute generated code in restricted namespace | Catch exception; return error message to user |
-
-No LLM call is made in this step.
-
-## Business Rules
-
-### Sandbox Namespace
-
-The exec() call runs with exactly this namespace — nothing else:
-
+exec() restricted namespace:
 ```python
 {
-    "dfs": {filename_stem: pd.DataFrame, ...},
+    "dfs": {filename_stem: pd.DataFrame, ...},  # all uploaded DataFrames
     "pd": pandas,
     "np": numpy,
     "go": plotly.graph_objects,
@@ -43,45 +17,39 @@ The exec() call runs with exactly this namespace — nothing else:
 }
 ```
 
-No `__builtins__` beyond the minimal set; no `import`, `open`, `os`, `sys`, `subprocess` accessible.
+No filesystem access, no network, no imports beyond pre-loaded modules. Timeout: 30 seconds.
 
-### Result Capture
+## Result Capture
 
-After exec(), the sandbox namespace is inspected for:
-- `result`: any value — converted to string via `str(result)` or `repr(result)` (max 2000 chars, truncated with notice if longer)
-- `fig`: a Plotly Figure object — serialised to JSON via `fig.to_json()` and parsed to dict
+After exec(), inspect namespace for:
+- `result`: any value → `str(result)` or `repr(result)`
+- `fig`: Plotly Figure → `json.loads(fig.to_json())`
 
-Both may be present simultaneously (e.g. a chart plus a printed summary).
+## Chart Rendering
 
-### Chart Rendering Contract
+Frontend renders Plotly JSON with react-plotly.js:
+- Full-width, 350px height
+- Interactive: zoom, pan, hover tooltips
+- Never PNG images — always Plotly JSON spec
 
-- Charts are returned as Plotly JSON specs in the `chart_json` response field
-- The frontend renders them with react-plotly.js at full width, 350 px height
-- Interactive: zoom, pan, hover tooltips enabled
-- No PNG or static images — always Plotly JSON
+## Privacy
 
-### Execution Timeout
-
-Execution is killed after 30 seconds. A timeout error message is returned to the user.
-
-### Privacy
-
-The exec() sandbox has access to full DataFrames (required for pandas operations). However, only `str(result)` — a summary value — is passed to the LLM for prose formatting; the LLM never receives the raw DataFrame contents.
+exec() sandbox has full DataFrame access (needed for pandas ops). `format_response` node receives only `str(result)` — not raw rows.
 
 ## Error Handling
 
-| Error Type | Handling |
-|-----------|----------|
-| SyntaxError in generated code | Caught; user-friendly message returned |
-| Runtime exception (KeyError, ValueError, etc.) | Caught; error type + message returned |
-| Execution timeout (> 30 s) | Process killed; timeout message returned |
-| `fig` is not a valid Plotly Figure | Ignored; `chart_json` set to null |
+- SyntaxError: caught, error message to user
+- Runtime exception: caught, traceback summary to user
+- Timeout > 30s: killed, timeout message to user
+- Phase 3: retry with error-corrected code
 
-## Success Criteria
+## Phase
 
-- [ ] Ask "show me a bar chart of sales by region" → a Plotly bar chart appears in the chat UI; zoom and hover work in the browser
-- [ ] Ask "what is the average revenue?" → prose answer contains the numeric value; `chart_json` is null
-- [ ] LLM generates code with a SyntaxError → server returns a user-facing error message; HTTP status is 200 (not 500)
-- [ ] Execution sandbox: attempting `import os` in generated code raises an error caught by the sandbox; server does not expose filesystem
-- [ ] Execution taking > 30 seconds is killed and a timeout message is returned within 31 seconds
-- [ ] `result` string longer than 2000 characters is truncated with a notice before being passed to the LLM
+Phase 1 (real).
+
+## Acceptance Criteria
+
+- [ ] "Show me a bar chart of sales by region" → interactive Plotly bar chart in chat
+- [ ] "What is the average revenue?" → text answer with numeric value, no chart
+- [ ] Malformed generated code → error message, app does not crash
+- [ ] Sandbox cannot import os, sys, subprocess

@@ -1,53 +1,65 @@
 """DB layer tests — no LLM key required."""
 from sqlalchemy.orm import Session
-from db.models import RunRow
+from db.models import SessionRow, UploadedFileRow, MessageRow
 import db.session as session_module
 
 
-def test_run_row_roundtrip(_isolated_db):
+def test_session_row_roundtrip(_isolated_db):
     with Session(_isolated_db) as s:
-        run = RunRow(input_text="hello world")
-        s.add(run)
+        row = SessionRow()
+        s.add(row)
         s.commit()
-        run_id = run.id
+        sid = row.id
 
     with Session(_isolated_db) as s:
-        fetched = s.get(RunRow, run_id)
+        fetched = s.get(SessionRow, sid)
         assert fetched is not None
-        assert fetched.input_text == "hello world"
-        assert fetched.status == "pending"
-        assert fetched.output_text is None
+        assert fetched.id == sid
+        assert fetched.created_at is not None
+        assert fetched.expires_at is not None
 
 
-def test_run_row_status_update(_isolated_db):
+def test_uploaded_file_row_roundtrip(_isolated_db):
     with Session(_isolated_db) as s:
-        run = RunRow(input_text="test")
-        s.add(run)
+        sess = SessionRow()
+        s.add(sess)
         s.commit()
-        run_id = run.id
+        sid = sess.id
 
     with Session(_isolated_db) as s:
-        run = s.get(RunRow, run_id)
-        run.status = "completed"
-        run.output_text = "some output"
+        f = UploadedFileRow(
+            session_id=sid,
+            filename="test.csv",
+            temp_path="/tmp/test.csv",
+            profile_json='{"row_count": 10}',
+        )
+        s.add(f)
         s.commit()
+        fid = f.id
 
     with Session(_isolated_db) as s:
-        run = s.get(RunRow, run_id)
-        assert run.status == "completed"
-        assert run.output_text == "some output"
+        fetched = s.get(UploadedFileRow, fid)
+        assert fetched is not None
+        assert fetched.filename == "test.csv"
+        assert fetched.session_id == sid
 
 
-def test_multiple_runs_independent(_isolated_db):
-    ids = []
+def test_message_row_roundtrip(_isolated_db):
     with Session(_isolated_db) as s:
-        for i in range(3):
-            run = RunRow(input_text=f"input {i}")
-            s.add(run)
+        sess = SessionRow()
+        s.add(sess)
         s.commit()
-        # fetch all
-        runs = s.query(RunRow).all()
-        ids = [r.id for r in runs]
+        sid = sess.id
 
-    assert len(ids) == 3
-    assert len(set(ids)) == 3  # all unique
+    with Session(_isolated_db) as s:
+        msg = MessageRow(session_id=sid, role="user", content="hello")
+        s.add(msg)
+        s.commit()
+        mid = msg.id
+
+    with Session(_isolated_db) as s:
+        fetched = s.get(MessageRow, mid)
+        assert fetched is not None
+        assert fetched.role == "user"
+        assert fetched.content == "hello"
+        assert fetched.chart_json is None

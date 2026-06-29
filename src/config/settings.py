@@ -1,3 +1,6 @@
+import tempfile
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -20,6 +23,13 @@ class Settings(BaseSettings):
     # Provider keys — set exactly one
     anthropic_api_key: str = Field(default="")
     gemini_api_key: str = Field(default="")
+
+    # Temp directory for uploaded files
+    temp_dir: str = Field(default="")
+
+    def get_temp_dir(self) -> Path:
+        base = Path(self.temp_dir) if self.temp_dir else Path(tempfile.gettempdir())
+        return base / "agent_sessions"
 
 
 _settings: Settings | None = None

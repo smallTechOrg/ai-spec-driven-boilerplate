@@ -2,7 +2,7 @@
 
 ## System Overview
 
-The CSV Data Analysis Assistant is a single-server application. The Next.js frontend (static export served at /app) communicates with a FastAPI backend via REST API. The backend runs a LangGraph agent that profiles uploaded CSV files and answers natural-language questions by generating and executing pandas code locally. Gemini (gemini-2.0-flash) is the LLM. SQLite stores session-scoped metadata (sessions, uploaded file references, conversation messages). No data persists after session end.
+The CSV Data Analysis Assistant is a single-server application. The Next.js frontend (static export served at /app) communicates with a FastAPI backend via REST API. The backend runs a LangGraph agent that profiles uploaded CSV files and answers natural-language questions by generating and executing pandas code locally. Gemini (`gemini-3.1-pro`) is the LLM. SQLite stores session-scoped metadata (sessions, uploaded file references, conversation messages). No data persists after session end.
 
 ## Component Map
 

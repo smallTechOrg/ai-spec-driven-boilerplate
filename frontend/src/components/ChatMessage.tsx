@@ -1,5 +1,6 @@
 import { Message } from "@/lib/api";
 import PlotlyChart from "./PlotlyChart";
+import ClarificationBubble from "./ClarificationBubble";
 
 interface Props {
   message: Message;
@@ -7,6 +8,12 @@ interface Props {
 
 export default function ChatMessage({ message }: Props) {
   const isUser = message.role === "user";
+
+  // Render clarification questions with a distinct style
+  if (!isUser && message.action === "clarification") {
+    return <ClarificationBubble message={message} />;
+  }
+
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
       <div

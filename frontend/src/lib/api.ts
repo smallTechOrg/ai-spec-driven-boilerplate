@@ -35,6 +35,7 @@ export interface Message {
   content: string;
   chart_json: Record<string, unknown> | null;
   created_at?: string;
+  action?: string;  // "answer" | "clarification" | "error"
 }
 
 export async function createSession(): Promise<string> {

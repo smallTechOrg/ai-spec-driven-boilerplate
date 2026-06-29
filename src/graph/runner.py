@@ -22,4 +22,8 @@ def run_question(session_id: str, question: str, uploaded_files: list[dict]) -> 
         "uploaded_files": uploaded_files,
     }
     final = qa_graph.invoke(initial)
-    return {"answer": final.get("answer"), "chart_json": final.get("chart_json")}
+    return {
+        "answer": final.get("answer"),
+        "chart_json": final.get("chart_json"),
+        "action": final.get("action", "answer"),
+    }

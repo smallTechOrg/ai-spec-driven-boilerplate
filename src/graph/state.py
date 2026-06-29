@@ -3,7 +3,7 @@ from typing import TypedDict
 
 class AgentState(TypedDict, total=False):
     session_id: str
-    action: str               # "profile" | "answer" | "error"
+    action: str               # "profile" | "answer" | "clarification" | "error"
     uploaded_files: list[dict]  # [{file_id, filename, path, profile_json}]
     current_question: str | None
     generated_code: str | None
@@ -11,3 +11,4 @@ class AgentState(TypedDict, total=False):
     chart_json: dict | None
     answer: str | None
     error: str | None
+    retry_count: int          # Phase 3: reflection retry counter (default 0)

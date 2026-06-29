@@ -105,6 +105,7 @@ def post_message(
         "role": "assistant",
         "content": answer,
         "chart_json": chart_json,
+        "action": result.get("action", "answer"),
     })
 
 

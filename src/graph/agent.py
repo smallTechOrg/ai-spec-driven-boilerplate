@@ -1,8 +1,8 @@
 from langgraph.graph import StateGraph, END
 
 from graph.state import AgentState
-from graph.nodes import profile_data, plan_and_code, execute_code, format_response, handle_error
-from graph.edges import after_plan, after_execute
+from graph.nodes import profile_data, needs_clarification, plan_and_code, execute_code, reflect_and_retry, format_response, handle_error
+from graph.edges import after_clarification, after_plan, after_execute, after_execute_p3
 
 
 def _build_profile_graph():
@@ -15,11 +15,18 @@ def _build_profile_graph():
 
 def _build_qa_graph():
     g = StateGraph(AgentState)
+    g.add_node("needs_clarification", needs_clarification)
     g.add_node("plan_and_code", plan_and_code)
     g.add_node("execute_code", execute_code)
+    g.add_node("reflect_and_retry", reflect_and_retry)
     g.add_node("format_response", format_response)
     g.add_node("handle_error", handle_error)
-    g.set_entry_point("plan_and_code")
+    g.set_entry_point("needs_clarification")
+    g.add_conditional_edges(
+        "needs_clarification",
+        after_clarification,
+        {"plan_and_code": "plan_and_code", END: END},
+    )
     g.add_conditional_edges(
         "plan_and_code",
         after_plan,
@@ -27,9 +34,10 @@ def _build_qa_graph():
     )
     g.add_conditional_edges(
         "execute_code",
-        after_execute,
-        {"format_response": "format_response", "handle_error": "handle_error"},
+        after_execute_p3,
+        {"format_response": "format_response", "reflect_and_retry": "reflect_and_retry", "handle_error": "handle_error"},
     )
+    g.add_edge("reflect_and_retry", "execute_code")
     g.add_edge("format_response", END)
     g.add_edge("handle_error", END)
     return g.compile()

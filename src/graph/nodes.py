@@ -19,6 +19,8 @@ logger = structlog.get_logger()
 
 _CODE_GEN_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "code_gen.md"
 _FORMAT_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "format_response.md"
+_CLARIFY_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "clarify.md"
+_REFLECT_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "reflect.md"
 
 _EXEC_TIMEOUT_SECONDS = 30
 
@@ -150,6 +152,100 @@ def _safe_float(v) -> float | None:
         return round(f, 6)
     except (TypeError, ValueError):
         return None
+
+
+# ---------------------------------------------------------------------------
+# needs_clarification — determine if the question is ambiguous before coding
+# ---------------------------------------------------------------------------
+
+def needs_clarification(state: AgentState) -> AgentState:
+    """Determine if the user's question needs clarification before code generation."""
+    t0 = time.time()
+    session_id = state.get("session_id", "")
+    log = logger.bind(node="needs_clarification", session_id=session_id)
+    log.info("node_enter")
+
+    try:
+        question = state.get("current_question", "")
+        uploaded_files = state.get("uploaded_files", [])
+
+        # Build column list from schema (no raw rows)
+        col_parts = []
+        for f in uploaded_files:
+            fname = f["filename"]
+            stem = Path(fname).stem
+            profile = f.get("profile_json")
+            if isinstance(profile, str):
+                import json as _json
+                profile = _json.loads(profile)
+            if profile:
+                cols = [c["name"] for c in profile.get("columns", [])]
+                col_parts.append(f"DataFrame '{stem}': columns = {cols}")
+
+        schema_summary = "\n".join(col_parts) if col_parts else "No files uploaded."
+
+        # Load conversation history for context
+        history_parts = []
+        try:
+            from db.session import create_db_session
+            from db.models import MessageRow
+            from sqlalchemy import select as sa_select
+            with create_db_session() as db:
+                stmt = (
+                    sa_select(MessageRow)
+                    .where(MessageRow.session_id == session_id)
+                    .order_by(MessageRow.created_at.asc())
+                    .limit(10)
+                )
+                messages = db.execute(stmt).scalars().all()
+                for msg in messages:
+                    history_parts.append(f"{msg.role.upper()}: {msg.content}")
+        except Exception as hist_exc:
+            log.warning("history_load_failed", error=str(hist_exc))
+
+        history_context = "\n".join(history_parts) if history_parts else "(no prior conversation)"
+
+        system_prompt = _load_prompt(_CLARIFY_PROMPT_PATH)
+
+        prompt = f"""Schema (column names only — no raw data):
+{schema_summary}
+
+Recent conversation:
+{history_context}
+
+User question: {question}
+
+Decide: is this question ambiguous given the schema? A question is ambiguous if:
+- It references a vague concept ("trend", "performance", "value") when multiple numeric columns could satisfy it
+- It asks to compare things without specifying which columns to compare
+- It uses pronouns ("it", "that column") that cannot be resolved from conversation history
+
+If AMBIGUOUS: respond with exactly this format:
+CLARIFICATION_NEEDED: <your clarification question, e.g. "I see columns revenue and units — which one should I plot as the trend?">
+
+If CLEAR (can be answered without clarification): respond with exactly:
+PROCEED
+
+Do not add any other text."""
+
+        response = LLMClient().call_model(prompt, system=system_prompt)
+        response = response.strip()
+
+        duration_ms = int((time.time() - t0) * 1000)
+
+        if response.startswith("CLARIFICATION_NEEDED:"):
+            clarification_question = response[len("CLARIFICATION_NEEDED:"):].strip()
+            log.info("node_exit_clarification", duration_ms=duration_ms)
+            return {**state, "action": "clarification", "answer": clarification_question}
+        else:
+            log.info("node_exit_proceed", duration_ms=duration_ms)
+            return {**state}
+
+    except Exception as exc:
+        duration_ms = int((time.time() - t0) * 1000)
+        log.error("node_error", error=str(exc), duration_ms=duration_ms)
+        # On any error in clarification check, proceed normally rather than blocking
+        return {**state}
 
 
 # ---------------------------------------------------------------------------
@@ -444,6 +540,87 @@ def format_response(state: AgentState) -> AgentState:
         duration_ms = int((time.time() - t0) * 1000)
         log.error("node_error", error=str(exc), duration_ms=duration_ms)
         return {**state, "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# reflect_and_retry — reflect on failed code and generate a corrected version
+# ---------------------------------------------------------------------------
+
+def reflect_and_retry(state: AgentState) -> AgentState:
+    """Reflect on failed code and generate a corrected version."""
+    t0 = time.time()
+    session_id = state.get("session_id", "")
+    log = logger.bind(node="reflect_and_retry", session_id=session_id)
+    retry_count = state.get("retry_count", 0)
+    log.info("node_enter", retry_count=retry_count)
+
+    try:
+        question = state.get("current_question", "")
+        failed_code = state.get("generated_code", "")
+        error_msg = state.get("error", "Unknown error")
+        uploaded_files = state.get("uploaded_files", [])
+
+        # Build schema context
+        schema_parts = []
+        for f in uploaded_files:
+            import json as _json
+            fname = f["filename"]
+            stem = Path(fname).stem
+            profile = f.get("profile_json")
+            if isinstance(profile, str):
+                profile = _json.loads(profile)
+            if profile:
+                cols = [f"  - {c['name']} ({c['dtype']})" for c in profile.get("columns", [])]
+                schema_parts.append(f"DataFrame '{stem}':\n" + "\n".join(cols))
+
+        schema_context = "\n".join(schema_parts) if schema_parts else "No schema available."
+        stems = [Path(f["filename"]).stem for f in uploaded_files]
+
+        system_prompt = _load_prompt(_REFLECT_PROMPT_PATH)
+
+        prompt = f"""The user asked: {question}
+
+Available DataFrames in `dfs` dict (keyed by filename stem): {stems}
+
+Schema:
+{schema_context}
+
+The following code was generated but failed with an error:
+
+--- FAILED CODE ---
+{failed_code}
+--- END CODE ---
+
+Error message:
+{error_msg}
+
+Please generate corrected Python code that:
+1. Fixes the error
+2. Still answers the original question
+3. Uses the same conventions: access data via dfs['{stems[0] if stems else "data"}'], store final answer in `result`, optional chart in `fig`
+4. Does NOT use imports — pd, np, go, px are already available
+5. Does NOT print anything
+
+Return ONLY the corrected Python code, no explanation, no markdown fences."""
+
+        corrected_code = LLMClient().call_model(prompt, system=system_prompt)
+        corrected_code = _strip_code_fences(corrected_code)
+
+        duration_ms = int((time.time() - t0) * 1000)
+        log.info("node_exit", duration_ms=duration_ms, new_retry_count=retry_count + 1)
+
+        return {
+            **state,
+            "generated_code": corrected_code,
+            "error": None,
+            "retry_count": retry_count + 1,
+        }
+
+    except Exception as exc:
+        duration_ms = int((time.time() - t0) * 1000)
+        log.error("node_error", error=str(exc), duration_ms=duration_ms)
+        # Reflection itself failed — keep the original error so handle_error sees it
+        return {**state}
 
 
 # ---------------------------------------------------------------------------

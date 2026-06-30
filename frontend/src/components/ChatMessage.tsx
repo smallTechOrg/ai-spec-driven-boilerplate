@@ -1,6 +1,7 @@
 import { Message } from "@/lib/api";
 import PlotlyChart from "./PlotlyChart";
 import ClarificationBubble from "./ClarificationBubble";
+import DataQualityNotice from "./DataQualityNotice";
 
 interface Props {
   message: Message;
@@ -15,18 +16,25 @@ export default function ChatMessage({ message }: Props) {
   }
 
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
-      <div
-        className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-          isUser
-            ? "bg-blue-600 text-white"
-            : "bg-white border border-gray-200 text-gray-800 shadow-sm"
-        }`}
-      >
-        <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-        {!isUser && message.chart_json && (
-          <PlotlyChart chartJson={message.chart_json as Record<string, unknown>} />
-        )}
+    <div className={`flex flex-col ${isUser ? "items-end" : "items-start"} mb-4`}>
+      {/* DataQualityNotice renders ABOVE the answer bubble, only for assistant messages with issues */}
+      {!isUser && message.quality_report?.has_issues && (
+        <DataQualityNotice report={message.quality_report} />
+      )}
+
+      <div className={`flex ${isUser ? "justify-end" : "justify-start"} w-full`}>
+        <div
+          className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+            isUser
+              ? "bg-blue-600 text-white"
+              : "bg-white border border-gray-200 text-gray-800 shadow-sm"
+          }`}
+        >
+          <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+          {!isUser && message.chart_json && (
+            <PlotlyChart chartJson={message.chart_json as Record<string, unknown>} />
+          )}
+        </div>
       </div>
     </div>
   );

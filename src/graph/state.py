@@ -12,3 +12,5 @@ class AgentState(TypedDict, total=False):
     answer: str | None
     error: str | None
     retry_count: int          # Phase 3: reflection retry counter (default 0)
+    quality_report: dict | None  # Phase 4: structured data quality report
+    clean_actions: list[str]     # Phase 4: human-readable list of auto-clean actions taken

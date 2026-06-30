@@ -262,6 +262,199 @@ Do not add any other text."""
 
 
 # ---------------------------------------------------------------------------
+# inspect_quality — deterministic pandas-only data quality check + auto-clean
+# ---------------------------------------------------------------------------
+
+def inspect_quality(state: AgentState) -> AgentState:
+    """Inspect uploaded files for data quality issues and apply safe auto-fixes.
+
+    Purely deterministic — NO LLM call. Runs before plan_and_code.
+    Auto-fixes: duplicate row removal, numeric string coercion.
+    Reports (no fix): missing values, invalid dates, outliers.
+    Overwrites the temp file in place so execute_code reads cleaned data.
+    """
+    t0 = time.time()
+    session_id = state.get("session_id", "")
+    log = logger.bind(node="inspect_quality", session_id=session_id)
+    log.info("node_enter")
+
+    try:
+        files = state.get("uploaded_files", [])
+        if not files:
+            return {**state, "quality_report": {"has_issues": False, "files": [], "clean_actions": []}, "clean_actions": []}
+
+        all_file_reports = []
+        all_clean_actions: list[str] = []
+
+        updated_files = list(files)  # shallow copy; we'll replace entries
+
+        for idx, file_info in enumerate(files):
+            filename = file_info.get("filename", "")
+            file_path = file_info.get("path") or file_info.get("temp_path")
+
+            if not file_path or not Path(file_path).exists():
+                log.warning("file_not_found", filename=filename)
+                continue
+
+            try:
+                if filename.lower().endswith(".xlsx"):
+                    df = pd.read_excel(file_path, engine="openpyxl")
+                else:
+                    df = pd.read_csv(file_path)
+            except Exception as read_exc:
+                log.warning("file_read_failed", filename=filename, error=str(read_exc))
+                continue
+
+            file_issues: list[dict] = []
+            dup_rows_removed = 0
+            file_clean_actions: list[str] = []
+            row_count = len(df)
+
+            # 1. DUPLICATE ROWS
+            dup_count = int(df.duplicated().sum())
+            if dup_count > 0:
+                df = df.drop_duplicates()
+                dup_rows_removed = dup_count
+                msg = f"Removed {dup_count} duplicate rows from '{filename}'"
+                file_clean_actions.append(msg)
+                all_clean_actions.append(msg)
+
+            # 2. MISSING VALUES — report only
+            for col in df.columns:
+                null_count = int(df[col].isna().sum())
+                if null_count > 0 and row_count > 0:
+                    null_pct = round(null_count / row_count * 100, 2)
+                    file_issues.append({
+                        "type": "WARNING",
+                        "category": "missing_values",
+                        "column": col,
+                        "detail": f"{null_count} missing values ({null_pct}%)",
+                    })
+
+            # 3. TYPE MISMATCH — numeric strings: auto-coerce if 100% convertible and >= 3 non-null
+            for col in df.columns:
+                is_str_col = (
+                    pd.api.types.is_string_dtype(df[col])
+                    or pd.api.types.is_object_dtype(df[col])
+                ) and not pd.api.types.is_numeric_dtype(df[col])
+                if is_str_col:
+                    non_null = df[col].dropna()
+                    if len(non_null) >= 3:
+                        coerced = pd.to_numeric(non_null, errors="coerce")
+                        if coerced.notna().all():
+                            df[col] = pd.to_numeric(df[col], errors="coerce")
+                            msg = f"Coerced column '{col}' in '{filename}' from text to numeric"
+                            file_clean_actions.append(msg)
+                            all_clean_actions.append(msg)
+                            file_issues.append({
+                                "type": "INFO",
+                                "category": "type_mismatch",
+                                "column": col,
+                                "detail": "Stored as text but all values are numeric — coerced automatically",
+                            })
+
+            # 4. INVALID DATES — report only (no auto-fix)
+            date_keywords = ["date", "time", "dt", "_at", "_on"]
+            for col in df.columns:
+                is_str_col = (
+                    pd.api.types.is_string_dtype(df[col])
+                    or pd.api.types.is_object_dtype(df[col])
+                ) and not pd.api.types.is_numeric_dtype(df[col])
+                if is_str_col:
+                    col_lower = col.lower()
+                    if any(kw in col_lower for kw in date_keywords):
+                        non_null = df[col].dropna()
+                        if len(non_null) > 0:
+                            try:
+                                parsed = pd.to_datetime(non_null, errors="coerce")
+                                nat_count = int(parsed.isna().sum())
+                                if nat_count > 0:
+                                    file_issues.append({
+                                        "type": "WARNING",
+                                        "category": "invalid_dates",
+                                        "column": col,
+                                        "detail": f"{nat_count} values could not be parsed as dates",
+                                    })
+                            except Exception:
+                                pass
+
+            # 5. OUTLIERS — IQR (Tukey) method: robust against extreme skew, report only (no auto-fix)
+            for col in df.columns:
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    col_data = df[col].dropna()
+                    if len(col_data) >= 4:
+                        q1 = col_data.quantile(0.25)
+                        q3 = col_data.quantile(0.75)
+                        iqr = q3 - q1
+                        if iqr > 0:
+                            lower_fence = q1 - 1.5 * iqr
+                            upper_fence = q3 + 1.5 * iqr
+                            outlier_count = int(
+                                ((col_data < lower_fence) | (col_data > upper_fence)).sum()
+                            )
+                            if outlier_count > 0:
+                                file_issues.append({
+                                    "type": "INFO",
+                                    "category": "outliers",
+                                    "column": col,
+                                    "detail": f"{outlier_count} values beyond 1.5x IQR (potential outliers)",
+                                })
+
+            # Write cleaned DataFrame back to same path (overwrite)
+            try:
+                if filename.lower().endswith(".xlsx"):
+                    df.to_excel(file_path, index=False, engine="openpyxl")
+                else:
+                    df.to_csv(file_path, index=False)
+            except Exception as write_exc:
+                log.warning("file_write_failed", filename=filename, error=str(write_exc))
+
+            # Update the file entry (path unchanged, but record clean actions)
+            updated_files[idx] = {**file_info}
+
+            has_file_issues = len(file_issues) > 0 or dup_rows_removed > 0
+            all_file_reports.append({
+                "filename": filename,
+                "issues": file_issues,
+                "duplicate_rows_removed": dup_rows_removed,
+            })
+
+        has_issues = len(all_clean_actions) > 0 or any(
+            r["issues"] for r in all_file_reports
+        )
+
+        if not has_issues and not all_file_reports:
+            quality_report = {"has_issues": False, "files": [], "clean_actions": []}
+        else:
+            quality_report = {
+                "has_issues": has_issues,
+                "files": all_file_reports,
+                "clean_actions": all_clean_actions,
+            }
+
+        duration_ms = int((time.time() - t0) * 1000)
+        log.info(
+            "node_exit",
+            duration_ms=duration_ms,
+            has_issues=has_issues,
+            clean_actions_count=len(all_clean_actions),
+        )
+
+        return {
+            **state,
+            "uploaded_files": updated_files,
+            "quality_report": quality_report,
+            "clean_actions": all_clean_actions,
+        }
+
+    except Exception as exc:
+        duration_ms = int((time.time() - t0) * 1000)
+        log.error("node_error", error=str(exc), duration_ms=duration_ms)
+        # Graceful degradation: return state unchanged so Q&A can still proceed
+        return {**state}
+
+
+# ---------------------------------------------------------------------------
 # plan_and_code — calls Gemini to generate pandas code
 # ---------------------------------------------------------------------------
 
@@ -316,6 +509,17 @@ def plan_and_code(state: AgentState) -> AgentState:
                     schema_parts.append(f"    - {cname} ({dtype}): nulls={null_count} ({null_pct}%)")
 
         schema_context = "\n".join(schema_parts)
+
+        # Append clean_actions note if any auto-cleaning was applied
+        clean_actions = state.get("clean_actions") or []
+        if clean_actions:
+            clean_note_lines = [
+                "",
+                "Note: The following data cleaning was applied automatically before this query:",
+            ]
+            for action in clean_actions:
+                clean_note_lines.append(f"- {action}")
+            schema_context += "\n" + "\n".join(clean_note_lines)
 
         # Conversation history from DB (last 20 messages)
         history_parts = []

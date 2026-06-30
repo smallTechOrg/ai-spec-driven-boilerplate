@@ -130,3 +130,33 @@ Non-technical users cannot query CSV data without writing SQL or Python. Existin
   3. Ask: "Show me the trend." — expect agent responds: "I see columns val1 and val2 — which one should I plot as the trend?"
   4. Reply with "val1" — expect a Plotly line chart.
   5. Ask a malformed analytical question — expect the agent to retry and return a corrected answer, or surface a clear human-readable error (not a raw traceback).
+
+---
+
+### Phase 4 — Automatic Data Quality Inspection + Auto-Clean
+
+- **Goal:** Before answering any question, automatically inspect uploaded data for quality issues (missing values, duplicates, type mismatches, invalid dates, outliers). Apply safe auto-fixes (drop exact duplicates; coerce fully-numeric string columns). Surface a collapsible amber "Data quality notice" to the user showing issues found and actions taken, so `plan_and_code` always operates on cleaner data.
+
+- **Independent slices (parallel build units):**
+  - `slice-a` (backend): New `inspect_quality` node in `src/graph/nodes.py`; update graph wiring in `src/graph/agent.py` + `src/graph/edges.py` to insert `inspect_quality` between `needs_clarification` and `plan_and_code`; add `quality_report: dict | None` and `clean_actions: list[str]` fields to `AgentState` in `src/graph/state.py`; update `plan_and_code` node to operate on cleaned DataFrames stored in state; update `src/api/messages.py` response to include `quality_report` field in the message response payload; integration tests in `tests/integration/test_quality.py` covering: no issues on clean data, duplicate removal, numeric coercion, invalid date detection, outlier reporting, privacy constraint (no raw row values in report), and a 50 000-row dataset where sampled and full-data answers are observably different. No dependency on slice-b.
+  - `slice-b` (frontend): `DataQualityNotice` component — collapsible amber panel listing quality issues and auto-clean actions; wire into `ChatMessage.tsx` to render when `quality_report` is non-null on the message; update `Message` interface in `frontend/src/lib/api.ts` to include optional `quality_report` field; E2E tests in `tests/e2e/phase4_quality.spec.ts` covering: dirty CSV upload → answer with panel visible → collapse/expand → clean CSV upload → answer with no panel. No dependency on slice-a at build time; calls the API at runtime.
+
+- **Key surfaces / files:**
+  - slice-a: `src/graph/nodes.py`, `src/graph/agent.py`, `src/graph/edges.py`, `src/graph/state.py`, `src/api/messages.py`, `tests/integration/test_quality.py`
+  - slice-b: `frontend/src/components/DataQualityNotice.tsx`, `frontend/src/components/ChatMessage.tsx`, `frontend/src/lib/api.ts`, `tests/e2e/phase4_quality.spec.ts`
+
+- **Gate command:**
+  ```
+  uv run pytest tests/integration/test_quality.py -v && cd frontend && pnpm build && cd .. && uv run python -m src & sleep 5 && npx playwright test tests/e2e/phase4_quality.spec.ts --reporter=line
+  ```
+
+- **How the user tests it:**
+  1. Start server: `uv run python -m src`, open `http://localhost:8001/app/`.
+  2. Upload a CSV that has: at least 2 duplicate rows, one string column whose values are all numbers (e.g. `"123"`, `"456"`), one column with >20% nulls, and one numeric column with an extreme outlier (e.g. revenue = 999999999 while mean is ~5000).
+  3. Ask any question (e.g. "What is the average revenue?").
+  4. Expect: above the answer, a collapsible amber "Data quality notice" panel appears listing all detected issues (e.g. "2 duplicate rows detected — removed automatically", "Column 'price' appears numeric but is stored as text — coerced to float", "Column 'revenue' has 3 outliers beyond 3 standard deviations — review recommended").
+  5. Click the panel header to collapse it — it folds up; click again to expand.
+  6. Expect: the answer itself uses the cleaned data (deduped, type-coerced).
+  7. Upload a clean CSV with no issues — ask a question — expect no quality notice panel appears at all.
+  - **Real on tested path:** `inspect_quality` node runs on every Q&A, auto-cleans duplicates and numeric-string coercions, passes cleaned DataFrames to `plan_and_code`, `quality_report` returned in API response, `DataQualityNotice` component rendered when present.
+  - **Labelled stubs:** none — this is a fully real feature on every Q&A path.

@@ -26,4 +26,6 @@ def run_question(session_id: str, question: str, uploaded_files: list[dict]) -> 
         "answer": final.get("answer"),
         "chart_json": final.get("chart_json"),
         "action": final.get("action", "answer"),
+        "quality_report": final.get("quality_report"),
+        "clean_actions": final.get("clean_actions", []),
     }

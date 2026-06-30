@@ -106,6 +106,7 @@ def post_message(
         "content": answer,
         "chart_json": chart_json,
         "action": result.get("action", "answer"),
+        "quality_report": result.get("quality_report"),
     })
 
 

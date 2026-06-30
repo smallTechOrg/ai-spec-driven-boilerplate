@@ -29,6 +29,25 @@ export interface UploadedFile {
   profile: FileProfile;
 }
 
+export interface QualityIssue {
+  type: "WARNING" | "INFO" | "ERROR";
+  category: "missing_values" | "type_mismatch" | "invalid_dates" | "outliers" | "duplicates";
+  column: string | null;
+  detail: string;
+}
+
+export interface QualityFileReport {
+  filename: string;
+  issues: QualityIssue[];
+  duplicate_rows_removed: number;
+}
+
+export interface QualityReport {
+  has_issues: boolean;
+  files: QualityFileReport[];
+  clean_actions: string[];
+}
+
 export interface Message {
   message_id: string;
   role: "user" | "assistant";
@@ -36,6 +55,7 @@ export interface Message {
   chart_json: Record<string, unknown> | null;
   created_at?: string;
   action?: string;  // "answer" | "clarification" | "error"
+  quality_report?: QualityReport | null;
 }
 
 export async function createSession(): Promise<string> {

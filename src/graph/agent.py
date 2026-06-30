@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph, END
 
 from graph.state import AgentState
-from graph.nodes import profile_data, needs_clarification, plan_and_code, execute_code, reflect_and_retry, format_response, handle_error
+from graph.nodes import profile_data, needs_clarification, inspect_quality, plan_and_code, execute_code, reflect_and_retry, format_response, handle_error
 from graph.edges import after_clarification, after_plan, after_execute, after_execute_p3
 
 
@@ -16,6 +16,7 @@ def _build_profile_graph():
 def _build_qa_graph():
     g = StateGraph(AgentState)
     g.add_node("needs_clarification", needs_clarification)
+    g.add_node("inspect_quality", inspect_quality)
     g.add_node("plan_and_code", plan_and_code)
     g.add_node("execute_code", execute_code)
     g.add_node("reflect_and_retry", reflect_and_retry)
@@ -25,8 +26,9 @@ def _build_qa_graph():
     g.add_conditional_edges(
         "needs_clarification",
         after_clarification,
-        {"plan_and_code": "plan_and_code", END: END},
+        {"inspect_quality": "inspect_quality", END: END},
     )
+    g.add_edge("inspect_quality", "plan_and_code")
     g.add_conditional_edges(
         "plan_and_code",
         after_plan,

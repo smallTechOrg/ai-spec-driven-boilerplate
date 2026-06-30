@@ -4,9 +4,14 @@ from graph.state import AgentState
 
 
 def after_clarification(state: AgentState) -> str:
+    """Phase 4 edge: routes to inspect_quality before plan_and_code."""
     if state.get("action") == "clarification":
         return END
-    return "plan_and_code"
+    return "inspect_quality"
+
+
+# Alias for explicitness — used interchangeably with after_clarification in Phase 4+
+after_clarification_p4 = after_clarification
 
 
 def after_plan(state: AgentState) -> str:

@@ -94,6 +94,20 @@ Send a natural-language question. Runs Q&A pipeline (LangGraph). Returns assista
     "chart_json": {
       "data": [{"type": "bar", "x": ["West", "East", "North", "South"], "y": [2100000, 1800000, 1100000, 900000]}],
       "layout": {"title": "Revenue by Region"}
+    },
+    "quality_report": {
+      "has_issues": true,
+      "issues": [
+        {"type": "duplicates",       "message": "2 exact duplicate rows detected — removed automatically"},
+        {"type": "missing_values",   "column": "revenue", "message": "Column 'revenue': 47 missing values (23.5%)"},
+        {"type": "numeric_coercion", "column": "price",   "message": "Column 'price' appears numeric but is stored as text — coerced to float automatically"},
+        {"type": "invalid_dates",    "column": "order_date", "message": "Column 'order_date': 5 values could not be parsed as dates"},
+        {"type": "outliers",         "column": "revenue", "message": "Column 'revenue': 3 values beyond 3 standard deviations (review recommended)"}
+      ],
+      "auto_fixed": [
+        "Removed 2 duplicate rows",
+        "Coerced column 'price' from object to float64"
+      ]
     }
   },
   "error": null
@@ -101,6 +115,7 @@ Send a natural-language question. Runs Q&A pipeline (LangGraph). Returns assista
 ```
 
 `chart_json` is `null` when no chart was generated.
+`quality_report` is `null` when no quality issues were detected in the uploaded data. Added in Phase 4. The field contains only column names, counts, and statistics — never raw cell values.
 
 **Error 400:** `{"data": null, "error": {"code": "NO_FILES", "message": "Upload a CSV file before asking questions"}}`
 **Error 404:** Session not found.
@@ -128,6 +143,7 @@ Get full conversation history for the session.
         "role": "assistant",
         "content": "Revenue by region shows the West leading...",
         "chart_json": {"data": [...], "layout": {...}},
+        "quality_report": null,
         "created_at": "2026-06-29T12:01:05Z"
       }
     ]

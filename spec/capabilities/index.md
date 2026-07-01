@@ -20,6 +20,7 @@ A capability is a single, discrete action or behavior the agent performs. Exampl
 | Conversational Q&A | 1 | [conversational_qa.md](conversational_qa.md) |
 | Code Execution and Interactive Charts | 1 | [code_execution_and_charts.md](code_execution_and_charts.md) |
 | Multi-File Analysis | 2 | [multi_file_analysis.md](multi_file_analysis.md) |
+| Automatic Data Quality Inspection + Auto-Clean | 4 | [data_quality.md](data_quality.md) |
 
 ## How to Add a New Capability
 

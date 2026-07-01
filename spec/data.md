@@ -44,6 +44,7 @@ class MessageRow(Base):
     role: Mapped[str] = mapped_column(Text, nullable=False)  # "user" | "assistant"
     content: Mapped[str] = mapped_column(Text, nullable=False)
     chart_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # Plotly JSON string or NULL
+    quality_report: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON blob from inspect_quality or NULL (Phase 4)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, default=_now)
 ```
 
@@ -76,3 +77,5 @@ Managed by Alembic. `alembic/env.py` sets `target_metadata = Base.metadata`. The
 Initial migration: `uv run alembic revision --autogenerate -m "initial"`
 Apply: `uv run alembic upgrade head`
 Verify: `uv run alembic current` (must show a revision hash, not blank)
+
+Phase 4 adds `quality_report` column to `messages`. Migration: `uv run alembic revision --autogenerate -m "add_quality_report_to_messages"` then `uv run alembic upgrade head`. The column is nullable so existing rows are unaffected.

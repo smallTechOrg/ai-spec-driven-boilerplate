@@ -2,8 +2,15 @@ from typing import TypedDict
 
 
 class AgentState(TypedDict, total=False):
-    run_id: str
-    input_text: str
-    output_text: str
+    session_id: str
+    action: str               # "profile" | "answer" | "clarification" | "error"
+    uploaded_files: list[dict]  # [{file_id, filename, path, profile_json}]
+    current_question: str | None
+    generated_code: str | None
+    execution_result: str | None
+    chart_json: dict | None
+    answer: str | None
     error: str | None
-    messages: list          # [{role: "user"|"assistant", content: str}, ...] — chat-turn history
+    retry_count: int          # Phase 3: reflection retry counter (default 0)
+    quality_report: dict | None  # Phase 4: structured data quality report
+    clean_actions: list[str]     # Phase 4: human-readable list of auto-clean actions taken

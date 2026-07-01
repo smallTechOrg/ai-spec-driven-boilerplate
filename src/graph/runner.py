@@ -1,25 +1,31 @@
-from graph.agent import agentic_ai
+from graph.agent import profile_graph, qa_graph
 from graph.state import AgentState
-from db.session import create_db_session, init_db
-from db.models import RunRow
 
 
-def run_agent(input_text: str) -> str:
-    init_db()
+def run_profile(session_id: str, file_id: str, filename: str, file_path: str) -> dict:
+    """Profile a freshly uploaded file. Returns profile dict."""
+    initial: AgentState = {
+        "session_id": session_id,
+        "action": "profile",
+        "uploaded_files": [{"file_id": file_id, "filename": filename, "path": file_path}],
+    }
+    final = profile_graph.invoke(initial)
+    return final["uploaded_files"][0]["profile_json"]
 
-    with create_db_session() as session:
-        run = RunRow(input_text=input_text)
-        session.add(run)
-        session.flush()
-        run_id = run.id
 
-    initial: AgentState = {"run_id": run_id, "input_text": input_text, "error": None}
-    final = agentic_ai.invoke(initial)
-
-    with create_db_session() as session:
-        run = session.get(RunRow, run_id)
-        run.status = final.get("status", "completed")
-        run.output_text = final.get("output_text")
-        run.error_message = final.get("error")
-
-    return run_id
+def run_question(session_id: str, question: str, uploaded_files: list[dict]) -> dict:
+    """Answer a natural-language question. Returns {answer, chart_json}."""
+    initial: AgentState = {
+        "session_id": session_id,
+        "action": "answer",
+        "current_question": question,
+        "uploaded_files": uploaded_files,
+    }
+    final = qa_graph.invoke(initial)
+    return {
+        "answer": final.get("answer"),
+        "chart_json": final.get("chart_json"),
+        "action": final.get("action", "answer"),
+        "quality_report": final.get("quality_report"),
+        "clean_actions": final.get("clean_actions", []),
+    }
